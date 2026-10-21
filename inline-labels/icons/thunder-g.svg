@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
+  <title id="title">Thunder-G</title>
+  <desc id="desc">A blue bird wrapped around a white envelope, with red, yellow and green feathers.</desc>
+  <defs>
+    <linearGradient id="blue" x1="90" y1="25" x2="280" y2="285" gradientUnits="userSpaceOnUse"><stop stop-color="#4285f4"/><stop offset=".48" stop-color="#1687ed"/><stop offset="1" stop-color="#1258b1"/></linearGradient>
+    <linearGradient id="red" x1="40" y1="55" x2="105" y2="247" gradientUnits="userSpaceOnUse"><stop stop-color="#ff6149"/><stop offset="1" stop-color="#d92322"/></linearGradient>
+    <linearGradient id="yellow" x1="39" y1="126" x2="98" y2="287" gradientUnits="userSpaceOnUse"><stop stop-color="#ffdf45"/><stop offset=".55" stop-color="#fbbc04"/><stop offset="1" stop-color="#e79b00"/></linearGradient>
+    <linearGradient id="green" x1="110" y1="195" x2="206" y2="309" gradientUnits="userSpaceOnUse"><stop stop-color="#70d65c"/><stop offset=".5" stop-color="#34a853"/><stop offset="1" stop-color="#07884e"/></linearGradient>
+    <linearGradient id="paper" x1="121" y1="98" x2="195" y2="222" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".6" stop-color="#e4f3ff"/><stop offset="1" stop-color="#b8dff9"/></linearGradient>
+    <linearGradient id="fold" x1="141" y1="124" x2="170" y2="171" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#e1f1ff"/></linearGradient>
+  </defs>
+  <path fill="url(#blue)" d="M104 103C107 67 127 57 141 54C158 13 228 3 278 39L251 47L282 67L266 68C313 119 304 189 272 237C247 278 207 302 159 300C85 300 30 260 17 204C10 177 9 144 19 107C23 135 35 146 40 151C53 109 62 83 62 46C87 58 96 80 96 110Z"/>
+  <path fill="#95a2ff" d="M104 103C103 77 119 64 139 59C156 18 229 5 278 39C228 10 163 28 145 65C123 69 110 83 104 103Z"/>
+  <path fill="url(#red)" d="M18 109C26 132 36 145 40 150C55 113 66 81 63 47C91 59 100 97 101 126C103 165 117 207 149 239C103 239 63 219 39 190C22 169 17 136 18 109Z"/>
+  <path fill="url(#yellow)" d="M19 108C18 155 29 188 55 213C43 174 53 138 70 123C74 119 79 122 78 129C76 180 91 228 137 261C164 279 190 282 220 280C175 309 118 296 83 273C35 243 12 190 14 146C14 130 16 116 19 108Z"/>
+  <path fill="url(#paper)" d="M89 118C105 94 130 87 151 89C188 88 214 113 217 145C221 177 201 204 174 216C157 224 145 224 145 224C155 240 180 250 198 251C150 263 109 240 91 209C77 185 77 145 89 118Z"/>
+  <path fill="#77b5de" opacity=".27" d="m93 128 48 43c5 5 11 5 16 0l51-46-49 54c-6 7-14 7-20 0Z"/>
+  <path fill="url(#fold)" d="M94 115C108 98 128 91 150 91C174 91 196 104 207 121L157 166C152 171 147 171 142 166Z"/>
+  <path fill="url(#green)" d="M74 177C83 196 101 215 126 229C150 242 176 248 198 248C177 244 154 229 145 211C143 208 145 204 150 205C183 209 211 194 236 171C229 203 206 229 181 240C217 246 254 224 278 198C266 252 221 292 169 298C121 302 89 284 73 255C59 232 57 198 68 179C69 176 72 175 74 177Z"/>
+  <ellipse cx="157" cy="57" rx="9" ry="5.3" fill="#fff" transform="rotate(-19 157 57)"/>
+</svg>

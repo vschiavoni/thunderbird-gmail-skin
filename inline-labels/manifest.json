@@ -1,13 +1,13 @@
 {
   "manifest_version": 2,
-  "name": "Gmail-style Inline Labels",
-  "description": "Gmail-inspired message list, native tag chips, conversation navigation, bulk actions, compact dates, and theme-aware styling.",
+  "name": "Thunder-G",
+  "description": "Gmail-inspired interface for Thunderbird with native tag chips, message previews, quick actions, and conversation styling.",
   "version": "0.7.1",
   "browser_specific_settings": {
     "gecko": {
       "id": "inline-labels@local.gmail-skin",
       "strict_min_version": "153.0",
-      "strict_max_version": "153.*"
+      "strict_max_version": "158.*"
     }
   },
   "background": {
@@ -30,5 +30,10 @@
         "script": "experiments/api.js"
       }
     }
+  },
+  "icons": {
+    "32": "icons/thunder-g-32.png",
+    "64": "icons/thunder-g-64.png",
+    "128": "icons/thunder-g-128.png"
   }
 }

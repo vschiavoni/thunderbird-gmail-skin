@@ -1,6 +1,4 @@
-/* Presentation only. Native header text stays in the accessibility tree;
- * sort buttons, focus outlines, resizing and column picker remain available.
- */
+/* Hide sender/subject titles while retaining sorting, resizing, and accessibility. */
 #threadTree :is(#senderColButton, #subjectColButton) {
   font-size: 0 !important;
   text-shadow: none !important;

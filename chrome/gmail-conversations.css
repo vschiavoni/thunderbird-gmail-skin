@@ -1,0 +1,265 @@
+/* Conversation layout. The email document inside each iframe is left intact. */
+@media (prefers-contrast: no-preference) {
+  :root {
+    color-scheme: light dark;
+    --application-background-color: light-dark(#fff, #202124);
+    --application-foreground-color: light-dark(#202124, #e8eaed);
+    --dull-foreground-color: light-dark(#5f6368, #bdc1c6);
+    --email-address-dull-color: light-dark(#5f6368, #bdc1c6);
+    --border-color: light-dark(#eceff1, #3c4043) !important;
+    --gm-conversation-surface: light-dark(#fff, #202124);
+  }
+  body {
+    background: var(--application-background-color) !important;
+    color: var(--application-foreground-color) !important;
+    font-family: Roboto, Arial, sans-serif !important;
+    font-size:14px !important;
+  }
+  .conversationHeader {
+    background: var(--gm-conversation-surface) !important;
+    color: var(--application-foreground-color) !important;
+    padding: 20px 24px 16px 64px !important;
+    border:0 !important;
+    align-items:center;
+  }
+  .conversationHeaderWrapper { box-shadow:none !important; position:static !important; }
+  .subject, :host(linkified-subject) .subject {
+    font-family:Roboto, Arial, sans-serif !important;
+    font-size:22px !important; font-weight:400 !important;
+    letter-spacing:normal !important;
+    height:auto !important; line-height:1.4 !important;
+  }
+  #messageList { margin-top:0 !important; }
+  .message {
+    background:var(--gm-conversation-surface) !important;
+    border:0 !important; border-bottom:1px solid var(--border-color) !important;
+    border-radius:0 !important; margin:0 !important; padding:12px 16px !important;
+  }
+  .message:focus { box-shadow:none !important; }
+  .message:focus-visible { outline:2px solid Highlight !important; outline-offset:-2px; }
+  .messageHeader {
+    margin:0 !important; padding:4px 0 !important;
+    line-height:1.5 !important; align-items:flex-start; gap:12px;
+    display:grid !important; grid-template-columns:minmax(0, 1fr) auto;
+  }
+  .contactInitials, .contactAvatar {
+    display:inline-flex !important; flex:0 0 32px;
+    width:32px; min-width:32px !important; height:32px;
+    border-radius:50% !important; align-items:center; justify-content:center;
+    font-size:16px !important; line-height:32px !important; text-decoration:none;
+  }
+  .messageHeader > .shrink-box {
+    display:grid !important;
+    grid-template-columns:32px minmax(0, 1fr) 24px !important;
+    grid-template-rows:auto auto !important;
+    column-gap:16px !important; row-gap:2px !important;
+    min-width:0; margin-inline-end:0 !important;
+    align-items:start;
+  }
+  .messageHeader .shrink-box > :is(.contactInitials,.contactAvatar) {
+    grid-column:1 !important; grid-row:1 / span 2 !important;
+  }
+  .messageHeader .shrink-box > .author {
+    grid-column:2 !important; grid-row:1 !important; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; margin:0 !important;
+  }
+  .messageHeader .shrink-box > .star {
+    grid-column:3 !important; grid-row:1 !important; width:24px; height:24px;
+    padding:3px !important; margin:0 !important;
+    border:0; background:none; color:var(--dull-foreground-color);
+  }
+  .messageHeader .shrink-box > :is(.snippet,.to,.bzTo) {
+    grid-column:2 / span 2 !important; grid-row:2 !important;
+    min-width:0; overflow:hidden; text-overflow:ellipsis;
+  }
+  .messageHeader .snippet > ul {
+    display:inline !important; margin:0 8px 0 0 !important; padding:0 !important;
+  }
+  .messageHeader > message-header-options { align-self:start; }
+  .author { font-weight:600 !important; }
+  .snippet { display:block; font-size:13px; line-height:1.5; }
+  .message .messageBody { padding:8px 8px 4px 48px !important; }
+  .messageFooter { padding:12px 8px 8px 48px !important; }
+  .tags li { border-radius:4px !important; padding:0 5px !important; }
+  .actions-button { border-radius:50% !important; }
+  .actions-button:hover { background:light-dark(#e9eef6, #30343b) !important; }
+  :host(contact-label) .contactName { font-family:Roboto, Arial, sans-serif; }
+  :host(message-header-options) .date { font-size:12px; }
+  @media (max-width:560px) {
+    .conversationHeader { padding-inline-start:20px !important; }
+    .message .messageBody, .messageFooter { padding-inline-start:0 !important; }
+  }
+}
+
+/* Expanded headers contain several sibling recipient nodes: keep their native
+   inline flow instead of putting every recipient in the same grid cell. */
+@media (prefers-contrast: no-preference) {
+  .messageHeader.expanded > .shrink-box {
+    display:block !important; position:relative !important;
+    padding-inline:48px 28px !important;
+    text-indent:0 !important; white-space:normal !important;
+    box-sizing:border-box !important;
+    min-block-size:32px;
+  }
+  .messageHeader.expanded .shrink-box > :is(.contactInitials,.contactAvatar) {
+    position:absolute !important; inset-inline-start:0 !important; inset-block-start:0 !important;
+  }
+  .messageHeader.expanded .shrink-box > .author { display:block !important; }
+  .messageHeader.expanded .shrink-box > .star {
+    position:absolute !important; inset-inline-end:0 !important; inset-block-start:0 !important;
+  }
+  .messageHeader.expanded .shrink-box > :is(.to,.bzTo) {
+    display:inline !important; font-size:12px; line-height:1.5;
+    overflow-wrap:anywhere;
+  }
+  :host(conversation-footer) .bottom-links {
+    display:flex; justify-content:flex-end; align-items:center; gap:8px;
+    padding:12px 16px; font-size:0;
+  }
+  :host(conversation-footer) .bottom-links > .link {
+    display:inline-flex; align-items:center; justify-content:center;
+    inline-size:36px; block-size:36px; border-radius:50%;
+    color:var(--dull-foreground-color); cursor:pointer;
+  }
+  :host(conversation-footer) .bottom-links > .link:hover {
+    background:light-dark(#e9eef6,#30343b);
+  }
+  :host(conversation-footer) .bottom-links > .link:focus-visible {
+    outline:2px solid Highlight;
+  }
+  :host(conversation-footer) .bottom-links > .link::before {
+    content:""; display:block; width:20px; height:20px; background:currentColor;
+  }
+  :host(conversation-footer) .forward::before {
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 4l9 8-9 8v-5H3V9h10z'/%3E%3C/svg%3E") center/contain no-repeat;
+  }
+  :host(conversation-footer) .print::before {
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M6 8V3h12v5M6 17H3V9h18v8h-3M6 14h12v7H6z'/%3E%3Cpath d='M17 11h1'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;
+  }
+}
+
+@media (prefers-contrast: no-preference) {
+  .regular-tags > li[color], li[is="message-tag"][color] {
+    display:inline-flex !important; align-items:center; gap:4px;
+    background-color:var(--gm-tag-bg, #e8eaed) !important;
+    color:var(--gm-tag-fg, #202124) !important;
+    font:400 12px/20px Roboto, Arial, sans-serif !important;
+    padding:0 6px !important; border:0 !important; border-radius:6px !important;
+    margin-inline-end:7px !important; vertical-align:middle;
+  }
+  .regular-tags .tag-x {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:16px !important; height:16px; line-height:16px;
+    margin:0 -3px 0 1px !important; padding:0 !important;
+    border:0 !important; border-radius:3px !important;
+    background:transparent !important; color:inherit !important;
+    font-weight:400 !important; opacity:.65;
+  }
+  .regular-tags .tag-x:hover { background:rgb(0 0 0 / .08) !important; opacity:1; }
+  .messageHeader .regular-tags .tag-x { display:none !important; }
+}
+
+@media (prefers-contrast:no-preference) {
+  :host(linkified-subject) {
+    display:flex !important; align-items:center; gap:6px; min-width:0;
+    flex-wrap:wrap;
+  }
+  :host(linkified-subject) .subject { flex:0 1 auto; min-width:0; }
+  .gm-title-tags { display:inline-flex; flex-wrap:wrap; gap:5px; align-items:center; }
+  .gm-title-tags > span {
+    display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; padding:1px 7px !important; border-radius:6px;
+    font:400 12px/20px Roboto,Arial,sans-serif !important;
+    background:var(--gm-tag-bg,#e8eaed); color:var(--gm-tag-fg,#202124);
+  }
+}
+
+/* Expanded-message tags must not share an inline line box with special tags. */
+@media (prefers-contrast:no-preference) {
+  .messageBody > ul.regular-tags {
+    display:flex !important; flex-wrap:wrap; justify-content:flex-start !important;
+    align-items:center; gap:4px; clear:both; float:none !important;
+    margin:0 0 8px !important; padding:0 !important;
+    text-align:start !important; text-indent:0 !important; list-style:none !important;
+  }
+  .messageBody > ul.regular-tags:empty { display:none !important; }
+}
+
+@media (prefers-contrast:no-preference) {
+  /* Keep the expanded header/body transition compact without changing email HTML. */
+  .messageHeader.expanded { padding-block-end:2px !important; }
+  .message .messageBody { padding-block-start:2px !important; }
+  .messageBody > ul.regular-tags:has(> li) {
+    display:flex !important; inline-size:100%; min-block-size:20px;
+    margin:0 0 4px !important; visibility:visible !important;
+  }
+  .messageBody > ul.special-tags:not(:has(> li)) { display:none !important; }
+  .messageBody > .body-container { margin-block:0 !important; padding-block:0 !important; }
+  .messageBody > iframe { margin-block:0 !important; }
+  .messageBody > iframe.hidden { display:none !important; }
+
+  :host(message-header-options) .options {
+    display:inline-flex !important; align-items:center !important;
+    gap:8px !important; white-space:nowrap;
+  }
+  :host(message-header-options) .options > slot[name="date"] {
+    margin-inline:4px 6px !important;
+  }
+  :host(message-header-options) :is(.mainActionButton,.details-hidden,.dropDown) {
+    display:inline-flex !important; align-items:center; justify-content:center;
+  }
+  :host(message-header-options) :is(.details-hidden,.dropDown) > button {
+    display:inline-flex !important; align-items:center; justify-content:center;
+    width:28px; height:28px; padding:5px !important; border-radius:50%;
+  }
+  :host(message-header-options) :is(.details-hidden,.dropDown) > button:hover {
+    background:light-dark(#e9eef6,#30343b) !important;
+  }
+  :host(action-button) button.header {
+    display:inline-flex !important; align-items:center; justify-content:center;
+    width:28px; height:28px; padding:5px !important; border-radius:50%;
+  }
+}
+
+@media (prefers-contrast:no-preference) {
+  .messageHeader.expanded { margin-block-end:0 !important; }
+  .message .messageBody { padding-block-start:0 !important; }
+  .messageBody > ul.regular-tags[expanded]:has(> li) {
+    display:flex !important; height:auto !important; max-height:none !important;
+    opacity:1 !important; overflow:visible !important;
+  }
+}
+
+/* Expanded mail keeps its own labels directly below its recipients. */
+.messageHeader.expanded .gm-message-tags {
+  display:flex !important; flex-wrap:wrap; gap:6px !important;
+  margin:7px 0 8px !important; padding:0 !important;
+}
+.gm-message-tags > span {
+  display:inline-block; padding:1px 8px !important; border-radius:6px !important;
+  font:400 12px/20px Roboto,Arial,sans-serif;
+  background:var(--gm-tag-bg,#e8eaed); color:var(--gm-tag-fg,#202124);
+}
+.messageBody > ul.gm-tags-in-message-header { display:none !important; }
+@media (prefers-contrast:more) {
+  .gm-message-tags > span { background:Canvas; color:CanvasText; border:1px solid CanvasText; }
+}
+
+.gm-message-tags > span { display:inline-flex; align-items:center; gap:5px; }
+.gm-message-tags .gm-remove-message-tag {
+  appearance:none !important; -moz-appearance:none !important;
+  display:inline-flex !important; align-items:center; justify-content:center;
+  min-width:0 !important; min-height:0 !important;
+  width:16px !important; height:16px !important;
+  margin:0 -3px 0 0 !important; padding:0 !important;
+  border:0 !important; border-radius:0 !important;
+  background:none !important; box-shadow:none !important;
+  color:inherit !important; cursor:pointer; opacity:.75;
+}
+.gm-remove-message-tag::before {
+  content:""; width:10px; height:10px; transform:rotate(45deg);
+  background:linear-gradient(currentColor,currentColor) center/100% 1.5px no-repeat,
+             linear-gradient(currentColor,currentColor) center/1.5px 100% no-repeat;
+}
+.gm-message-tags .gm-remove-message-tag:hover { background:none !important; opacity:1; }
+.gm-remove-message-tag:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
