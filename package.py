@@ -6,10 +6,10 @@ import json
 
 root = Path(__file__).resolve().parent
 version = json.loads((root/'inline-labels/manifest.json').read_text())['version']
-files = [root/name for name in ['README.md','LICENSE','.gitignore','install.py','build.py','package.py']]
-for folder in ['chrome','inline-labels','scripts','tests']:
+files = [root/name for name in ['README.md','CHANGELOG.md','LICENSE','.gitignore','install.py','build.py','package.py','publish.py']]
+for folder in ['chrome','inline-labels','scripts','tests','docs']:
     files += [p for p in (root/folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc']
-output = root.parent/f'thunderbird-gmail-skin-{version}-source.zip'
+output = root/f'thunder-g-{version}-source.zip'
 with ZipFile(output,'w',ZIP_DEFLATED) as archive:
     for path in sorted(files):
         archive.write(path, 'thunderbird-gmail-skin/' + path.relative_to(root).as_posix())

@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 recovery/
 .gmail-skin-install*/
+*.xpi.sha256
+*.zip.sha256
