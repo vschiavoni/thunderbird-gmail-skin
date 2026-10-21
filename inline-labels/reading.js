@@ -32,6 +32,26 @@ function labelAssignmentState(tag, messages) {
     mixed: count > 0 && count < messages.length};
 }
 
+function adjacentMessageIndex(view, index, direction) {
+  for (let next = index + direction; next >= 0 && next < view.rowCount; next += direction) {
+    try {
+      // Group headers do not represent messages.
+      if (!(view.getFlagsAt(next) & 0x20000000) && view.getMsgHdrAt(next)) return next;
+    } catch (_) { /* Skip invalid view rows. */ }
+  }
+  return -1;
+}
+
+function sameMessage(header, identity) {
+  return !!(header && identity && header.messageKey === identity.key && header.folder?.URI === identity.folderURI);
+}
+function messageViewIndex(view, identity) {
+  for (let index=0; index < (view?.rowCount || 0); index++) {
+    try { if (sameMessage(view.getMsgHdrAt(index), identity)) return index; } catch (_) {}
+  }
+  return -1;
+}
+
 function installReadingMode(win) {
   const doc = win.document;
   const layout = doc.getElementById('paneLayout');
@@ -40,10 +60,12 @@ function installReadingMode(win) {
   if (!layout || !tree || !folderTree) return { close() {} };
   let active = false;
   let closed = false;
-  let pending = null;
+  let pending = null, openTicket = 0;
   let previous = null;
   let bulk = false;
   const threadPane = doc.getElementById('threadPane');
+  const headingTargets = ['threadPaneFolderName', 'threadPaneFolderCountContainer']
+    .map(id => doc.getElementById(id)).filter(Boolean);
   const selectionLabel = doc.createElement('span');
   const originalColumns = new Map();
   const originalUpdateColumns = win.threadPane?.updateColumns;
@@ -69,8 +91,7 @@ function installReadingMode(win) {
     updateColumns(); tree.reset();
   }
   const originalMessagePaneVisible = layout.messagePaneVisible;
-  // Gmail navigation has two explicit states: list-only and conversation-only.
-  // Never restore an expanded native preview when returning to the list.
+  // A message replaces the list inside the current mail tab.
   layout.messagePaneVisible = false;
   const style = doc.createElement('style');
   style.textContent = `
@@ -83,7 +104,7 @@ function installReadingMode(win) {
     #paneLayout.gm-reading > :is(#threadPane, #messagePaneSplitter) { display:none !important; }
     #paneLayout.gm-reading > #messagePane { min-height:0 !important; min-width:0 !important; }
     .gm-reading-toolbar {
-      grid-area:readingbar; display:flex; align-items:center; gap:2px;
+      grid-area:readingbar; display:flex; align-items:center; gap:4px;
       box-sizing:border-box; block-size:44px; padding:4px 12px; background:var(--layout-background-0, white);
       color:var(--layout-color-0, #202124); border-radius:16px 16px 0 0;
       border-bottom:1px solid var(--layout-border-0, #e8eaed);
@@ -120,10 +141,10 @@ function installReadingMode(win) {
       :root #threadTree tbody > tr.table-layout.selected,
       :root #threadTree tbody > tr.table-layout.selected:hover {
         background:var(--gm-selected, #c2dbff) !important; color:var(--gm-ink, #202124) !important;
-        box-shadow:inset 0 -1px var(--layout-border-0, #b5cfee) !important;
+        box-shadow:inset 0 -1px var(--gm-border, #b5cfee) !important;
       }
       :root #threadTree .tree-view-row-select img,
-      :root #threadTree .tree-view-header-select img { color:var(--layout-color-1, #444746) !important; }
+      :root #threadTree .tree-view-header-select img { color:var(--gm-muted, #444746) !important; }
     }
   `;
   doc.head.append(style);
@@ -339,9 +360,32 @@ function installReadingMode(win) {
       color:inherit; background:transparent; border:0; border-radius:0; margin:0;
       padding:4px 22px 4px 49px; min-height:24px; cursor:pointer; }
     `;
+  const printButton = action('Print conversation', 'M6 8V3h12v5 M3 17V9h18v8h-3 M6 14h12v7H6z M17 11h1', () => {
+    const conversationDoc = doc.getElementById('multiMessageBrowser')?.contentDocument;
+    const print = conversationDoc?.querySelector('conversation-footer')?.shadowRoot?.querySelector('.print');
+    if (print) print.click();
+    else command('cmd_print');
+  });
+  const navigation = doc.createElement('span');
+  navigation.style.marginInlineStart = 'auto';
+  toolbar.append(navigation);
+  function navigate(direction) {
+    const current = messageViewIndex(win.gDBView, previous?.message);
+    if (current < 0) { previousButton.disabled = nextButton.disabled = true; return; }
+    const index = adjacentMessageIndex(win.gDBView, current, direction);
+    if (index < 0) return;
+    tree.selectedIndex = index;
+    tree.scrollToIndex?.(index);
+    open({index, dataset:{}});
+  }
+  const previousButton = action('Previous message', 'M15 5l-7 7 7 7', () => navigate(-1));
+  const nextButton = action('Next message', 'M9 5l7 7-7 7', () => navigate(1));
+  previousButton.hidden = nextButton.hidden = true;
   layout.append(toolbar);
   function syncBulk() {
     if (active || closed || !threadPane) return;
+    previousButton.hidden = nextButton.hidden = true;
+    printButton.hidden = true;
     const count = win.gDBView?.getSelectedMsgHdrs().length || 0;
     toolbar.hidden = !bulk || !count;
     if (toolbar.hidden) threadPane.classList.remove('gm-bulk-selecting');
@@ -357,26 +401,49 @@ function installReadingMode(win) {
   function clearBulk() {
     bulk = false;
     tree.selectedIndices = [];
+    win.threadPaneHeader?.updateSelectedCount();
     syncBulk();
   }
-  function selectionChanged() { tagPopup.hidePopup(); syncBulk(); }
+  function headingClick(event) {
+    if (event.button !== 0) return;
+    // Clear a pending single-click open as well as any native row selection.
+    if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
+    leave(false);
+    clearBulk();
+    layout.messagePaneVisible = false;
+  }
+  for (const heading of headingTargets) heading.addEventListener('click', headingClick);
+  function selectionChanged() {
+    tagPopup.hidePopup();
+    // A collapsed thread can select several messages as one row. Only explicit
+    // checkbox/modifier clicks enter bulk mode; let the native reader show threads.
+    syncBulk();
+  }
   function selectionClick(event) {
-    if (active) return;
+    if (event.target.closest('.gm-row-actions')) {
+      if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
+      return;
+    }
     if (event.target.closest('.select-column, .selectcol-column, #selectCol') ||
         event.ctrlKey || event.metaKey || event.shiftKey) {
+      if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
+      if (active) leave(false);
       bulk = true;
       win.requestAnimationFrame(() => { if (!closed) syncBulk(); });
     }
   }
 
   function leave(restorePosition = true) {
-    if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; }
+    if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
     if (!active) return;
     active = false;
     layout.classList.remove('gm-reading');
     bulk = false;
     toolbar.hidden = true;
     layout.messagePaneVisible = false;
+    // Reader selection can include every member of a collapsed conversation.
+    // Returning to the inbox must not retain that implicit bulk selection.
+    if (restorePosition) clearBulk();
     if (restorePosition && win.gFolder?.URI === previous.folderURI) {
       tree.scrollTop = previous.scrollTop;
       tree.scrollLeft = previous.scrollLeft;
@@ -387,13 +454,14 @@ function installReadingMode(win) {
     }
   }
   function open(row) {
-    if (closed || active || !win.gDBView || row.index < 0) return;
+    if (closed || !win.gDBView || row.index < 0) return;
     if ((row.dataset.properties || '').split(' ').includes('dummy')) return;
+    let header;
+    try { header = win.gDBView.getMsgHdrAt(row.index); } catch (_) { return; }
+    if (!header) return;
     previous = {
-      message:win.gDBView.hdrForFirstSelectedMessage ? {
-        key:win.gDBView.hdrForFirstSelectedMessage.messageKey,
-        folderURI:win.gDBView.hdrForFirstSelectedMessage.folder.URI
-      } : null,
+      index:row.index,
+      message:{key:header.messageKey, folderURI:header.folder?.URI},
       folderURI:win.gFolder?.URI, scrollTop:tree.scrollTop, scrollLeft:tree.scrollLeft };
     active = true;
     threadPane?.classList.remove('gm-bulk-selecting');
@@ -404,24 +472,41 @@ function installReadingMode(win) {
     snoozeButton.disabled = false;
     toolbar.setAttribute('aria-label', 'Conversation navigation');
     toolbar.hidden = false;
+    previousButton.hidden = nextButton.hidden = false;
+    printButton.hidden = false;
+    previousButton.disabled = adjacentMessageIndex(win.gDBView, row.index, -1) < 0;
+    nextButton.disabled = adjacentMessageIndex(win.gDBView, row.index, 1) < 0;
     layout.classList.add('gm-reading');
-    // Expanding triggers Thunderbird's request-message-selection event, which
-    // Conversations already handles. If already expanded, explicitly refresh.
+    // A single click must both reveal the pane and display the selected mail.
+    // Do not rely only on a splitter expansion event to refresh the reader.
     if (!layout.messagePaneVisible) layout.messagePaneVisible = true;
-    else win.threadPane._onSelect(new win.Event('select'));
+    win.threadPane?._onSelect(new win.Event('select'));
     back.focus({preventScroll:true});
   }
   function click(event) {
-    if (!isReadingClick(event) || active) return;
+    if (!isReadingClick(event)) return;
     const row = event.target.closest('tr.table-layout');
     if (!row || !tree.contains(row)) return;
     if (pending !== null) win.cancelAnimationFrame(pending);
-    // Let native selection complete before invoking the existing reader.
-    pending = win.requestAnimationFrame(() => { pending = null; open(row); });
+    const view = win.gDBView, index = row.index, ticket = ++openTicket;
+    let header;
+    try { header = view?.getMsgHdrAt(index); } catch (_) { return; }
+    if (!header) return;
+    const identity = {key:header.messageKey, folderURI:header.folder?.URI};
+    // Recycled rows and folder changes must not redirect a queued click.
+    pending = win.requestAnimationFrame(() => {
+      if (ticket !== openTicket || closed) return;
+      pending = null;
+      if (win.gDBView !== view || row.index !== index) return;
+      try { if (!sameMessage(view.getMsgHdrAt(index),identity)) return; } catch (_) { return; }
+      open(row);
+    });
   }
   function doubleClick(event) {
     if (!isReadingClick(event) || !event.target.closest('tr.table-layout')) return;
-    event.preventDefault(); event.stopImmediatePropagation();
+    // The first click already opened the in-tab reader; avoid a second tab.
+    event.preventDefault();
+    event.stopImmediatePropagation();
   }
   // Conversations archives via the messages API, bypassing our toolbar.
   // Observe successful moves so every archive entry point returns to the list.
@@ -437,7 +522,7 @@ function installReadingMode(win) {
   function backClick() { if (active) leave(true); else clearBulk(); }
   tree.addEventListener('click', selectionClick, true);
   tree.addEventListener('select', selectionChanged);
-  tree.addEventListener('click', click);
+  tree.addEventListener('click', click, true);
   tree.addEventListener('dblclick', doubleClick, true);
   folderTree.addEventListener('select', folderChange, true);
   back.addEventListener('click', backClick);
@@ -449,17 +534,18 @@ function installReadingMode(win) {
     MailServices.mfn.removeListener(moveListener);
     tree.removeEventListener('click', selectionClick, true);
     tree.removeEventListener('select', selectionChanged);
-    tree.removeEventListener('click', click);
+    tree.removeEventListener('click', click, true);
+    tree.removeEventListener('dblclick', doubleClick, true);
     for (const [column, state] of originalColumns) Object.assign(column, state);
     if (originalUpdateColumns && win.threadPane.updateColumns === updateColumns) {
       win.threadPane.updateColumns = originalUpdateColumns;
       originalUpdateColumns.call(win.threadPane); tree.reset();
     }
-    tree.removeEventListener('dblclick', doubleClick, true);
     folderTree.removeEventListener('select', folderChange, true);
     back.removeEventListener('click', backClick);
-    for (const document of keyDocuments) document.removeEventListener('keydown', labelKey, true);
-    win.removeEventListener('load', documentLoaded, true);
+    for (const heading of headingTargets) heading.removeEventListener('click', headingClick);
+    for (const document of keyDocuments) document.removeEventListener("keydown", labelKey, true);
+    win.removeEventListener("load", documentLoaded, true);
     tagPopup.hidePopup?.();
     for (const popup of popups) popup.remove();
     toolbar.remove(); style.remove();

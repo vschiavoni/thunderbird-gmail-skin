@@ -1,4 +1,4 @@
-/* Gmail-inspired desktop skin. Target: Thunderbird 153 ESR.
+/* Gmail-inspired desktop skin. Compatibility range: Thunderbird 153–158.x; see README for validation limits.
  * UI only: no message content, account, or synchronization changes.
  * Keep native row heights: Thunderbird's virtual list calculates them in JS.
  */
@@ -9,6 +9,15 @@
     --gm-read: #f2f6fc;
     --gm-ink: #202124;
     --gm-selected: #c2dbff;
+    --gm-selection-ink: #001d35;
+    --gm-surface: #ffffff;
+    --gm-muted: #444746;
+    --gm-border: #e3e7ed;
+    --gm-hover: #e9eef6;
+    --gm-compose: #c2e7ff;
+    --gm-neutral-chip: #e0e5e9;
+    --gm-search: #eaf1fb;
+    --gm-shadow: rgba(60, 64, 67, .22);
     --layout-background-0: #ffffff !important;
     --layout-background-1: #f6f8fc !important;
     --layout-color-0: #202124 !important;
@@ -25,19 +34,38 @@
     --treeitem-text-active: #001d35 !important;
     --listbox-focused-selected-bg: #c2dbff !important;
     --listbox-selected-color: #202124 !important;
-    --thread-pane-flag-fill: #1a73e8 !important;
-    --thread-pane-flag-stroke: #1a73e8 !important;
+    --thread-pane-flag-fill: #f4b400 !important;
+    --thread-pane-flag-stroke: #b58100 !important;
   }
 
   #messengerWindow, #paneLayout, #unifiedToolbar, #tabs-toolbar,
+  #titlebar, .titlebar, .titlebar-row, #navigation-toolbox,
+  #unifiedToolbarContainer, #tabmail-container, #tabmail-tabbox,
   #folderPane, #folderPaneHeaderBar, #spacesToolbar {
     background-color: var(--gm-shell) !important;
     color: var(--gm-ink) !important;
   }
 
   #folderTree, #threadTree {
-    font-family: Arial, sans-serif !important;
+    font-family: Roboto, Arial, sans-serif !important;
     font-size: 14px !important;
+  }
+
+  /* Style the native search host through variables inherited by its shadow DOM. */
+  #unifiedToolbar global-search-bar {
+    --search-bar-background: var(--gm-search);
+    --search-bar-focus-background: var(--gm-surface);
+    --search-bar-color: var(--gm-ink);
+    --search-field-placeholder: var(--gm-muted);
+    --search-bar-border-color: transparent;
+    --button-border-radius: 24px;
+    --search-padding: 12px;
+    min-inline-size: 0;
+    border-radius: 24px;
+  }
+
+  #unifiedToolbar global-search-bar:focus-within {
+    box-shadow: 0 1px 3px var(--gm-shadow);
   }
 
   #folderPaneHeaderBar {
@@ -45,17 +73,35 @@
     border: 0 !important;
   }
 
+  #folderPane { container-type:inline-size; }
+
   #folderPaneWriteMessage {
-    background: #c2e7ff !important;
-    color: #001d35 !important;
+    background-color: var(--gm-compose) !important;
+    background-image: none !important;
+    display:inline-flex !important; align-items:center; justify-content:center;
+    gap:12px; min-inline-size:48px; text-overflow:clip !important;
+    color: var(--gm-selection-ink) !important;
     border: 0 !important;
     border-radius: 16px !important;
     padding: 14px 20px !important;
+    font-weight: 500 !important;
     box-shadow: none !important;
   }
 
+  #folderPaneWriteMessage::before {
+    content:""; display:block; width:20px; height:20px; flex:0 0 20px;
+    background-color:currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='m3 17.25 0 3.75h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.42l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+
+  @container (max-width:210px) {
+    #folderPaneWriteMessage {
+      font-size:0 !important; gap:0; inline-size:48px; padding:14px !important;
+    }
+  }
+
   #folderPaneWriteMessage:hover {
-    box-shadow: 0 2px 5px #3c404326 !important;
+    box-shadow: 0 2px 5px var(--gm-shadow) !important;
   }
 
   #folderTree .container {
@@ -64,8 +110,8 @@
   }
 
   #folderTree li.selected > .container {
-    background: #d3e3fd !important;
-    color: #001d35 !important;
+    background: var(--gm-selected) !important;
+    color: var(--gm-selection-ink) !important;
     font-weight: 600 !important;
   }
 
@@ -82,13 +128,13 @@
 
   #threadPane {
     border-radius: 16px 16px 0 0 !important;
-    background: white !important;
+    background: var(--gm-surface) !important;
   }
 
   #threadPaneHeaderBar, #quick-filter-bar {
-    background: white !important;
-    color: #444746 !important;
-    border-color: #e8eaed !important;
+    background: var(--gm-surface) !important;
+    color: var(--gm-muted) !important;
+    border-color: var(--gm-border) !important;
   }
 
   #threadPaneFolderName {
@@ -97,29 +143,49 @@
   }
 
   #threadTree thead {
-    background: white !important;
-    color: #5f6368 !important;
+    background: var(--gm-surface) !important;
+    color: var(--gm-muted) !important;
   }
 
   #threadTree tbody > tr.table-layout {
     background: var(--gm-read) !important;
     color: var(--gm-ink) !important;
-    box-shadow: inset 0 -1px #e3e7ed !important;
+    box-shadow: inset 0 -1px var(--gm-border) !important;
   }
 
   #threadTree tbody > tr.table-layout[data-properties~="unread"] {
-    background: white !important;
+    background: var(--gm-surface) !important;
     font-weight: 700 !important;
   }
 
   #threadTree tbody > tr.table-layout:hover {
-    background: #e9eef6 !important;
-    box-shadow: inset 0 1px #dadce0, inset 0 -1px #dadce0 !important;
+    background: var(--gm-hover) !important;
+    box-shadow: inset 0 1px var(--gm-border), inset 0 -1px var(--gm-border),
+      0 1px 2px var(--gm-shadow) !important;
   }
 
   #threadTree tbody > tr.table-layout.selected {
     background: var(--gm-selected) !important;
     color: var(--gm-ink) !important;
+  }
+
+  #threadTree .datecol-column {
+    font-size: 0.86em !important;
+    color: var(--gm-muted) !important;
+  }
+
+  #threadTree tr[data-properties~="unread"] .datecol-column {
+    color: var(--gm-ink) !important;
+    font-weight: 700 !important;
+  }
+
+  #threadTree :is(#senderColButton, #subjectColButton, #dateColButton) {
+    color: var(--gm-muted) !important;
+    font-weight: 500 !important;
+  }
+
+  #folderTree .container:hover {
+    background-color: var(--gm-hover) !important;
   }
 
   #threadTree tbody > tr:focus-visible {
@@ -136,57 +202,56 @@
   }
 
   #threadTree .tagscol-column .cell-text:not(:empty) {
-    background: #e0e5e9 !important;
-    color: #3c4043 !important;
+    background: var(--gm-neutral-chip) !important;
+    color: var(--gm-ink) !important;
     border-radius: 4px !important;
     padding: 2px 5px !important;
   }
 
   #messageHeader {
-    background: white !important;
-    color: #202124 !important;
-    border-bottom: 1px solid #e8eaed !important;
+    background: var(--gm-surface) !important;
+    color: var(--gm-ink) !important;
+    border-bottom: 1px solid var(--gm-border) !important;
   }
 }
 
-
-/* Thunderbird's Light/Dark/System theme controls prefers-color-scheme. */
+/* Follows Thunderbird's preferred colour scheme; native high contrast wins. */
 @media (prefers-color-scheme: dark) and (prefers-contrast: no-preference) {
   :root {
     color-scheme: dark !important;
-    --gm-shell: #202124;
-    --gm-read: #292a2d;
+    --gm-shell: #191b20;
+    --gm-read: #202124;
     --gm-ink: #e8eaed;
-    --gm-selected: #394f70;
-    --layout-background-0: #202124 !important;
-    --layout-background-1: #292a2d !important;
-    --layout-color-0: #e8eaed !important;
-    --layout-color-1: #bdc1c6 !important;
-    --layout-border-0: #45474a !important;
-    --sidebar-background: #202124 !important;
-    --sidebar-color: #e8eaed !important;
-    --tree-view-bg: #292a2d !important;
-    --tree-view-color: #e8eaed !important;
-    --unread-color: #f1f3f4 !important;
-    --treeitem-background-selected: #394f70 !important;
-    --treeitem-background-active: #394f70 !important;
-    --treeitem-background-hover: #35373b !important;
-    --treeitem-text-active: #e8eaed !important;
-    --listbox-focused-selected-bg: #394f70 !important;
-    --listbox-selected-color: #e8eaed !important;
-    --thread-pane-flag-fill: #8ab4f8 !important;
-    --thread-pane-flag-stroke: #8ab4f8 !important;
+    --gm-selected: #354c70;
+    --gm-selection-ink: #e8f0fe;
+    --gm-surface: #25272c;
+    --gm-muted: #bdc1c6;
+    --gm-border: #41454d;
+    --gm-hover: #30343b;
+    --gm-compose: #304969;
+    --gm-neutral-chip: #41454d;
+    --gm-search: #30343b;
+    --gm-shadow: rgba(0, 0, 0, .45);
+    --layout-background-0: var(--gm-surface) !important;
+    --layout-background-1: var(--gm-shell) !important;
+    --layout-color-0: var(--gm-ink) !important;
+    --layout-color-1: var(--gm-muted) !important;
+    --layout-border-0: var(--gm-border) !important;
+    --sidebar-background: var(--gm-shell) !important;
+    --sidebar-color: var(--gm-ink) !important;
+    --tree-view-bg: var(--gm-read) !important;
+    --tree-view-color: var(--gm-ink) !important;
+    --unread-color: var(--gm-ink) !important;
+    --treeitem-background-selected: var(--gm-selected) !important;
+    --treeitem-background-active: var(--gm-selected) !important;
+    --treeitem-background-hover: var(--gm-hover) !important;
+    --treeitem-text-active: var(--gm-selection-ink) !important;
+    --listbox-focused-selected-bg: var(--gm-selected) !important;
+    --listbox-selected-color: var(--gm-selection-ink) !important;
+    --thread-pane-flag-fill: #fdd663 !important;
+    --thread-pane-flag-stroke: #fdd663 !important;
   }
-  #folderPaneWriteMessage { background:#004a77 !important; color:#c2e7ff !important; }
-  #folderTree li.selected > .container { background:#394f70 !important; color:#e8eaed !important; }
-  #threadPane, #threadPaneHeaderBar, #quick-filter-bar, #threadTree thead,
-  #messageHeader { background:#202124 !important; color:#e8eaed !important; border-color:#45474a !important; }
-  #threadTree tbody > tr.table-layout { box-shadow:inset 0 -1px #3c4043 !important; }
-  #threadTree tbody > tr.table-layout[data-properties~="unread"] { background:#202124 !important; }
-  #threadTree tbody > tr.table-layout:hover {
-    background:#35373b !important; box-shadow:inset 0 1px #45474a, inset 0 -1px #45474a !important;
-  }
-  #threadTree tbody > tr.table-layout.selected { background:var(--gm-selected) !important; }
-  #threadTree tbody > tr:focus-visible { outline-color:#8ab4f8 !important; }
-  #threadTree .tagscol-column .cell-text:not(:empty) { background:#45474a !important; color:#e8eaed !important; }
 }
+
+/* The Today Pane remains available from Thunderbird's menus. */
+#calendar-show-todaypane-panel { display:none !important; }

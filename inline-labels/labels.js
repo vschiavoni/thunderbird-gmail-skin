@@ -22,11 +22,16 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
   let tags = MailServices.tags.getAllTags();
   const style = doc.createElement("style");
   style.textContent = `
+    /* Keep sender/subject headers visually empty; native controls remain. */
+    :root #threadTree :is(#senderColButton, #subjectColButton) {
+      font-size: 0 !important;
+      text-shadow: none !important;
+    }
     /* Hidden only while the add-on is active; native column settings survive. */
     #threadTree :is(#tagsCol, .tagscol-column) { display: none !important; }
     #threadTree .subject-line {
       display: flex !important; align-items: center; min-width: 0;
-      flex: 1 1 auto; overflow: hidden;
+      flex: 1 1 auto; overflow: hidden; column-gap: 0 !important;
     }
     #threadTree .subject-line > span:not(.gm-inline-labels) {
       flex: 1 1 0; overflow: hidden; text-overflow: ellipsis;
@@ -35,7 +40,7 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     #threadTree .subject-line > img { flex: 0 0 auto; }
     #threadTree .gm-inline-labels {
       display: inline-flex; flex: 0 1 auto; max-width: 48%; gap: 4px;
-      overflow: hidden; margin-inline-end: 6px; align-items: center;
+      overflow: hidden; margin-inline-end: 4px; align-items: center;
       font-weight: 400; vertical-align: middle;
     }
     #threadTree .gm-inline-label {
@@ -55,6 +60,18 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     }
   `;
   doc.head.append(style);
+  // userChrome.css is a USER sheet: its !important rules beat document styles.
+  // Match that origin so the companion and installed column styles agree.
+  const headerSheet = 'data:text/css;charset=utf-8,' + encodeURIComponent(`
+    @-moz-document url("about:3pane") {
+      :root #threadTree :is(#senderColButton, #subjectColButton) {
+        font-size: 0 !important;
+        text-shadow: none !important;
+      }
+    }
+  `);
+  const sheetUtils = window.windowUtils;
+  if (sheetUtils) sheetUtils.loadSheetUsingURIString(headerSheet, Ci.nsIDOMWindowUtils.USER_SHEET);
   function render(row) {
     const line = row.querySelector(".subject-line");
     if (!line) return;
@@ -108,6 +125,7 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     disposed = true;
     if (prototype?.fillRow === wrapped) prototype.fillRow = original;
     style.remove();
+    if (sheetUtils) sheetUtils.removeSheetUsingURIString(headerSheet, Ci.nsIDOMWindowUtils.USER_SHEET);
     for (const node of doc.querySelectorAll(".gm-inline-labels")) node.remove();
     window.removeEventListener("unload", close);
   }
