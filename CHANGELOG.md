@@ -3,9 +3,12 @@
 ## Unreleased
 
 - Renamed the companion to **Thunder-G**, with a new icon, refined Gmail-style
-  controls, Previous/Next navigation, row actions, and local previews.
+  controls, Previous/Next navigation, local previews, and row actions that occupy
+  space only on hover or keyboard focus.
 - Styled Conversations with compact headers, per-message and subject tag chips,
-  print/forward icons, and extended light/dark support.
+  individual tag removal, print/forward icons, and extended light/dark support.
+  Tag chips in the list and conversations use coordinated
+  pastel backgrounds and colored text, with a lighter text palette in dark mode.
 - Fixed selection cleanup, navigation and preview lifecycle; improved uninstall
   recovery and added local release tooling. Accepts Thunderbird 153–158.x;
   cross-version and full visual verification remain pending.

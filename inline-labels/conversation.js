@@ -1,7 +1,5 @@
 function conversationTagColors(color) {
-  if (!/^#[0-9a-f]{6}$/i.test(color || '')) return {background:'#e8eaed',foreground:'#3c4043'};
-  const rgb=[1,3,5].map(start=>Math.round(parseInt(color.slice(start,start+2),16)*.3+255*.7));
-  return {background:`rgb(${rgb.join(', ')})`,foreground:'#202124'};
+  return chipColors(color);
 }
 function conversationTitleLabels(lists) {
   const tags = new Map();

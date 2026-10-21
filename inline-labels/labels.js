@@ -8,11 +8,14 @@ function assignedTags(header, tags) {
 }
 
 function chipColors(color) {
-  if (!/^#[0-9a-f]{6}$/i.test(color || "")) return { background: "#e8eaed", foreground: "#3c4043" };
-  const rgb = [1, 3, 5].map(start => parseInt(color.slice(start, start + 2), 16));
-  // Pastel tint of the user's existing tag color, with dark readable text.
-  const tint = rgb.map(value => Math.round(value * 0.3 + 255 * 0.7));
-  return { background: `rgb(${tint.join(", ")})`, foreground: "#202124" };
+  const valid = /^#[0-9a-f]{6}$/i.test(color || "");
+  const rgb = valid ? [1, 3, 5].map(start => parseInt(color.slice(start, start + 2), 16)) : [128,134,139];
+  const mix = (base, weight) => `rgb(${rgb.map((value,index) => Math.round(value * weight + base[index] * (1-weight))).join(', ')})`;
+  // Related hues for background and text, with a distinct palette per theme.
+  return {
+    background: `light-dark(${mix([255,255,255],.2)}, ${mix([32,33,36],.28)})`,
+    foreground: `light-dark(${mix([0,0,0],.4)}, ${mix([255,255,255],.25)})`
+  };
 }
 
 function installInlineLabels(window = globalThis.window, MailServices = globalThis.MailServices) {
@@ -48,12 +51,6 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
       text-overflow: ellipsis; white-space: nowrap; max-width: 160px;
       font: 12px/16px Arial, sans-serif; border-radius: 4px; padding: 0 5px;
       background: var(--gm-chip-bg); color: var(--gm-chip-fg);
-    }
-    @media (prefers-color-scheme: dark) {
-      #threadTree .gm-inline-label {
-        background:color-mix(in srgb, var(--gm-chip-bg) 35%, #202124);
-        color:#f1f3f4;
-      }
     }
     @media (prefers-contrast) {
       #threadTree .gm-inline-label { background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
