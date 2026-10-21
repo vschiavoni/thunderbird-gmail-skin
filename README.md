@@ -1,37 +1,58 @@
-# Gmail-inspired Thunderbird desktop skin
+<div align="center">
+  <img src="docs/resources/logo.png" height="100px">
+  <p>
+<h3>Thunder-G</h3></p>
+ <p><i>An experimental, independently developed Gmail-inspired skin for Thunderbird.  </i></p>
+ <p><img src="https://img.shields.io/github/v/release/vschiavoni/thunderbird-gmail-skin"/></p>
+</div>
 
-An experimental, independently developed skin for Thunderbird: a compact inbox,
-existing tags as colored chips before the subject, and a conversation reader
-with a Back button and message actions. No Google affiliation or Gmail login is
-required. Your mailbox remains with its existing provider.
+> [!NOTE]
+> This independent project is not affiliated with Google and requires no Gmail account. It works with your existing email provider.
+> Cross-client synchronization of Exchange tags is not supported.
+> Compatibility with Windows and Linux has not yet been verified.
 
-Current version: **0.7.1**. Developed and manually checked on **Thunderbird 153.5
-ESR on macOS**. The privileged companion is deliberately restricted to Thunderbird
-153.x. Other Thunderbird versions, Windows, and Linux are unverified. This is not
-an iOS skin, and it does not add cross-client Exchange tag synchronization.
+A compact inbox, existing tags as colored chips before the subject, and a conversation reader with a Back button and message actions.
+
+Current version: **0.7.1**. Installable package: `thunder-g-0.7.1.xpi`. The companion accepts **Thunderbird 153–158.x**.
+
+Renderer hooks were inspected against Thunderbird **158.0.1 on macOS**. Recent
+visual changes still require live verification; Windows and Linux are unverified.
+
+Release history and detailed changes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## What is included
 
-- Light/dark Gmail-inspired shell, compose button, selections, rows, and stars.
-- Existing Thunderbird tag names/colors displayed as chips, without migration.
+- Automatic light/dark shell, responsive pencil/Write button, and yellow stars.
+- Native tag chips, searchable Labels menu, and gray snippets from locally available mail.
 - Hidden From/Subject header text and Spam column; UI font size follows Thunderbird.
-- Click a message to replace the list with the reader; Back restores the list.
+- Single-click reading in the current tab; Back restores the list; Previous/Next navigate.
 - Archive, spam, delete, unread, Move, Labels, and a Follow-Up clock in the reader.
 - Return to the full list after archiving, with the native preview collapsed.
-- Optional reversible column-layout scripts: From → Subject with chips → Date.
+- Native quick-filter chips and row actions for archive, delete, and read/unread.
+- Optional Conversations styling and reversible From → Subject → Date layout scripts.
+
+## Label picker
+
+Press **L** in the mail browsing pane or use the Labels button. Search supports
+Unicode names; use Up/Down to navigate, Space to toggle, and Escape to close.
+Mixed checkboxes indicate tags assigned to only part of the selection.
+Use **Create new** to open New Tag or **Manage labels** to open tag settings.
 
 ## Requirements
 
 Python 3.9+ for the installer/build; Node.js 18+ only to run tests. No Python or
 Node packages are downloaded or required.
 
-Install **Thunderbird Conversations** separately from Thunderbird's add-on
+Install **Thunderbird Conversations** [↗](https://addons.thunderbird.net/en-US/thunderbird/addon/gmail-conversation-view/) separately from Thunderbird's add-on
 manager for the conversation cards and inline replies shown in this project.
-The clock requires **mailmindr / Follow-Ups**; it opens that add-on's reminder
-form. Gmail-style snoozing is not implemented; mailmindr's icebox behavior needs
-its own configuration. Tag Popup is optional: the skin uses native Thunderbird
-tags, including any previously created with Tag Popup. These third-party add-ons
-are not bundled or automatically installed.
+
+The clock requires **mailmindr / Follow-Ups** [↗](https://addons.thunderbird.net/en-US/thunderbird/addon/mailmindr/); it opens that add-on's reminder
+form.
+
+Gmail-style snoozing is not implemented; mailmindr's icebox behavior needs its own configuration.
+
+Tag Popup is optional: the skin uses native Thunderbird tags, including any previously created with Tag Popup.
+These third-party add-ons are not bundled or automatically installed.
 
 ## Install
 
@@ -45,8 +66,8 @@ are not bundled or automatically installed.
    ```
 
    On Windows use `py -3` instead of `python3` if appropriate.
-4. Restart Thunderbird. Review any add-on permission prompt. Select a built-in
-   Light, Dark, or System theme, Classic layout, Compact density, and **Table View**. Enable threaded
+4. Restart Thunderbird. Review any add-on permission prompt. Select the built-in
+   System theme for automatic dark mode, Classic layout, and **Table View**. Enable threaded
    sorting. The companion starts with the message preview collapsed.
 5. Optionally enable Tags folder-pane mode and the folder-pane header.
 
@@ -58,8 +79,8 @@ sessions, or someone else's preferences into your profile. Do not share that
 snapshot: pre-existing profile files may contain personal settings.
 
 Alternatively build with `python3 build.py` and install the resulting XPI through
-Add-ons Manager → gear → Install Add-on From File. That installs only the
-companion; it does not install the shell CSS or enable the stylesheet preference.
+Add-ons Manager → gear → Install Add-on From File. The XPI also bundles shell and Conversations styles, loaded while the companion
+is active. The installer additionally manages persistent profile CSS and rollback.
 
 ### Optional column layout
 
@@ -110,17 +131,19 @@ node --test tests/*.test.cjs
 python3 build.py
 ```
 
-Nine focused tests cover tag rendering, row reuse, click filtering, move detection,
-and returning to list-only mode from an initially expanded preview. These are
-mock-based tests; they do not replace testing in a disposable Thunderbird profile.
-Live UI checks covered opening/returning, toolbar menus, and the reminder dialog.
-The latest archive return fix has automated coverage but has not been verified by
-archiving live mail. Try a separate test profile before using it for daily mail.
+The tests use mocked Thunderbird interfaces and temporary installer profiles.
+They cover presentation, row reuse, selection scope, navigation, local snippets,
+component cleanup, and rollback. Run installer checks with:
 
-Installer verification: `python3 tests/installer_test.py` runs install/uninstall
-against temporary profiles, including existing customization and conflict refusal.
-Build a source ZIP and SHA-256 checksum with `python3 package.py`; packaging uses
-an explicit allowlist, excluding generated packages and profile recovery data.
+```sh
+python3 tests/installer_test.py
+```
+
+Live visual and interaction checks remain necessary, especially on another
+Thunderbird version. See the changelog for validation limits.
+
+Build a source ZIP and SHA-256 checksum with `python3 package.py`. Packaging uses
+an explicit allowlist excluding generated packages and profile recovery data.
 
 ## Publishing to GitHub
 
@@ -128,128 +151,21 @@ Create a repository with this directory's contents (not a Thunderbird profile
 and not the original development folder). The included MIT license allows reuse.
 Keep generated XPI files out of Git history; attach the source ZIP, checksum and,
 optionally, the built XPI as release assets tagged `v0.7.1`. The source ZIP is the
-complete installable bundle; the XPI alone supplies only the companion features.
+complete source bundle; the XPI contains the companion and its bundled styles.
 Mark the first release experimental and include the compatibility/testing limits
 above. No repository has been published by the package preparation step.
 
 
-## Checkbox selection (0.4.0)
+## Prepare a local release
 
-The native selection checkbox column is visible before the star controls. Tick
-individual rows or use the column header to toggle selection of the current
-view. Selection uses Thunderbird's native thread semantics, including child
-messages when a collapsed thread is selected. Checking rows keeps the reader
-closed and displays a bulk toolbar for archive, spam, delete, unread, move, and
-labels. The clock is disabled for multiple messages because Follow-Ups schedules
-one message at a time. Clear selection hides the toolbar. A checked label means
-all selected messages have it; selecting an unchecked label applies it to all,
-and unchecking a checked label removes it from all. Mixed tags appear unchecked.
+Preview a version change without modifying files:
 
-Verified two-row selection, correct count, label menu, and clearing in the live
-inbox without executing mail mutations. A mock regression test verifies that
-Archive receives the native multi-message selection. Column visibility/order
-changes are applied while the companion runs; its saved in-memory originals are
-restored on shutdown.
+```sh
+python3 publish.py 0.7.2 --dry-run
+```
 
-
-## Action-bar polish (0.4.1)
-
-Arrow-only Back button with accessible name and tooltip. Consistent 20 px SVG
-icons inside 36 px circular buttons, 2 px spacing, and vertical separators
-between navigation, mail actions, follow-up actions, and move/labels. Bulk
-selection uses an X icon for Clear selection and retains the selected count.
-The 44 px bar keeps visible keyboard focus and a distinct disabled state.
-Verified the reading bar visually, Back returning to the list, bulk selection,
-and clearing selection in Thunderbird. Seven regression tests pass; no mail
-mutation was executed during UI verification.
-
-For a portable rollback, keep the source ZIP for your previous release. Quit
-Thunderbird, uninstall using the installer from the currently installed release,
-then install the previous release. This applies to profiles managed by the
-portable installer; local development rollback scripts are machine-specific and
-are intentionally excluded from public packages.
-
-
-## Selection polish (0.4.2)
-
-Native header/row checkboxes are consistently 18 px, with stronger hover and
-checked-state contrast. Selected rows keep a light blue #c2dbff background on
-hover and when focus moves to the toolbar. High-contrast mode retains native
-selection colors. The bulk toolbar replaces the folder heading while selecting,
-rather than inserting a second heading row. Clearing selection, opening the
-reader, changing folders, or disabling the companion restores the heading.
-Seven regression tests pass. Live UI checks covered compact checkbox appearance,
-selected-row color, multiple selection, toolbar placement, and heading restoration;
-no archive/delete/move/tag operations were executed during verification.
-
-
-## Compact dates (0.5.0)
-
-The message-list Date column shows a time for messages dated today, abbreviated
-month/day for other messages in the current year, and includes the year for
-older mail. Formatting follows the UI language and the computer's local time
-zone. Hover reveals the full weekday, date, year, time (including seconds), and
-zone. Dates refresh at local midnight and when the window regains focus.
-
-This changes only rendered text and tooltip data, not message timestamps or
-sorting. The Received column and conversation-reader timestamps remain native.
-The renderer preserves native row accessibility descriptions and removes its
-hook, timers, and display changes on shutdown. Nine tests pass, including local
-midnight/year boundaries, invalid dates, virtual-row reuse, tooltip translation,
-and restoring native strings. Live Thunderbird cells were verified to display
-short dates with full timestamp tooltips.
-
-
-## Dark mode (0.6.0)
-
-Choose **Tools → Add-ons and Themes → Themes → Dark → Enable**. Light restores
-the light palette; System theme — auto follows the operating-system appearance.
-The skin responds to the theme's `prefers-color-scheme` setting without a restart
-once its CSS is installed. Dark surfaces cover the sidebar, message list,
-heading, compose button, selection, and reading/bulk action bars. Inline label
-chips use darker tints with light text; tag definitions and colors are unchanged.
-High-contrast mode retains native colors.
-
-Conversations supplies its own existing dark header/card styles. The skin does
-not invert or rewrite email HTML bodies: those remain subject to Thunderbird's
-message-color settings and the message author's explicit colors. Third-party
-add-on toolbar icons and custom themes may need their own adjustments.
-Nine existing regression tests pass. Manually verified live Light/Dark switching, dark list/labels, dark selected rows and bulk toolbar, loaded conversation cards and reader toolbar, Back navigation, and return to Light. The original Light theme was restored after testing.
-
-## Searchable label picker (0.7.0)
-
-Select one or more messages, or open a conversation, then press **L** (without modifiers).
-The Labels toolbar button opens the same picker. Type part of a label name to filter;
-search ignores case and supports Unicode names. Use Up/Down to navigate, Space to
-check or uncheck the focused label, and Escape or a click outside to close.
-
-Changes apply immediately through Thunderbird's native tag command to the current
-selection. Checked means every selected message has the label; mixed means only
-some do. Checking a mixed label applies it to all selected messages. Existing tag
-names, keys, colors, and assignments are preserved. Changing folders or selection
-closes the picker so it cannot act on a stale selection.
-
-Bare L replaces Thunderbird's Ignore Subthread shortcut in the mail browsing pane.
-It does not override typing in search fields/editors, modified shortcuts, or other
-tabs. This shortcut is part of the desktop skin; it does not add an iOS shortcut or
-change the account's existing tag synchronization support.
-
-Validation: 13 automated tests pass, including search, shortcut guards, legacy/mixed
-tag states, native bulk add/remove delegation, stale selection rejection and focus
-restoration. Live Thunderbird checks cover opening from list/conversation views,
-search matches/no matches, arrow navigation and Escape. Real mail tags were not
-changed during testing.
-
-## Gmail-style label panel (0.7.1)
-
-The L picker now reads **Label as:** and follows the supplied Gmail reference:
-plain square checkboxes without color dots, regular-weight heading, a wider panel,
-compact rows, underlined search with a magnifying glass, and a divided footer.
-**Create new** opens Thunderbird's New Tag dialog; **Manage labels** opens its tag
-settings. Native tag metadata, immediate application, search and keyboard navigation
-remain unchanged. Theme colors follow Light/Dark. The list scrolls independently of
-the heading/search/footer. Ordering remains Thunderbird's existing tag order.
-
-Validation: 13 automated tests pass, including heading and footer native-command
-routing. In Thunderbird, L opens the panel, the heading/footer appear, searching
-filters labels, and Create new opens New Tag (cancelled without changing tags).
+Prepare it with `python3 publish.py 0.7.2`. The command runs tests, updates the
+manifest and README, moves Unreleased notes into the new changelog entry, and
+builds XPI/source ZIP files with SHA-256 checksums. It preserves older release
+notes and refuses existing target versions/artifacts. It does not commit, push,
+upload, or install. Keep writing future notes under Unreleased.
