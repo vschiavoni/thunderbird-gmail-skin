@@ -125,6 +125,32 @@
             "type": "boolean"
           }
         ]
+      },
+      {
+        "name": "gmailLabelImport",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {
+            "name": "action",
+            "type": "string",
+            "enum": [
+              "status",
+              "connect",
+              "disconnect",
+              "preview",
+              "import",
+              "cancel"
+            ]
+          },
+          {
+            "name": "data",
+            "type": "string"
+          }
+        ],
+        "returns": {
+          "type": "string"
+        }
       }
     ],
     "events": [

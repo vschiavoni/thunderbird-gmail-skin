@@ -19,6 +19,7 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
                              ['gmail-inspired.css', 'gmail-columns.css'])
             data += ('\nvar GMAIL_SKIN_CSS = ' + json.dumps(skin) + ';\n').encode()
             data += ('\nvar GMAIL_CONVERSATIONS_CSS = ' + json.dumps((root / 'chrome/gmail-conversations.css').read_text()) + ';\n').encode()
+            data += b'\n' + (source / 'gmail-import.js').read_bytes()
             data += b'\n' + (source / 'label-navigation.js').read_bytes()
             data += b'\n' + (source / 'labels.js').read_bytes()
             data += b'\n' + (source / 'label-menu.js').read_bytes()

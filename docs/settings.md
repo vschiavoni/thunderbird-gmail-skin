@@ -60,3 +60,12 @@ An ordinary DKIM Verifier installation does not provide this integration.
 Only the advertised logo is downloaded, without an external logo lookup service.
 Logos and missing results are cached for one hour during the session. Turning
 this off stops new downloads and restores the usual avatars.
+
+## Labels
+
+**Import labels from Gmail** is optional and starts with a dry run. Connect using
+an optional Google Desktop OAuth client, choose custom labels and a destination
+(default `GMAIL-Labels`), then review every proposed local change before importing.
+System labels, emails, assignments and colors are excluded. Existing labels are
+never overwritten. See the [Gmail import guide](gmail-import.md) for setup, Google
+permissions, session-only credentials, conflict handling and safe retries.

@@ -63,6 +63,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       try {await popup.browserLoaded;await popup.contentReadyAndResized.promise;if(!disposed && button.isConnected)popup.viewNode.openPopup(button,'bottomleft topleft',0,0);else close();}
       catch(error){close();throw error;}
     };
+    let gmailImporter = null;
     const documents = new Map();
     const pendingDocuments = new Map();
     const windows = new Map();
@@ -182,6 +183,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
     };
     context.callOnClose({ close() {
+      gmailImporter?.close(); gmailImporter=null;
       for(const close of [...dkimPopups])close();openIndependentDkimPopup=null;
       verifyIndependentDkim=null;
       for(const pending of dkimRequests.values()){clearTimeout(pending.timer);pending.reject(new Error('Reader closed'));}dkimRequests.clear();
@@ -204,6 +206,20 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       documents.clear(); windows.clear();
     }});
     return { inlineLabels: {
+      async gmailLabelImport(action, data) {
+        try {
+          if (closed) throw new Error('Extension has closed.');
+          let payload;
+          try { payload=JSON.parse(data || '{}'); } catch (_) { throw new Error('Invalid importer request.'); }
+          if (!payload || typeof payload!=='object' || Array.isArray(payload)) throw new Error('Invalid importer request.');
+          gmailImporter ||= createNativeGmailImporter(MailServices.tags);
+          return JSON.stringify({ok:true,result:await gmailImporter.run(action,payload)});
+        } catch (error) {
+          // Privileged exceptions otherwise become an unhelpful generic error at
+          // the extension boundary. Return only the controlled user-facing text.
+          return JSON.stringify({ok:false,error:error.message || 'The Gmail import operation failed.'});
+        }
+      },
       async setShowColumnHeaders(enabled) {
         showColumnHeaders = enabled === true;
         for (const doc of documents.keys()) doc.documentElement.toggleAttribute('data-gm-hide-column-headers', !showColumnHeaders);

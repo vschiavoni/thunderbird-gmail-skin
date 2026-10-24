@@ -34,6 +34,14 @@ Release history and detailed changes are in [CHANGELOG.md](CHANGELOG.md).
 - Native quick-filter chips and row actions for archive, delete, and read/unread.
 - Optional Conversations styling and reversible From → Subject → Attachment → Date layout scripts.
 
+## Optional Gmail label import
+
+Settings → Labels can fetch custom label names from a chosen Google account and
+preview their creation under `GMAIL-Labels`. Dry run is enabled by default;
+import requires a reviewed preview and an explicit action. No emails are imported.
+A separately configured Google Desktop OAuth client is currently required only
+for this optional feature. See [setup, permissions and limits](docs/gmail-import.md).
+
 ## Label picker
 
 Press **L** in the mail browsing pane or use the Labels button. Search supports

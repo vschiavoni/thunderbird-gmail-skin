@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add an optional Gmail label importer in settings: external-browser Google sign-in, verified account identity, custom-label selection and nested native tags under a configurable parent.
+- Default to dry run with per-path create/skip/conflict reporting, branch exclusions and explicit import; recheck the local plan before writes, preserve existing labels and support safe retries after partial failure.
+- Keep Google credentials/tokens session-only, request no Gmail message scope, and document the optional Desktop OAuth client setup. Real Google sign-in still requires client configuration and end-to-end validation.
+
 ## 0.14.0
 
 - Enable native updates from stable GitHub Releases with versioned downloads, SHA-256 checks and compatibility bounds.

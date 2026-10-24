@@ -41,3 +41,7 @@ Keep profile data and local screenshots out of commits and packages.
 Add a regression test for behavior changes and a short **Unreleased** changelog entry.
 In the PR, state which tests ran and which Thunderbird version you checked manually.
 See [release publishing](updates.md#publishing-a-release) for versioning and distribution.
+
+The optional Gmail importer uses Thunderbird's native external-browser OAuth2
+module and the Gmail labels API. See [setup and validation](gmail-import.md). No
+Google client credentials are distributed with the source or required for builds.
