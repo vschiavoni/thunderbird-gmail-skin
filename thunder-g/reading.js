@@ -369,24 +369,17 @@ function installReadingMode(win) {
     return !pickerConversation || (conversationDocument() === pickerConversation &&
       sameLabelMessages(resolveConversation(pickerConversation), pickerMessages));
   }
-  const collapsedLabels=new Set();
   function renderTags() {
     tagList.replaceChildren();
-    for (const entry of nestedLabelRows(pickerTags, search.value, collapsedLabels)) {
-      const tag=entry.tag;
+    for (const tag of pickerTags.filter(tag=>labelMatchesQuery(tag.tag,search.value))) {
       const row = doc.createElement('label'); row.className = 'gm-label-option';
       const checkbox = doc.createElement('input'); checkbox.type = 'checkbox';
       const state = labelAssignmentState(tag, pickerMessages);
       checkbox.checked = state.checked; checkbox.indeterminate = state.mixed;
       checkbox.setAttribute('aria-label', tag.tag);
-      const name = doc.createElement('span'); name.textContent = search.value.trim()?tag.tag:entry.name;
-      row.title=tag.tag;row.style.paddingInlineStart=`${20+entry.depth*16}px`;
-      const toggle=doc.createElement('button');toggle.type='button';toggle.className='gm-label-disclosure';
-      toggle.textContent=entry.children.length?(collapsedLabels.has(entry.path)?'▸':'▾'):'';
-      toggle.disabled=!entry.children.length;gmBindAttribute(toggle, 'aria-label', () => gmText("Expand or collapse $1", tag.tag));
-      if(entry.children.length)toggle.setAttribute('aria-expanded',String(!collapsedLabels.has(entry.path)));
-      toggle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();if(collapsedLabels.has(entry.path))collapsedLabels.delete(entry.path);else collapsedLabels.add(entry.path);renderTags();});
-      row.append(toggle,checkbox, name); tagList.append(row);
+      const name = doc.createElement('span'); name.textContent = tag.tag;
+      row.title=tag.tag;
+      row.append(checkbox,name);tagList.append(row);
       checkbox.addEventListener('change', () => {
         if (!sameSelection()) { tagPopup.hidePopup(); return; }
         try {
@@ -526,8 +519,6 @@ function installReadingMode(win) {
     watchKeys(doc); win.addEventListener('load', documentLoaded, true);
   }
   style.textContent += `
-    .gm-label-disclosure { border:0; background:transparent; color:inherit; width:12px; min-width:12px; max-width:12px; height:20px; min-height:0; margin:0; padding:0; flex:0 0 12px; appearance:none; cursor:pointer; }
-    .gm-label-disclosure:disabled { opacity:0; }
     .gm-new-label { width:min(420px,80vw); padding:24px; color:var(--layout-color-0,#202124); background:var(--layout-background-0,#fff); }
     .gm-new-label h2 { margin:0 0 24px; font-size:22px; font-weight:400; }
     .gm-new-label input[type=text],.gm-new-label select { display:block; box-sizing:border-box; width:100%; padding:10px; margin:10px 0 18px; color:inherit; background:var(--layout-background-0,#fff); border:1px solid var(--layout-border-0,#888); border-radius:4px; font:inherit; }
@@ -549,8 +540,8 @@ function installReadingMode(win) {
       border:0; border-radius:0; outline:none; box-shadow:none; }
     .gm-label-search > svg { width:20px; height:20px; flex:none; margin-inline:8px; }
     .gm-label-list { max-height:260px; overflow-y:auto; padding-block:4px 8px; }
-    .gm-label-option { display:flex; align-items:center; gap:8px; height:24px; min-height:24px; margin:0;
-      box-sizing:border-box; padding:2px 12px; cursor:pointer; }
+    .gm-label-option { display:flex; align-items:center; gap:10px; height:24px; min-height:24px; margin:0;
+      box-sizing:border-box; padding:2px 20px; cursor:pointer; }
     .gm-label-option:hover, .gm-label-option:focus-within,
     .gm-label-footer > button:hover { background:var(--treeitem-background-hover, #f1f3f4); }
     .gm-label-option input { appearance:none; box-sizing:border-box; width:15px; height:15px;
@@ -565,7 +556,7 @@ function installReadingMode(win) {
     .gm-label-footer { border-top:1px solid var(--layout-border-0, #e8eaed); padding-top:4px; }
     .gm-label-footer > button { display:block; width:100%; text-align:start; font:inherit;
       color:inherit; background:transparent; border:0; border-radius:0; margin:0;
-      padding:4px 12px 4px 48px; height:26px; min-height:26px; box-sizing:border-box; cursor:pointer; }
+      padding:4px 12px 4px 45px; height:26px; min-height:26px; box-sizing:border-box; cursor:pointer; }
     `;
   const printButton = action(gmText("Print conversation"), 'M6 8V3h12v5 M3 17V9h18v8h-3 M6 14h12v7H6z M17 11h1', () => {
     if(useIndependent) {independent?.print();return}
