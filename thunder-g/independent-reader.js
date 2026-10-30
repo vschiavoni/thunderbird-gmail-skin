@@ -488,7 +488,7 @@ function installIndependentReader(win) {
       let composer=inlineComposeControllers.get(win);
       if(!composer){composer=createInlineCompose(win);inlineComposeControllers.set(win,composer);}
       const token=ticket,labelHeaders=currentHeaders.slice();
-      composer.open(target,command,{container:conversation,scrollHost:host,
+      composer.open(target,command,{container:conversation,scrollHost:host,isCurrent:()=>token===ticket,
         labelMessages:()=>token===ticket?currentHeaders:labelHeaders,onSendState:state=>sendFeedback(state,token)});return;
     }
     const frame=frames.get(independentMessageKey(target || {}));

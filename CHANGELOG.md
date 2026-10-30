@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Load the original body and attachments before opening an embedded forward; preserve inline images and leave recipient fields empty.
+
 - Remove the obsolete checkbox offset and reserve separate checkbox/star gutters to prevent overlap after hiding thread-status icons.
 
 - Hide the native thread-status column, including watched/ignored icons, consistently across all accounts and folders. Preserve conversation grouping and subject expand/collapse controls.
