@@ -275,7 +275,8 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     {messageKey:2,folder:{URI:'inbox'},getStringProperty:()=> ''}];let selected=messages;const calls=[];
   scope.Ci={nsIMsgFolderNotificationService:{msgsMoveCopyCompleted:1}};
   scope.MailServices={mfn:{addListener(){},removeListener(){}},tags:{getAllTags:()=>[
-    {key:'one',tag:'Project One',color:'#ff0000'},{key:'two',tag:'Other'}]}};
+    {key:'one',tag:'Project One',color:'#ff0000'},{key:'two',tag:'Other'},
+    {key:'child',tag:'Project One/Child'},{key:'leaf',tag:'Project One/Child/Leaf'}]}};
   const nativeCommands=[];
   const win={document:doc,top:{document:doc},gDBView:{rowCount:2,getFlagsAt:()=>0,getMsgHdrAt:i=>messages[i],getSelectedMsgHdrs:()=>selected},commandController:{_toggleMessageTag:(...args)=>calls.push(args),doCommand:name=>nativeCommands.push(name)},
     addEventListener(){},removeEventListener(){}};
@@ -312,6 +313,13 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.ok(nodes.some(n=>n.textContent==='Label as:'));
   assert.equal(nodes.find(n=>n.className==='gm-label-scope').hidden,true,'list selection does not claim to label a whole conversation');
   const search=nodes.find(n=>n.type==='search');assert.equal(doc.activeElement,search);
+  const flat=nodes.find(n=>n.className==='gm-label-list');
+  assert.deepEqual(flat.children.map(row=>row.children[1].textContent),['Project One','Other','Project One/Child','Project One/Child/Leaf']);
+  assert.ok(flat.children.every(row=>row.children.length===2 && row.children[0].type==='checkbox'),'all labels share a single checkbox gutter, without disclosure buttons');
+  assert.ok(flat.children.every(row=>row.style.paddingInlineStart===undefined),'nested paths have no extra indentation');
+  search.value='Child';search.events.input[0]();
+  assert.deepEqual(flat.children.map(row=>row.children[1].textContent),['Project One/Child','Project One/Child/Leaf'],'search preserves the full path at every nesting depth');
+  search.value='';search.events.input[0]();
   const first=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');assert.equal(first.indeterminate,true);
   first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['one',true]]);
   first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['one',false]);
@@ -337,9 +345,9 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   scope.MailServices.tags.getKeyForTag=()=> 'new-child-key';
   newName.value='Project One';form.events.submit[0]({preventDefault(){}});
   assert.equal(additions.length,0,'duplicate label must not be created');
-  newName.value='Child';nest.checked=true;parentSelect.value='Project One';
+  newName.value='New Child';nest.checked=true;parentSelect.value='Project One';
   form.events.submit[0]({preventDefault(){}});
-  assert.deepEqual(additions,[['Project One/Child','','']]);
+  assert.deepEqual(additions,[['Project One/New Child','','']]);
   assert.deepEqual(calls.at(-1),['new-child-key',true],'apply only the child key to the exact selection');
   controller.close();
 });

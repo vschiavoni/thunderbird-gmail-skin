@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show full nested label paths in a flat Gmail-style assignment picker, with aligned checkboxes and no expand/collapse arrows. Keep the sidebar hierarchy unchanged.
+
 ## 0.21.0
 
 - Show a startup splash while the visible mailbox becomes usable, then fade it away. Slow startup uses a dismissible waiting card; include English/Italian text, dark mode and reduced-motion support.
