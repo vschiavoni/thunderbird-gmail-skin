@@ -574,3 +574,22 @@ test('failed sends and unlabelled conversations leave no inheritance listener be
  }
  const f=replyLabelFixture();f.sources.length=0;const watch=f.start();assert.equal(f.listener,null);assert.equal(f.timers.size,0);watch.close();
 });
+
+
+test('forward MIME preparation includes body and attachments without copying recipients or draft identity',async()=>{
+ const identity={key:'sender'},header={mime2DecodedSubject:'Original',folder:{getUriForMsg:()=> 'imap-message://Inbox#42'}};
+ let mime={headers:{subject:['Original'],from:['Sender <sender@example.org>'],to:['Me <me@example.org>'],bcc:['private@example.org'],'x-identity-key':['wrong-account']},parts:[{contentType:'text/plain',body:'Original message text'}],allUserAttachments:[{url:'imap://local?part=1.2',name:'document.pdf',contentType:'application/pdf',size:217000}]};
+ const interfaces={nsIMsgCompType:{ForwardInline:3},nsIMsgCompFormat:{PlainText:1,HTML:2}};
+ const classes={'@mozilla.org/messengercompose/composeparams;1':{createInstance:()=>({})},'@mozilla.org/messengercompose/composefields;1':{createInstance:()=>({attachments:[],addAttachment(a){this.attachments.push(a)}})},'@mozilla.org/messengercompose/attachment;1':{createInstance:()=>({})}};
+ const modules={importESModule(name){return name.includes('MimeMessage')?{MsgHdrToMimeMessage(h,c,done,download,options){assert.equal(download,true);assert.equal(options.saneBodySize,false);done(h,mime)}}:{MailUtils:{getIdentityForHeader(h,type){assert.equal(type,3);return [identity]}}}}};
+ const load=()=>scope.inlineDraftParams(header,{},interfaces,classes,modules,true);
+ let params=await load();let fields=params.composeFields;
+ assert.equal(params.type,3);assert.equal(params.identity,identity);assert.equal(params.originalMsgURI,'imap-message://Inbox#42');
+ assert.equal(fields.subject,'Fwd: Original');assert.match(fields.body,/Original message text/);assert.match(fields.body,/From: Sender <sender@example.org>/);
+ for(const name of ['to','cc','bcc','from','draftId'])assert.equal(fields[name],undefined);
+ assert.equal(fields.attachments.length,1);assert.equal(fields.attachments[0].name,'document.pdf');assert.equal(fields.attachments[0].url,'imap://local?part=1.2');
+ mime.parts=[{contentType:'text/html',body:'<p>Original HTML<img src="cid:picture"></p>'},{contentType:'image/png',url:'imap://local?part=1.3',headers:{'content-id':['<picture>']}}];
+ params=await load();assert.equal(params.format,2);assert.match(params.composeFields.body,/Sender &lt;sender@example.org&gt;/);assert.match(params.composeFields.body,/src="imap:\/\/local\?part=1.3"/);
+ mime.isEncrypted=true;await assert.rejects(load(),/encrypted/);
+ mime=null;await assert.rejects(load(),/Could not load/);
+});

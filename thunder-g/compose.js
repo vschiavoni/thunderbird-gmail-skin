@@ -594,7 +594,7 @@ function styleInlineComposeBody(native) {
 }
 // Parse the saved MIME directly: opening a native window merely to obtain its
 // arguments causes a visible flash and creates two editors for the same draft.
-async function inlineDraftParams(header,services=MailServices,interfaces=Ci,classes=Cc,modules=ChromeUtils) {
+async function inlineDraftParams(header,services=MailServices,interfaces=Ci,classes=Cc,modules=ChromeUtils,forward=false) {
   const {MsgHdrToMimeMessage}=modules.importESModule('resource:///modules/gloda/MimeMessage.sys.mjs');
   const mime=await new Promise((resolve,reject)=>{
     try {MsgHdrToMimeMessage(header,null,(_header,message)=>message?resolve(message):reject(new Error('Could not load the saved draft.')),true,{saneBodySize:false,examineEncryptedParts:true})}
@@ -612,19 +612,20 @@ async function inlineDraftParams(header,services=MailServices,interfaces=Ci,clas
     for(const child of part.parts || [])visit(child);
   }
   visit(mime,true);
-  const body=bodies.find(part=>part.contentType==='text/html' || part.contentType==='text/enriched') || bodies[0];
-  if(!body)throw new Error('The saved draft has no readable body. Open it from Drafts in the classic composer.');
-  params.type=interfaces.nsIMsgCompType.Draft;
+  const body=bodies.find(part=>part.contentType==='text/html' || part.contentType==='text/enriched') || bodies[0] || (forward?{contentType:'text/plain',body:''}:null);
+  if(!body)throw new Error('The message has no readable body. Open it in the classic composer.');
+  params.type=forward?interfaces.nsIMsgCompType.ForwardInline:interfaces.nsIMsgCompType.Draft;
   params.format=body.contentType==='text/plain'?interfaces.nsIMsgCompFormat.PlainText:interfaces.nsIMsgCompFormat.HTML;
   params.originalMsgURI=uri;params.origMsgHdr=header;
-  const identityKey=value('x-identity-key');
+  const identityKey=forward?'':value('x-identity-key');
   params.identity=identityKey?services.accounts.getIdentity(identityKey):null;
   if(!params.identity){const {MailUtils}=modules.importESModule('resource:///modules/MailUtils.sys.mjs');[params.identity]=MailUtils.getIdentityForHeader(header,params.type)}
   if(!params.identity)throw new Error('The draft account identity is unavailable.');
   for(const [name,property] of Object.entries({'from':'from','to':'to','cc':'cc','bcc':'bcc','reply-to':'replyTo','subject':'subject','references':'references','newsgroups':'newsgroups','followup-to':'followupTo','organization':'organization','priority':'priority','fcc':'fcc','x-mozilla-fcc2':'fcc2'})) {
+    if(forward && !['subject'].includes(property))continue;
     const raw=value(name);if(raw)fields[property]=services.mimeConverter?.decodeMimeHeader(raw,null,false,true) || raw;
   }
-  fields.draftId=uri;fields.body=body.body;
+  if(!forward)fields.draftId=uri;fields.body=body.body;
   const info=value('x-mozilla-draft-info');
   fields.attachVCard=/\bvcard=1\b/.test(info);fields.returnReceipt=/\breceipt=1\b/.test(info);
   fields.DSN=/\bDSN=1\b/i.test(info);
@@ -643,7 +644,18 @@ async function inlineDraftParams(header,services=MailServices,interfaces=Ci,clas
     if(cid && part.url && body.contentType!=='text/plain')fields.body=fields.body.split('cid:'+cid).join(part.url.replaceAll('&','&amp;'));
     for(const child of part.parts || [])inlineImages(child);
   }
-  inlineImages(mime);params.composeFields=fields;return params;
+  inlineImages(mime);
+  if(forward){
+    // Unlike replies, native ForwardInline initialization expects MIME content
+    // already in compFields. Never copy the original recipients or draft flags.
+    const decode=raw=>services.mimeConverter?.decodeMimeHeader(raw,null,false,true) || raw;
+    const envelope=['-------- Forwarded Message --------',...['subject','date','from','to','cc'].filter(name=>value(name)).map(name=>`${name[0].toUpperCase()+name.slice(1)}: ${decode(value(name))}`)].join('\n');
+    const escape=text=>text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    fields.body=body.contentType==='text/plain'?`\n\n${envelope}\n\n${fields.body}`:`<br><br><div class="moz-forward-container"><pre>${escape(envelope)}</pre>${fields.body}</div>`;
+    fields.subject='Fwd: '+decode(value('subject') || header.mime2DecodedSubject || '');
+    fields.attachVCard=false;fields.returnReceipt=false;fields.DSN=false;
+  }
+  params.composeFields=fields;return params;
 }
 var pendingInlineDrafts=new WeakMap();
 async function resumeInlineDraft(win,header,placement,load=inlineDraftParams) {
@@ -700,10 +712,11 @@ function createInlineCompose(win) {
   const doc=win.document;let browser=null,panel=null,originalHeader=null,originalCommand=null,ready=false,observer=null;
   let restoreChrome=null,loadingTimer=null,inlineContainer=null,scrollHost=null,presentation='inline',bar=null,title=null,floatButton=null,windowButton=null,transferBusy=false,attachmentPicker=null,draftStatus=null,floatingResize=null,sendStatus=null;
   let sendNotice=null,noticeTimer=null,scrim=null,minimized=false,minimizeButton=null,bodyReadyWatcher=null,bodySheet=null,composeContentBridge=null;
-  let changeAutosave=null,attachmentDrop=null;
+  let changeAutosave=null,attachmentDrop=null,pendingForward=null;
   const main=win.browsingContext.topChromeWindow;
   function stopObserver(){if(observer){Services.obs.removeObserver(observer,'chrome-document-global-created');observer=null;}}
   function dispose(){
+    pendingForward=null;
     bodyReadyWatcher?.close();bodyReadyWatcher=null;bodySheet?.close();bodySheet=null;
     changeAutosave?.close();changeAutosave=null;
     sendStatus?.close();sendStatus=null;
@@ -898,6 +911,21 @@ function createInlineCompose(win) {
       if(browser){
         // Never replace another unsent message when navigating or pressing Reply again.
         panel.hidden=false;browser.focus();return;
+      }
+      if(command==='cmd_forwardInline' && !placement.params){
+        if(pendingForward)return;
+        const token={};pendingForward=token;
+        inlineDraftParams(header,MailServices,Ci,Cc,ChromeUtils,true).then(params=>{
+          if(pendingForward!==token)return;
+          pendingForward=null;
+          if(placement.isCurrent && !placement.isCurrent())return;
+          this.open(header,command,{...placement,params});
+        }).catch(error=>{
+          if(pendingForward!==token)return;
+          pendingForward=null;
+          Services.prompt.alert(main,'Thunder-G',`Could not load the forwarded message. ${error.message || error}`);
+        });
+        return;
       }
       let replyLabels=null;
       const onSendState=state=>{
