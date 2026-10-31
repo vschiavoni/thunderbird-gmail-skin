@@ -1,5 +1,10 @@
 # Labels  ![](resources/microelements/labels.svg)
 
+To move labels and their email assignments to another Thunderbird setup, use
+**Preferences → Labels → Export labels and assignments**. After downloading the
+same mail on the new computer, preview and restore the saved file. See the
+[label backup guide](label-backup.md) for matching rules and missing messages.
+
 Press **L** to search and apply labels; use Up/Down, Space to toggle and Escape to close.
 In the list, changes apply to selected messages; in the conversation reader, they apply to the whole resolved conversation, including sent replies.
 Numeric tag shortcuts target the active message, identified by a slim marker.

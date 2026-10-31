@@ -3,6 +3,16 @@
     "namespace": "inlineLabels",
     "functions": [
       {
+        "name": "labelBackup",
+        "type": "function",
+        "async": true,
+        "parameters": [
+          {"name":"action","type":"string","enum":["accounts","export","preview","import","cancel"]},
+          {"name":"data","type":"string"}
+        ],
+        "returns":{"type":"string"}
+      },
+      {
         "name": "start",
         "type": "function",
         "async": true,

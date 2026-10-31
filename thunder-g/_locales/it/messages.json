@@ -1746,5 +1746,292 @@
   "startup_warning": {
     "message": "Thunderbird segnala un problema",
     "description": "Thunderbird reported a problem"
+  },
+  "label_backup_title": {
+    "message": "Backup delle etichette e delle assegnazioni alle email",
+    "description": "Back up labels and message assignments"
+  },
+  "label_backup_intro": {
+    "message": "Trasferisci le etichette di Thunder-G su un altro computer dopo aver riscaricato la posta.",
+    "description": "Move your Thunder-G labels to another computer after downloading your mail again."
+  },
+  "label_backup_contents": {
+    "message": "Un solo file conserva nomi, colori, gerarchia, visibilità delle etichette e le assegnazioni alle email. Sono esclusi il testo dei messaggi, gli allegati e le credenziali degli account.",
+    "description": "One file keeps label names, colors, nesting, visibility and their message assignments. Message text, attachments and account credentials are excluded."
+  },
+  "label_backup_export": {
+    "message": "Esporta etichette e assegnazioni",
+    "description": "Export labels and assignments"
+  },
+  "label_backup_privacy": {
+    "message": "Il file include gli identificativi degli account e dei messaggi per ritrovare le email sul nuovo computer. Conservalo con i tuoi backup personali.",
+    "description": "The file includes account identifiers and message identifiers so matching mail can be found on the new computer. Keep it with your personal backups."
+  },
+  "label_backup_choose": {
+    "message": "Scegli un backup delle etichette di Thunder-G",
+    "description": "Choose a Thunder-G label backup"
+  },
+  "label_backup_import_help": {
+    "message": "Collega prima gli stessi account e lascia che Thunderbird scarichi gli elenchi dei messaggi. L’anteprima trova le email corrispondenti senza modificarle. Dimensione massima del file: 16 MiB.",
+    "description": "First connect the same accounts and let Thunderbird download the message lists. Preview finds matching messages without changing them. Maximum file size: 16 MiB."
+  },
+  "label_backup_preview": {
+    "message": "Anteprima del ripristino",
+    "description": "Preview restore"
+  },
+  "label_backup_apply": {
+    "message": "Ripristina etichette",
+    "description": "Restore labels"
+  },
+  "label_backup_cancel": {
+    "message": "Annulla anteprima",
+    "description": "Cancel preview"
+  },
+  "label_backup_additive": {
+    "message": "Le etichette e le assegnazioni esistenti vengono mantenute. Le email mancanti o ambigue vengono saltate; puoi ripetere l’anteprima dello stesso file dopo aver scaricato altra posta.",
+    "description": "Your existing labels and assignments are kept. Missing or ambiguous messages are skipped; you can preview the same file again after downloading more mail."
+  },
+  "label_backup_preview_caption": {
+    "message": "Etichette in questo backup",
+    "description": "Labels in this backup"
+  },
+  "label_backup_label_column": {
+    "message": "Etichetta",
+    "description": "Label"
+  },
+  "label_backup_action_column": {
+    "message": "Azione",
+    "description": "Action"
+  },
+  "label_backup_details_column": {
+    "message": "Dettagli",
+    "description": "Details"
+  },
+  "label_backup_failed": {
+    "message": "L’operazione di backup delle etichette non è riuscita.",
+    "description": "The label backup operation failed."
+  },
+  "label_backup_create_label": {
+    "message": "Crea etichetta",
+    "description": "Create label"
+  },
+  "label_backup_keep_label": {
+    "message": "Mantieni etichetta esistente",
+    "description": "Keep existing label"
+  },
+  "label_backup_preview_summary": {
+    "message": "$1 etichette da creare, $2 etichette esistenti, $3 conflitti. Email: $4 corrispondenti, $5 mancanti, $6 ambigue.",
+    "description": "$1 labels to create, $2 existing labels, $3 conflicts. Messages: $4 matched, $5 missing, $6 ambiguous."
+  },
+  "label_backup_preview_omitted": {
+    "message": "Sono mostrate $1 etichette su $2. I totali comprendono l’intero backup.",
+    "description": "Showing $1 of $2 labels. The totals include the full backup."
+  },
+  "label_backup_selected": {
+    "message": "Backup selezionato. Scegli Anteprima del ripristino per controllare le etichette e trovare le email corrispondenti.",
+    "description": "Backup selected. Choose Preview restore to check labels and find matching messages."
+  },
+  "label_backup_reading": {
+    "message": "Lettura del backup e ricerca delle email corrispondenti…",
+    "description": "Reading the backup and finding matching messages…"
+  },
+  "label_backup_too_large": {
+    "message": "Scegli un backup delle etichette di Thunder-G inferiore a 16 MiB.",
+    "description": "Choose a Thunder-G label backup smaller than 16 MiB."
+  },
+  "label_backup_conflicts": {
+    "message": "Risolvi i conflitti delle etichette prima del ripristino. Non è stata apportata alcuna modifica.",
+    "description": "Resolve the label conflicts before restoring. No changes have been made."
+  },
+  "label_backup_review": {
+    "message": "Controlla l’anteprima, poi scegli Ripristina etichette. Le email mancanti o ambigue vengono saltate.",
+    "description": "Review the preview, then choose Restore labels. Missing or ambiguous messages are skipped."
+  },
+  "label_backup_restoring": {
+    "message": "Ripristino delle etichette e delle assegnazioni alle email…",
+    "description": "Restoring labels and message assignments…"
+  },
+  "label_backup_restored": {
+    "message": "Create $1 etichette, mantenute $2 etichette esistenti e ripristinate le etichette su $3 email. Mancanti: $4; ambigue: $5; non riuscite: $6.",
+    "description": "Created $1 labels, kept $2 existing labels, and restored labels on $3 messages. Missing: $4; ambiguous: $5; failed: $6."
+  },
+  "label_backup_exporting": {
+    "message": "Lettura delle etichette e delle assegnazioni alle email…",
+    "description": "Reading labels and message assignments…"
+  },
+  "label_backup_export_too_large": {
+    "message": "Questo backup supera il limite di 16 MiB. Nessun file è stato salvato.",
+    "description": "This backup exceeds the 16 MiB limit. No file was saved."
+  },
+  "label_backup_export_ready": {
+    "message": "Backup pronto: $1 etichette e assegnazioni per $2 email. Email saltate: $3.",
+    "description": "Backup ready: $1 labels and assignments for $2 messages. Messages skipped: $3."
+  },
+  "label_backup_cancelled": {
+    "message": "Anteprima annullata. Nessuna etichetta o assegnazione è stata modificata.",
+    "description": "Preview cancelled. No labels or assignments were changed."
+  },
+  "label_backup_invalid": {
+    "message": "File di backup delle etichette non valido.",
+    "description": "Invalid label backup file."
+  },
+  "label_backup_version": {
+    "message": "Versione del backup delle etichette non supportata.",
+    "description": "Unsupported label backup version."
+  },
+  "label_backup_core_too_large": {
+    "message": "Il file di backup delle etichette è troppo grande (massimo 16 MiB).",
+    "description": "The label backup file is too large (maximum 16 MiB)."
+  },
+  "label_backup_limits": {
+    "message": "Il backup contiene troppe etichette, account o assegnazioni alle email.",
+    "description": "Too many labels, accounts or message assignments in the backup."
+  },
+  "label_backup_local_conflict": {
+    "message": "Le etichette locali esistenti sono in conflitto con questa etichetta.",
+    "description": "Existing local labels conflict with this label."
+  },
+  "label_backup_key_changed": {
+    "message": "L’etichetta usa un identificativo locale diverso; i dati esistenti verranno mantenuti.",
+    "description": "The label uses a different local key; existing metadata will be kept."
+  },
+  "label_backup_keep_metadata": {
+    "message": "I dati locali dell’etichetta verranno mantenuti.",
+    "description": "Local label metadata will be kept."
+  },
+  "label_backup_account_missing": {
+    "message": "Non è stato trovato alcun account corrispondente.",
+    "description": "No matching account was found."
+  },
+  "label_backup_account_ambiguous": {
+    "message": "Corrispondono più account locali.",
+    "description": "More than one local account matches."
+  },
+  "label_backup_message_missing": {
+    "message": "L’email non è disponibile nella cartella corrispondente.",
+    "description": "The message is not available in the matching folder."
+  },
+  "label_backup_message_ambiguous": {
+    "message": "Più email hanno questo identificativo nella cartella corrispondente.",
+    "description": "More than one message has this identifier in the matching folder."
+  },
+  "label_backup_message_blocked": {
+    "message": "L’email fa riferimento solo a etichette in conflitto.",
+    "description": "The message refers only to conflicting labels."
+  },
+  "label_backup_operation_cancelled": {
+    "message": "Operazione di backup delle etichette annullata.",
+    "description": "Label backup operation cancelled."
+  },
+  "label_backup_folder_unidentified": {
+    "message": "Non è stato possibile identificare una cartella locale.",
+    "description": "A local folder could not be identified."
+  },
+  "label_backup_too_many_accounts": {
+    "message": "Troppi account per un solo backup delle etichette.",
+    "description": "Too many accounts for a label backup."
+  },
+  "label_backup_too_many_folders": {
+    "message": "Troppe cartelle per un solo backup delle etichette.",
+    "description": "Too many folders for a label backup."
+  },
+  "label_backup_too_many_headers": {
+    "message": "Questa casella è troppo grande per un solo backup delle etichette (massimo 500.000 messaggi nella cache).",
+    "description": "This mailbox is too large for one label backup (maximum 500,000 cached messages)."
+  },
+  "label_backup_unreadable_folders": {
+    "message": "Non è stato possibile leggere $1 cartelle. Le loro assegnazioni alle email non sono incluse; apri o sincronizza quelle cartelle e riprova.",
+    "description": "$1 folders could not be read. Their message assignments are not included; open or synchronize those folders and try again."
+  },
+  "label_backup_wait": {
+    "message": "Attendi il completamento dell’operazione di backup delle etichette in corso.",
+    "description": "Wait for the current label backup operation to finish."
+  },
+  "label_backup_unknown_operation": {
+    "message": "Operazione di backup delle etichette sconosciuta.",
+    "description": "Unknown label backup operation."
+  },
+  "label_backup_preview_again": {
+    "message": "Ripeti l’anteprima del backup delle etichette prima del ripristino.",
+    "description": "Preview the label backup again before restoring."
+  },
+  "label_backup_changed_since_preview": {
+    "message": "Le etichette o le email corrispondenti sono cambiate dopo l’anteprima. Ripeti l’anteprima; non è stato ripristinato nulla.",
+    "description": "Labels or matching messages changed since the preview. Preview again; nothing was restored."
+  },
+  "label_backup_resolve_conflicts": {
+    "message": "Risolvi i conflitti delle etichette prima di ripristinare questo backup.",
+    "description": "Resolve label conflicts before restoring this backup."
+  },
+  "label_backup_partial_restore": {
+    "message": "Il ripristino è stato interrotto prima del completamento. Le modifiche già applicate sono state mantenute. Ripeti l’anteprima del backup per riprovare.",
+    "description": "Restore stopped before completing. Changes already applied were kept. Preview the backup again to retry."
+  },
+  "label_backup_some_failed": {
+    "message": "Alcune email sono cambiate o non è stato possibile aggiornarle. Ripeti l’anteprima del backup per riprovare.",
+    "description": "Some messages changed or could not be updated. Preview the backup again to retry."
+  },
+  "label_backup_invalid_request": {
+    "message": "Richiesta di backup delle etichette non valida.",
+    "description": "Invalid label backup request."
+  },
+  "label_backup_scan_changed": {
+    "message": "Il contenuto della casella è cambiato durante la lettura. Ripeti l’anteprima o l’esportazione."
+  },
+  "label_backup_account_label": {
+    "message": "Esporta le assegnazioni alle email da",
+    "description": "Export message assignments from"
+  },
+  "label_backup_account_placeholder": {
+    "message": "Scegli un account…",
+    "description": "Choose an account…"
+  },
+  "label_backup_load_accounts": {
+    "message": "Mostra account",
+    "description": "Show accounts"
+  },
+  "label_backup_all_accounts": {
+    "message": "Tutti gli account",
+    "description": "All accounts"
+  },
+  "label_backup_account_help": {
+    "message": "Le definizioni delle etichette sono condivise tra gli account. Vengono esportate solo le assegnazioni alle email dell’account selezionato.",
+    "description": "Label definitions are shared across accounts. Only message assignments from the selected account are exported."
+  },
+  "label_backup_loading_accounts": {
+    "message": "Lettura degli account configurati…",
+    "description": "Reading configured accounts…"
+  },
+  "label_backup_choose_export_account": {
+    "message": "Scegli un account, poi esporta le etichette e le assegnazioni alle email.",
+    "description": "Choose an account, then export its labels and message assignments."
+  },
+  "label_backup_available_account": {
+    "message": "Scegli un account disponibile per il backup delle etichette.",
+    "description": "Choose an available account for the label backup."
+  },
+  "import_export_title": {
+    "message": "Import/Export",
+    "description": "Settings section for Gmail import and label backup/restore"
+  },
+  "label_backup_done": {
+    "message": "Fatto",
+    "description": "Done"
+  },
+  "label_backup_assignment_counts": {
+    "message": "Messaggi con assegnazioni da ripristinare: $1; già assegnati: $2.",
+    "description": "Messages needing label assignments: $1; already assigned: $2."
+  },
+  "label_backup_already_done": {
+    "message": "Fatto — tutte le etichette e le assegnazioni di questo backup sono già presenti nelle cartelle corrispondenti. L’anteprima non ha applicato modifiche.",
+    "description": "Done — all labels and assignments in this backup are already present in their matching folders. Preview did not apply any changes."
+  },
+  "label_backup_no_pending": {
+    "message": "Nessun ripristino possibile da questa anteprima. I messaggi mancanti o ambigui vengono ignorati. L’anteprima non ha applicato modifiche.",
+    "description": "Nothing can be restored from this preview. Missing or ambiguous messages are skipped. Preview did not apply any changes."
+  },
+  "label_backup_preview_ready": {
+    "message": "Anteprima completata. Nessuna modifica applicata. Scegli Ripristina etichette per applicare le modifiche in attesa. I messaggi mancanti o ambigui vengono ignorati.",
+    "description": "Preview complete. No changes have been made. Choose Restore labels to apply the pending changes. Missing or ambiguous messages are skipped."
   }
 }
