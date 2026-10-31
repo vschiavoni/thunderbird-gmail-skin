@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "Thunder-G",
   "description": "__MSG_gmail_inspired_interface_for_thunderbird_with_native_ef84227__",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "browser_specific_settings": {
     "gecko": {
       "id": "thunder-g@vschiavoni",

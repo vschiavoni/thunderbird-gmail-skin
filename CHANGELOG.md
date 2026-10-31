@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.22.0
+
+- Add label backup and restore under Settings → Import/Export, including account selection, JSON export, a dry-run preview, and restoration of missing definitions and message assignments. Preserve existing labels and report missing or ambiguous matches.
+
 - Show full nested label paths in a flat Gmail-style assignment picker, with aligned checkboxes and no expand/collapse arrows. Keep the sidebar hierarchy unchanged.
 - Load the original body and attachments before opening an embedded forward; preserve inline images and leave recipient fields empty.
 
