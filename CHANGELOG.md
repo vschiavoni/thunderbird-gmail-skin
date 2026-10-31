@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Show full nested label paths in a flat Gmail-style assignment picker, with aligned checkboxes and no expand/collapse arrows. Keep the sidebar hierarchy unchanged.
 - Load the original body and attachments before opening an embedded forward; preserve inline images and leave recipient fields empty.
 
 - Remove the obsolete checkbox offset and reserve separate checkbox/star gutters to prevent overlap after hiding thread-status icons.

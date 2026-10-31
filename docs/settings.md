@@ -101,6 +101,10 @@ file, **Preview restore**, and **Restore labels**. Existing labels and assignmen
 are kept; missing or ambiguous messages are skipped. No message text, attachments
 or credentials are exported. See the [label backup guide](label-backup.md).
 
+The **Label as** picker lists every label at the same level using its full path
+(for example, `Research/Projects/Example`). Search matches that full path. The
+sidebar continues to display expandable nested labels.
+
 **Import labels from Gmail** is optional and starts with a dry run. Connect using
 an optional Google Desktop OAuth client, choose custom labels and a destination
 (default `GMAIL-Labels`), then review every proposed local change before importing.
