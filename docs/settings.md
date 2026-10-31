@@ -90,7 +90,16 @@ An ordinary DKIM Verifier installation does not provide this integration.
 > Only the advertised logo is downloaded, without an external logo lookup service.
 > Logos and missing results are cached for one hour during the session. **Turning this off stops new downloads and restores the usual avatars.**
 
-## Labels
+## Import/Export
+
+**Back up labels and message assignments** exports one file containing label
+definitions, visibility and assignments to identifiable messages. Choose **Show
+accounts**, then select one account or explicitly choose **All accounts**. Label
+definitions are profile-wide; message assignments follow your selection. On a new
+computer, add the same accounts and download the message lists, then choose the
+file, **Preview restore**, and **Restore labels**. Existing labels and assignments
+are kept; missing or ambiguous messages are skipped. No message text, attachments
+or credentials are exported. See the [label backup guide](label-backup.md).
 
 **Import labels from Gmail** is optional and starts with a dry run. Connect using
 an optional Google Desktop OAuth client, choose custom labels and a destination

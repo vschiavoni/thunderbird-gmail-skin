@@ -25,7 +25,7 @@
         <nav aria-label="Settings sections" data-i18n-aria-label="settings_sections_2e7109b">
           <a href="#inbox"><span data-i18n="inbox_44caf74">Inbox</span></a>
           <a href="#conversations"><span data-i18n="conversations_07c59b4">Conversations</span></a>
-          <a href="#gmail-labels"><span data-i18n="labels_2228985">Labels</span></a>
+          <a href="#import-export"><span data-i18n="import_export_title">Import/Export</span></a>
           <a href="#writing"><span data-i18n="writing_2dabb83">Writing</span></a>
           <a href="#sender-logos"><span data-i18n="sender_logos_f3c497a">Sender logos</span></a>
         </nav>
@@ -87,33 +87,60 @@
           <details><summary><span data-i18n="how_conversations_work_b782f81">How conversations work</span></summary><div class="details-content"><p><span data-i18n="messages_are_grouped_using_thunderbird_s_local_index_d236247">Messages are grouped using Thunderbird’s local index, with a folder-thread fallback when indexing is unavailable. Message bodies, attachments, Reply, Forward and Print use Thunderbird’s native viewer and commands.</span></p><p><span data-i18n="changing_readers_returns_to_the_list_the_conversatio_601190b">Changing readers returns to the list. The conversation toolbar acts on messages selected in the list, even when the reader finds additional messages in other folders.</span></p></div></details>
         </section>
 
-        <section id="gmail-labels" aria-labelledby="gmail-labels-title">
-          <div class="section-heading"><h2 id="gmail-labels-title"><span data-i18n="import_labels_from_gmail_646acdc">Import labels from Gmail</span></h2><p><span data-i18n="optional_one_time_import_of_label_names_and_nesting__1dcd19b">Optional, one-time import of label names and nesting. No emails are downloaded or assigned labels.</span></p></div>
-          <p class="notice"><span data-i18n="nothing_connects_to_google_until_you_choose_connect__91a5778">Nothing connects to Google until you choose Connect. Google sign-in opens in your browser and supports 2FA. Google asks to see and edit labels; this importer only reads them. Account identity and label names are fetched directly from Google, with no intermediary server.</span></p>
-          <details id="gmail-setup"><summary><span data-i18n="optional_google_connection_setup_46786e3">Optional Google connection setup</span></summary>
-            <div class="details-content">
-              <p><span data-i18n="a_google_cloud_desktop_oauth_client_with_gmail_api_e_6dc8b88">A Google Cloud Desktop OAuth client with Gmail API enabled is required. Thunder-G does not yet ship a shared Google client. This feature is optional; other settings work without it.</span></p>
-              <p><span data-i18n="create_a_desktop_app_client_configure_its_consent_sc_1f8adb7">Create a Desktop app client, configure its consent screen and (in Testing mode) add your account as a test user. Request only OpenID email and Gmail labels. See</span> <a href="https://developers.google.com/identity/protocols/oauth2/native-app" target="_blank" rel="noopener noreferrer"><span data-i18n="google_s_desktop_oauth_setup_e14b930">Google’s Desktop OAuth setup</span></a><span data-i18n="workspace_accounts_may_require_administrator_approva_7be1375">. Workspace accounts may require administrator approval.</span></p>
-              <label for="gmail-client-file"><span data-i18n="load_downloaded_desktop_client_json_optional_384cd12">Load downloaded Desktop client JSON (optional)</span></label>
-              <input id="gmail-client-file" type="file" accept="application/json,.json">
-              <label for="gmail-client-id"><span data-i18n="google_desktop_client_id_b722762">Google Desktop client ID</span></label><input id="gmail-client-id" type="text" autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com">
-              <label for="gmail-client-secret"><span data-i18n="desktop_client_secret_if_supplied_by_google_b9cf3bd">Desktop client secret (if supplied by Google)</span></label><input id="gmail-client-secret" type="password" autocomplete="off">
-              <p><span data-i18n="credentials_and_google_access_tokens_are_not_saved_t_b3ed3f7">Credentials and Google access tokens are not saved to extension storage. The downloaded configuration is used only for this connection. Import credentials are separate from your Thunderbird mail accounts.</span></p>
+        <section id="import-export" aria-labelledby="import-export-title">
+          <div class="section-heading"><h2 id="import-export-title" data-i18n="import_export_title">Import/Export</h2></div>
+          <div class="import-export-group" role="region" id="label-backup-section" aria-labelledby="label-backup-title">
+            <div class="section-heading"><h3 id="label-backup-title" data-i18n="label_backup_title">Back up labels and message assignments</h3><p data-i18n="label_backup_intro">Move your Thunder-G labels to another computer after downloading your mail again.</p></div>
+            <p data-i18n="label_backup_contents">One file keeps label names, colors, nesting, visibility and their message assignments. Message text, attachments and account credentials are excluded.</p>
+            <div class="label-backup-account-picker"><label for="label-backup-accounts" data-i18n="label_backup_account_label">Export message assignments from</label><div class="label-backup-actions"><select id="label-backup-accounts" disabled><option value="" data-i18n="label_backup_account_placeholder">Choose an account…</option></select><button id="label-backup-load-accounts" type="button" data-i18n="label_backup_load_accounts">Show accounts</button></div></div>
+            <p class="section-note" data-i18n="label_backup_account_help">Label definitions are shared across accounts. Only message assignments from the selected account are exported.</p>
+            <div class="label-backup-actions"><button id="label-backup-export" type="button" disabled data-i18n="label_backup_export">Export labels and assignments</button></div>
+            <p class="section-note" data-i18n="label_backup_privacy">The file includes account identifiers and message identifiers so matching mail can be found on the new computer. Keep it with your personal backups.</p>
+            <div class="label-backup-import">
+              <label for="label-backup-file" data-i18n="label_backup_choose">Choose a Thunder-G label backup</label>
+              <input id="label-backup-file" type="file" accept="application/json,.json" aria-describedby="label-backup-import-help">
+              <p id="label-backup-import-help" class="section-note" data-i18n="label_backup_import_help">First connect the same accounts and let Thunderbird download the message lists. Preview finds matching messages without changing them. Maximum file size: 16 MiB.</p>
+              <div class="label-backup-actions"><button id="label-backup-preview" type="button" disabled data-i18n="label_backup_preview">Preview restore</button><button id="label-backup-apply" type="button" disabled data-i18n="label_backup_apply">Restore labels</button><button id="label-backup-cancel" type="button" disabled data-i18n="label_backup_cancel">Cancel preview</button></div>
+              <div id="label-backup-review" hidden>
+                <p id="label-backup-summary" role="status" aria-live="polite"></p>
+                <p class="section-note" data-i18n="label_backup_additive">Your existing labels and assignments are kept. Missing or ambiguous messages are skipped; you can preview the same file again after downloading more mail.</p>
+                <div class="label-backup-table-scroll"><table><caption data-i18n="label_backup_preview_caption">Labels in this backup</caption><thead><tr><th data-i18n="label_backup_label_column">Label</th><th data-i18n="label_backup_action_column">Action</th><th data-i18n="label_backup_details_column">Details</th></tr></thead><tbody id="label-backup-rows"></tbody></table></div>
+                <p id="label-backup-omitted" class="section-note"></p>
+              </div>
             </div>
-          </details>
-          <div class="gmail-actions"><button id="gmail-connect" type="button"><span data-i18n="connect_google_account_and_fetch_labels_ec5638b">Connect Google account and fetch labels</span></button><button id="gmail-disconnect" type="button" disabled><span data-i18n="disconnect_cancel_sign_in_b90c1a2">Disconnect / cancel sign-in</span></button></div>
-          <p id="gmail-account" role="status" aria-live="polite"><span data-i18n="not_connected_8b02f3d">Not connected</span></p>
-          <div id="gmail-import-controls" hidden>
-            <label for="gmail-root"><span data-i18n="destination_parent_971732b">Destination parent</span></label><input id="gmail-root" type="text" value="GMAIL-Labels" autocomplete="off" spellcheck="false">
-            <p><span data-i18n="required_parent_tags_are_included_automatically_pare_1f23b65">Required parent tags are included automatically. Parent and child assignments remain independent. Colors and email assignments are not imported.</span></p>
-            <div class="gmail-actions"><button id="gmail-select-all" type="button"><span data-i18n="select_all_913afff">Select all</span></button><button id="gmail-select-none" type="button"><span data-i18n="select_none_618cfb0">Select none</span></button></div>
-            <div id="gmail-remote-labels" class="gmail-label-list" role="group" aria-label="Gmail labels to import" data-i18n-aria-label="gmail_labels_to_import_ed2aefe"></div>
-            <label class="gmail-dry-run"><input id="gmail-dry-run" type="checkbox" checked> <span data-i18n="dry_run_preview_only_no_local_labels_created_d5c4bda">Dry run — preview only (no local labels created)</span></label>
-            <div class="gmail-actions"><button id="gmail-preview" type="button"><span data-i18n="preview_selected_labels_9c73f64">Preview selected labels</span></button><button id="gmail-import" type="button" disabled><span data-i18n="import_selected_labels_913eacc">Import selected labels</span></button><button id="gmail-cancel" type="button"><span data-i18n="cancel_preview_6ea314a">Cancel preview</span></button></div>
-            <p id="gmail-summary" role="status" aria-live="polite"></p>
-            <div class="gmail-preview-scroll"><table id="gmail-preview-table" hidden><caption><span data-i18n="proposed_local_changes_dae99de">Proposed local changes</span></caption><thead><tr><th><span data-i18n="local_label_path_e4b1711">Local label path</span></th><th><span data-i18n="action_97c89a4">Action</span></th><th><span data-i18n="details_dc3decb">Details</span></th></tr></thead><tbody id="gmail-preview-rows"></tbody></table></div>
+            <p id="label-backup-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+            <ul id="label-backup-warnings" class="section-note"></ul>
           </div>
-          <p id="gmail-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+
+          <div class="import-export-group" role="region" id="gmail-labels" aria-labelledby="gmail-labels-title">
+            <div class="section-heading"><div class="heading-line"><h3 id="gmail-labels-title"><span data-i18n="import_labels_from_gmail_646acdc">Import labels from Gmail</span></h3><span class="badge"><span data-i18n="experimental_b718f8c">Experimental</span></span></div><p><span data-i18n="optional_one_time_import_of_label_names_and_nesting__1dcd19b">Optional, one-time import of label names and nesting. No emails are downloaded or assigned labels.</span></p></div>
+            <p class="notice"><span data-i18n="nothing_connects_to_google_until_you_choose_connect__91a5778">Nothing connects to Google until you choose Connect. Google sign-in opens in your browser and supports 2FA. Google asks to see and edit labels; this importer only reads them. Account identity and label names are fetched directly from Google, with no intermediary server.</span></p>
+            <details id="gmail-setup"><summary><span data-i18n="optional_google_connection_setup_46786e3">Optional Google connection setup</span></summary>
+              <div class="details-content">
+                <p><span data-i18n="a_google_cloud_desktop_oauth_client_with_gmail_api_e_6dc8b88">A Google Cloud Desktop OAuth client with Gmail API enabled is required. Thunder-G does not yet ship a shared Google client. This feature is optional; other settings work without it.</span></p>
+                <p><span data-i18n="create_a_desktop_app_client_configure_its_consent_sc_1f8adb7">Create a Desktop app client, configure its consent screen and (in Testing mode) add your account as a test user. Request only OpenID email and Gmail labels. See</span> <a href="https://developers.google.com/identity/protocols/oauth2/native-app" target="_blank" rel="noopener noreferrer"><span data-i18n="google_s_desktop_oauth_setup_e14b930">Google’s Desktop OAuth setup</span></a><span data-i18n="workspace_accounts_may_require_administrator_approva_7be1375">. Workspace accounts may require administrator approval.</span></p>
+                <label for="gmail-client-file"><span data-i18n="load_downloaded_desktop_client_json_optional_384cd12">Load downloaded Desktop client JSON (optional)</span></label>
+                <input id="gmail-client-file" type="file" accept="application/json,.json">
+                <label for="gmail-client-id"><span data-i18n="google_desktop_client_id_b722762">Google Desktop client ID</span></label><input id="gmail-client-id" type="text" autocomplete="off" spellcheck="false" placeholder="…apps.googleusercontent.com">
+                <label for="gmail-client-secret"><span data-i18n="desktop_client_secret_if_supplied_by_google_b9cf3bd">Desktop client secret (if supplied by Google)</span></label><input id="gmail-client-secret" type="password" autocomplete="off">
+                <p><span data-i18n="credentials_and_google_access_tokens_are_not_saved_t_b3ed3f7">Credentials and Google access tokens are not saved to extension storage. The downloaded configuration is used only for this connection. Import credentials are separate from your Thunderbird mail accounts.</span></p>
+              </div>
+            </details>
+            <div class="gmail-actions"><button id="gmail-connect" type="button"><span data-i18n="connect_google_account_and_fetch_labels_ec5638b">Connect Google account and fetch labels</span></button><button id="gmail-disconnect" type="button" disabled><span data-i18n="disconnect_cancel_sign_in_b90c1a2">Disconnect / cancel sign-in</span></button></div>
+            <p id="gmail-account" role="status" aria-live="polite"><span data-i18n="not_connected_8b02f3d">Not connected</span></p>
+            <div id="gmail-import-controls" hidden>
+              <label for="gmail-root"><span data-i18n="destination_parent_971732b">Destination parent</span></label><input id="gmail-root" type="text" value="GMAIL-Labels" autocomplete="off" spellcheck="false">
+              <p><span data-i18n="required_parent_tags_are_included_automatically_pare_1f23b65">Required parent tags are included automatically. Parent and child assignments remain independent. Colors and email assignments are not imported.</span></p>
+              <div class="gmail-actions"><button id="gmail-select-all" type="button"><span data-i18n="select_all_913afff">Select all</span></button><button id="gmail-select-none" type="button"><span data-i18n="select_none_618cfb0">Select none</span></button></div>
+              <div id="gmail-remote-labels" class="gmail-label-list" role="group" aria-label="Gmail labels to import" data-i18n-aria-label="gmail_labels_to_import_ed2aefe"></div>
+              <label class="gmail-dry-run"><input id="gmail-dry-run" type="checkbox" checked> <span data-i18n="dry_run_preview_only_no_local_labels_created_d5c4bda">Dry run — preview only (no local labels created)</span></label>
+              <div class="gmail-actions"><button id="gmail-preview" type="button"><span data-i18n="preview_selected_labels_9c73f64">Preview selected labels</span></button><button id="gmail-import" type="button" disabled><span data-i18n="import_selected_labels_913eacc">Import selected labels</span></button><button id="gmail-cancel" type="button"><span data-i18n="cancel_preview_6ea314a">Cancel preview</span></button></div>
+              <p id="gmail-summary" role="status" aria-live="polite"></p>
+              <div class="gmail-preview-scroll"><table id="gmail-preview-table" hidden><caption><span data-i18n="proposed_local_changes_dae99de">Proposed local changes</span></caption><thead><tr><th><span data-i18n="local_label_path_e4b1711">Local label path</span></th><th><span data-i18n="action_97c89a4">Action</span></th><th><span data-i18n="details_dc3decb">Details</span></th></tr></thead><tbody id="gmail-preview-rows"></tbody></table></div>
+            </div>
+            <p id="gmail-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+          </div>
+
         </section>
 
         <section id="writing" aria-labelledby="writing-title">
