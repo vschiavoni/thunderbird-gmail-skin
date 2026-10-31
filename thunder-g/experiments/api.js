@@ -129,7 +129,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       try {await popup.browserLoaded;await popup.contentReadyAndResized.promise;if(!disposed && button.isConnected)popup.viewNode.openPopup(button,'bottomleft topleft',0,0);else close();}
       catch(error){close();throw error;}
     };
-    let gmailImporter = null;
+    let gmailImporter = null,labelBackupController=null;
     const documents = new Map();
     const pendingDocuments = new Map();
     const windows = new Map(),tabWatchers=new Map(),startupWindows=new Map();
@@ -292,6 +292,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     };
     context.callOnClose({ close() {
       gmailImporter?.close(); gmailImporter=null;
+      labelBackupController?.close();labelBackupController=null;
       for(const close of [...dkimPopups])close();openIndependentDkimPopup=null;
       verifyIndependentDkim=null;
       for(const pending of dkimRequests.values()){clearTimeout(pending.timer);pending.reject(new Error(gmText("Reader closed")));}dkimRequests.clear();
@@ -322,6 +323,18 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       documents.clear(); windows.clear();
     }});
     return { inlineLabels: {
+      async labelBackup(action,data){
+        try{
+          if(closed)throw new Error(gmText('Extension has closed.'));
+          if(typeof data!=='string' || data.length>24*1024*1024)throw new Error(gmText('Invalid label backup request.'));
+          let payload;try{payload=JSON.parse(data || '{}');}catch(_){throw new Error(gmText('Invalid label backup request.'));}
+          if(!payload || typeof payload!=='object' || Array.isArray(payload))throw new Error(gmText('Invalid label backup request.'));
+          labelBackupController ||= createNativeLabelBackup();
+          return JSON.stringify({ok:true,result:await labelBackupController.run(action,payload)});
+        }catch(_){
+          return JSON.stringify({ok:false,error:_.message || gmText('The label backup operation failed.')});
+        }
+      },
       async gmailLabelImport(action, data) {
         try {
           if (closed) throw new Error(gmText("Extension has closed."));

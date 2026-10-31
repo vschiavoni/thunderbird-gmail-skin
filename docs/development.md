@@ -39,6 +39,7 @@ controllers, including cleanup when windows or the extension close.
 | Startup splash and mailbox readiness | `startup.js`; window lifecycle in `experiments/api.js` |
 | Settings and defaults | `options.html`, `options.js`, `background.js`; follow the setter into the experiment |
 | Gmail import | `gmail-import.js`, `gmail-import-options.js` and the native adapter in `experiments/api.js` |
+| Label backup and restore | `label-backup.js` (format/planning), `label-backup-native.js` (cached headers/native writes), `label-backup-options.js` (preview and file UI) |
 
 `build.py` appends modules and CSS to the packaged `experiments/api.js` in an
 explicit order. Add new runtime modules to that build step when needed, and
@@ -79,6 +80,11 @@ Automated tests do not replace these checks:
 
 - Open a message, return to the list, change folders and use Previous/Next.
 - Apply/remove a label on one message and a multi-selection; for conversation changes, include a sent reply and wait for the complete conversation.
+- For label backups, export a synthetic conversation with nested labels, then
+  restore into a separate profile containing the same messages with different
+  local message keys. Verify colors, visibility, additive assignments, missing
+  and ambiguous matches, and retry after a partial restore. Preview must not
+  change native tags or message keywords. No message bodies belong in the file.
 - For composer changes, check signatures, attachments, draft save/reopen and inline/floating/separate-window transitions. Verify sending separately with a test account when the send path changes.
 - Toggle the affected settings, close/reopen a mail window, and disable/re-enable the extension to check cleanup and duplicate controls.
 - Check light/dark appearance and narrow panes when changing layout.

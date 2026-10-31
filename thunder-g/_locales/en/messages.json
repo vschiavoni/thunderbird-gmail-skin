@@ -1746,5 +1746,292 @@
   "startup_warning": {
     "message": "Thunderbird reported a problem",
     "description": "Thunderbird reported a problem"
+  },
+  "label_backup_title": {
+    "message": "Back up labels and message assignments",
+    "description": "Back up labels and message assignments"
+  },
+  "label_backup_intro": {
+    "message": "Move your Thunder-G labels to another computer after downloading your mail again.",
+    "description": "Move your Thunder-G labels to another computer after downloading your mail again."
+  },
+  "label_backup_contents": {
+    "message": "One file keeps label names, colors, nesting, visibility and their message assignments. Message text, attachments and account credentials are excluded.",
+    "description": "One file keeps label names, colors, nesting, visibility and their message assignments. Message text, attachments and account credentials are excluded."
+  },
+  "label_backup_export": {
+    "message": "Export labels and assignments",
+    "description": "Export labels and assignments"
+  },
+  "label_backup_privacy": {
+    "message": "The file includes account identifiers and message identifiers so matching mail can be found on the new computer. Keep it with your personal backups.",
+    "description": "The file includes account identifiers and message identifiers so matching mail can be found on the new computer. Keep it with your personal backups."
+  },
+  "label_backup_choose": {
+    "message": "Choose a Thunder-G label backup",
+    "description": "Choose a Thunder-G label backup"
+  },
+  "label_backup_import_help": {
+    "message": "First connect the same accounts and let Thunderbird download the message lists. Preview finds matching messages without changing them. Maximum file size: 16 MiB.",
+    "description": "First connect the same accounts and let Thunderbird download the message lists. Preview finds matching messages without changing them. Maximum file size: 16 MiB."
+  },
+  "label_backup_preview": {
+    "message": "Preview restore",
+    "description": "Preview restore"
+  },
+  "label_backup_apply": {
+    "message": "Restore labels",
+    "description": "Restore labels"
+  },
+  "label_backup_cancel": {
+    "message": "Cancel preview",
+    "description": "Cancel preview"
+  },
+  "label_backup_additive": {
+    "message": "Your existing labels and assignments are kept. Missing or ambiguous messages are skipped; you can preview the same file again after downloading more mail.",
+    "description": "Your existing labels and assignments are kept. Missing or ambiguous messages are skipped; you can preview the same file again after downloading more mail."
+  },
+  "label_backup_preview_caption": {
+    "message": "Labels in this backup",
+    "description": "Labels in this backup"
+  },
+  "label_backup_label_column": {
+    "message": "Label",
+    "description": "Label"
+  },
+  "label_backup_action_column": {
+    "message": "Action",
+    "description": "Action"
+  },
+  "label_backup_details_column": {
+    "message": "Details",
+    "description": "Details"
+  },
+  "label_backup_failed": {
+    "message": "The label backup operation failed.",
+    "description": "The label backup operation failed."
+  },
+  "label_backup_create_label": {
+    "message": "Create label",
+    "description": "Create label"
+  },
+  "label_backup_keep_label": {
+    "message": "Keep existing label",
+    "description": "Keep existing label"
+  },
+  "label_backup_preview_summary": {
+    "message": "$1 labels to create, $2 existing labels, $3 conflicts. Messages: $4 matched, $5 missing, $6 ambiguous.",
+    "description": "$1 labels to create, $2 existing labels, $3 conflicts. Messages: $4 matched, $5 missing, $6 ambiguous."
+  },
+  "label_backup_preview_omitted": {
+    "message": "Showing $1 of $2 labels. The totals include the full backup.",
+    "description": "Showing $1 of $2 labels. The totals include the full backup."
+  },
+  "label_backup_selected": {
+    "message": "Backup selected. Choose Preview restore to check labels and find matching messages.",
+    "description": "Backup selected. Choose Preview restore to check labels and find matching messages."
+  },
+  "label_backup_reading": {
+    "message": "Reading the backup and finding matching messages…",
+    "description": "Reading the backup and finding matching messages…"
+  },
+  "label_backup_too_large": {
+    "message": "Choose a Thunder-G label backup smaller than 16 MiB.",
+    "description": "Choose a Thunder-G label backup smaller than 16 MiB."
+  },
+  "label_backup_conflicts": {
+    "message": "Resolve the label conflicts before restoring. No changes have been made.",
+    "description": "Resolve the label conflicts before restoring. No changes have been made."
+  },
+  "label_backup_review": {
+    "message": "Review the preview, then choose Restore labels. Missing or ambiguous messages are skipped.",
+    "description": "Review the preview, then choose Restore labels. Missing or ambiguous messages are skipped."
+  },
+  "label_backup_restoring": {
+    "message": "Restoring labels and message assignments…",
+    "description": "Restoring labels and message assignments…"
+  },
+  "label_backup_restored": {
+    "message": "Created $1 labels, kept $2 existing labels, and restored labels on $3 messages. Missing: $4; ambiguous: $5; failed: $6.",
+    "description": "Created $1 labels, kept $2 existing labels, and restored labels on $3 messages. Missing: $4; ambiguous: $5; failed: $6."
+  },
+  "label_backup_exporting": {
+    "message": "Reading labels and message assignments…",
+    "description": "Reading labels and message assignments…"
+  },
+  "label_backup_export_too_large": {
+    "message": "This backup exceeds the 16 MiB limit. No file was saved.",
+    "description": "This backup exceeds the 16 MiB limit. No file was saved."
+  },
+  "label_backup_export_ready": {
+    "message": "Backup ready: $1 labels and assignments for $2 messages. Messages skipped: $3.",
+    "description": "Backup ready: $1 labels and assignments for $2 messages. Messages skipped: $3."
+  },
+  "label_backup_cancelled": {
+    "message": "Preview cancelled. No labels or assignments were changed.",
+    "description": "Preview cancelled. No labels or assignments were changed."
+  },
+  "label_backup_invalid": {
+    "message": "Invalid label backup file.",
+    "description": "Invalid label backup file."
+  },
+  "label_backup_version": {
+    "message": "Unsupported label backup version.",
+    "description": "Unsupported label backup version."
+  },
+  "label_backup_core_too_large": {
+    "message": "The label backup file is too large (maximum 16 MiB).",
+    "description": "The label backup file is too large (maximum 16 MiB)."
+  },
+  "label_backup_limits": {
+    "message": "Too many labels, accounts or message assignments in the backup.",
+    "description": "Too many labels, accounts or message assignments in the backup."
+  },
+  "label_backup_local_conflict": {
+    "message": "Existing local labels conflict with this label.",
+    "description": "Existing local labels conflict with this label."
+  },
+  "label_backup_key_changed": {
+    "message": "The label uses a different local key; existing metadata will be kept.",
+    "description": "The label uses a different local key; existing metadata will be kept."
+  },
+  "label_backup_keep_metadata": {
+    "message": "Local label metadata will be kept.",
+    "description": "Local label metadata will be kept."
+  },
+  "label_backup_account_missing": {
+    "message": "No matching account was found.",
+    "description": "No matching account was found."
+  },
+  "label_backup_account_ambiguous": {
+    "message": "More than one local account matches.",
+    "description": "More than one local account matches."
+  },
+  "label_backup_message_missing": {
+    "message": "The message is not available in the matching folder.",
+    "description": "The message is not available in the matching folder."
+  },
+  "label_backup_message_ambiguous": {
+    "message": "More than one message has this identifier in the matching folder.",
+    "description": "More than one message has this identifier in the matching folder."
+  },
+  "label_backup_message_blocked": {
+    "message": "The message refers only to conflicting labels.",
+    "description": "The message refers only to conflicting labels."
+  },
+  "label_backup_operation_cancelled": {
+    "message": "Label backup operation cancelled.",
+    "description": "Label backup operation cancelled."
+  },
+  "label_backup_folder_unidentified": {
+    "message": "A local folder could not be identified.",
+    "description": "A local folder could not be identified."
+  },
+  "label_backup_too_many_accounts": {
+    "message": "Too many accounts for a label backup.",
+    "description": "Too many accounts for a label backup."
+  },
+  "label_backup_too_many_folders": {
+    "message": "Too many folders for a label backup.",
+    "description": "Too many folders for a label backup."
+  },
+  "label_backup_too_many_headers": {
+    "message": "This mailbox is too large for one label backup (maximum 500,000 cached messages).",
+    "description": "This mailbox is too large for one label backup (maximum 500,000 cached messages)."
+  },
+  "label_backup_unreadable_folders": {
+    "message": "$1 folders could not be read. Their message assignments are not included; open or synchronize those folders and try again.",
+    "description": "$1 folders could not be read. Their message assignments are not included; open or synchronize those folders and try again."
+  },
+  "label_backup_wait": {
+    "message": "Wait for the current label backup operation to finish.",
+    "description": "Wait for the current label backup operation to finish."
+  },
+  "label_backup_unknown_operation": {
+    "message": "Unknown label backup operation.",
+    "description": "Unknown label backup operation."
+  },
+  "label_backup_preview_again": {
+    "message": "Preview the label backup again before restoring.",
+    "description": "Preview the label backup again before restoring."
+  },
+  "label_backup_changed_since_preview": {
+    "message": "Labels or matching messages changed since the preview. Preview again; nothing was restored.",
+    "description": "Labels or matching messages changed since the preview. Preview again; nothing was restored."
+  },
+  "label_backup_resolve_conflicts": {
+    "message": "Resolve label conflicts before restoring this backup.",
+    "description": "Resolve label conflicts before restoring this backup."
+  },
+  "label_backup_partial_restore": {
+    "message": "Restore stopped before completing. Changes already applied were kept. Preview the backup again to retry.",
+    "description": "Restore stopped before completing. Changes already applied were kept. Preview the backup again to retry."
+  },
+  "label_backup_some_failed": {
+    "message": "Some messages changed or could not be updated. Preview the backup again to retry.",
+    "description": "Some messages changed or could not be updated. Preview the backup again to retry."
+  },
+  "label_backup_invalid_request": {
+    "message": "Invalid label backup request.",
+    "description": "Invalid label backup request."
+  },
+  "label_backup_scan_changed": {
+    "message": "Mailbox contents changed while scanning. Preview or export again to retry."
+  },
+  "label_backup_account_label": {
+    "message": "Export message assignments from",
+    "description": "Export message assignments from"
+  },
+  "label_backup_account_placeholder": {
+    "message": "Choose an account…",
+    "description": "Choose an account…"
+  },
+  "label_backup_load_accounts": {
+    "message": "Show accounts",
+    "description": "Show accounts"
+  },
+  "label_backup_all_accounts": {
+    "message": "All accounts",
+    "description": "All accounts"
+  },
+  "label_backup_account_help": {
+    "message": "Label definitions are shared across accounts. Only message assignments from the selected account are exported.",
+    "description": "Label definitions are shared across accounts. Only message assignments from the selected account are exported."
+  },
+  "label_backup_loading_accounts": {
+    "message": "Reading configured accounts…",
+    "description": "Reading configured accounts…"
+  },
+  "label_backup_choose_export_account": {
+    "message": "Choose an account, then export its labels and message assignments.",
+    "description": "Choose an account, then export its labels and message assignments."
+  },
+  "label_backup_available_account": {
+    "message": "Choose an available account for the label backup.",
+    "description": "Choose an available account for the label backup."
+  },
+  "import_export_title": {
+    "message": "Import/Export",
+    "description": "Settings section for Gmail import and label backup/restore"
+  },
+  "label_backup_done": {
+    "message": "Done",
+    "description": "Done"
+  },
+  "label_backup_assignment_counts": {
+    "message": "Messages needing label assignments: $1; already assigned: $2.",
+    "description": "Messages needing label assignments: $1; already assigned: $2."
+  },
+  "label_backup_already_done": {
+    "message": "Done — all labels and assignments in this backup are already present in their matching folders. Preview did not apply any changes.",
+    "description": "Done — all labels and assignments in this backup are already present in their matching folders. Preview did not apply any changes."
+  },
+  "label_backup_no_pending": {
+    "message": "Nothing can be restored from this preview. Missing or ambiguous messages are skipped. Preview did not apply any changes.",
+    "description": "Nothing can be restored from this preview. Missing or ambiguous messages are skipped. Preview did not apply any changes."
+  },
+  "label_backup_preview_ready": {
+    "message": "Preview complete. No changes have been made. Choose Restore labels to apply the pending changes. Missing or ambiguous messages are skipped.",
+    "description": "Preview complete. No changes have been made. Choose Restore labels to apply the pending changes. Missing or ambiguous messages are skipped."
   }
 }

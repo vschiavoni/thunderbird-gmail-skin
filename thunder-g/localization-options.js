@@ -3,7 +3,7 @@
 (async () => {
   try { await ThunderGI18n.ready; } catch (error) { console.error('Thunder-G translations:', error); }
   gmLocalizeDocument(document);
-  for (const name of ['options.js', 'gmail-import-options.js']) {
+  for (const name of ['options.js', 'gmail-import-options.js', 'label-backup-options.js']) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = browser.runtime.getURL(name);
