@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.22.1
+
+- Upload release assets before publishing immutable GitHub releases. Include the label-backup guide in source archives. Supersedes the assetless 0.22.0 release with the same three merged PRs.
+
 ## 0.22.0
 
 - Add label backup and restore under Settings → Import/Export, including account selection, JSON export, a dry-run preview, and restoration of missing definitions and message assignments. Preserve existing labels and report missing or ambiguous matches.

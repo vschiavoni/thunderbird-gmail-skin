@@ -59,3 +59,16 @@ publication time. Re-running it keeps byte-identical assets and refuses to repla
 different published files. A failed workflow must be fixed before announcing the
 release. Do not mark an older release as latest: the stable feed lives on GitHub's
 latest release. Automatic update delivery still requires a live published release.
+
+
+### Publishing with immutable GitHub releases
+
+Prepare and push the version commit and tag, then create a **draft** release.
+Run the `release.yml` workflow manually with that tag. It tests and builds the
+assets, uploads them to the draft, and publishes only after all files are present.
+Do not publish an empty release first: immutable releases reject later uploads.
+
+```sh
+gh release create vVERSION --verify-tag --draft --title "Thunder-G VERSION" --notes-file /path/to/notes.md
+gh workflow run release.yml -f tag=vVERSION
+```

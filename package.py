@@ -10,7 +10,7 @@ files = [root/name for name in ['README.md','CHANGELOG.md','LICENSE','.gitignore
 for folder in ['chrome','thunder-g','scripts','tests','integrations']:
     files += [p for p in (root/folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc']
 # Only approved documentation and assets; never include local screenshots.
-files += [root/name for name in ['docs/settings.md','docs/gmail-import.md','docs/updates.md','docs/labels.md','docs/development.md','docs/troubleshooting.md','docs/resources/logo.png','docs/resources/microelements/labels.svg','docs/resources/microelements/label_menu.svg','docs/resources/microelements/label_options.svg','.github/workflows/release.yml']]
+files += [root/name for name in ['docs/settings.md','docs/gmail-import.md','docs/updates.md','docs/labels.md','docs/label-backup.md','docs/development.md','docs/troubleshooting.md','docs/resources/logo.png','docs/resources/microelements/labels.svg','docs/resources/microelements/label_menu.svg','docs/resources/microelements/label_options.svg','.github/workflows/release.yml']]
 output = root/f'thunder-g-{version}-source.zip'
 with ZipFile(output,'w',ZIP_DEFLATED) as archive:
     for path in sorted(files):
