@@ -4,6 +4,10 @@
 
 - Show full nested label paths in a flat Gmail-style assignment picker, with aligned checkboxes and no expand/collapse arrows. Keep the sidebar hierarchy unchanged.
 
+- Remove the obsolete checkbox offset and reserve separate checkbox/star gutters to prevent overlap after hiding thread-status icons.
+
+- Hide the native thread-status column, including watched/ignored icons, consistently across all accounts and folders. Preserve conversation grouping and subject expand/collapse controls.
+
 ## 0.21.0
 
 - Show a startup splash while the visible mailbox becomes usable, then fade it away. Slow startup uses a dismissible waiting card; include English/Italian text, dark mode and reduced-motion support.

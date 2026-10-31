@@ -97,6 +97,12 @@
   visibility:collapse !important;
 }
 
-/* Meet the toolbar checkbox halfway without moving the remaining row columns. */
-#threadTree .tree-view-row-select { transform:translateX(7px); }
-#threadTree:dir(rtl) .tree-view-row-select { transform:translateX(-7px); }
+/* Give selection and stars separate gutters. The toolbar measures the native
+   checkbox center, so shifting a row cell would only overlap the next icon. */
+#threadTree .tree-view-row-select { transform:none !important; }
+#threadTree :is(#selectCol, #flaggedCol, .selectcol-column, .flaggedcol-column) {
+  box-sizing:border-box !important;
+  width:28px !important; min-width:28px !important; max-width:28px !important;
+  inline-size:28px !important; min-inline-size:28px !important; max-inline-size:28px !important;
+  padding-inline:0 !important;
+}

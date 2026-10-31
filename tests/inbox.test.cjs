@@ -387,10 +387,11 @@ test('all accounts and folder types share Gmail columns and restore their saved 
  const calls=[],first=make(),pane={columns:first,updateColumns(simple){calls.push(simple)}};
  const win={threadPane:pane,gViewWrapper:{isSynthetic:false},document:{getElementById:()=>({reset(){}})}};
  const controller=scope.installUniformColumns(win);
- const expected=['selectCol','threadCol','flaggedCol','senderCol','subjectCol','attachmentCol','dateCol'];
+ const expected=['selectCol','flaggedCol','senderCol','subjectCol','attachmentCol','dateCol'];
  for(const account of ['first','second'])for(const type of ['Inbox','Drafts','Sent','Trash','Archive','custom','search']){
   const columns=make();pane.columns=columns;win.gViewWrapper.isSynthetic=type==='search';pane.updateColumns(true);
   assert.deepEqual(columns.filter(column=>!column.hidden).map(column=>column.id),expected,account+' '+type);
+  assert.equal(columns.find(column=>column.id==='threadCol').hidden,true,'threaded, watched and ignored status icons remain hidden in every folder');
   assert.equal(calls.at(-1),false,'changed column structure rebuilds the native template');
   pane.updateColumns(true);assert.equal(calls.at(-1),true,'unchanged layouts avoid unnecessary rebuilds');
  }

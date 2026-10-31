@@ -26,7 +26,7 @@ or `inline-labels` extension? Read the [migration guide](docs/updates.md#migrati
 ## Quick tips
 
 - Press **L** to apply labels; click a label chip to find matching mail.
-- All accounts and mail folders use the same message-list columns: selection, thread indicator, star, sender, labels/subject, attachment, and date. Saved native layouts return when the add-on is disabled.
+- All accounts and mail folders use the same message-list columns: selection, star, sender, labels/subject, attachment, and date. Saved native layouts return when the add-on is disabled.
 - Enable **Show column headers** in Preferences → Inbox to sort or resize columns.
 - Conversation reading and in-window writing are experimental and off by default. See [settings](docs/settings.md) for setup and add-on compatibility.
 - Follow-Up reminders require mailmindr; Gmail label import and BIMI logos need separate setup. See the guides below.

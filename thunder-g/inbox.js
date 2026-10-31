@@ -363,7 +363,7 @@ function installInboxIdleActions(win,reader=null) {
     .gm-inbox-action[hidden]{display:none!important;}
     .gm-label-back{order:-1;}
     #threadPaneFolderName,#threadPaneFolderCountContainer{display:none!important}
-    #threadPaneHeaderBar{box-sizing:border-box!important;block-size:44px!important;min-block-size:44px!important;max-block-size:44px!important;padding:3px 5px!important;margin-block:0!important;align-items:center!important;}
+    #threadPaneHeaderBar{box-sizing:border-box!important;block-size:44px!important;min-block-size:44px!important;max-block-size:44px!important;padding:3px 5px!important;padding-inline-start:0!important;margin-block:0!important;align-items:center!important;}
     #threadPaneHeaderBar > .list-header-bar-container-start{padding:0!important;margin-block:0!important;min-block-size:0!important;block-size:36px;align-items:center;}
     .gm-inbox-idle-actions{display:flex;align-items:center;gap:8px;min-height:36px;flex:0 0 auto;overflow:visible;}
     .gm-inbox-select-group{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;block-size:36px;flex:0 0 auto;margin:0;padding:0 6px;border-radius:6px;gap:2px;}
@@ -627,7 +627,7 @@ function installUniformColumns(win) {
   const pane=win.threadPane,original=pane?.updateColumns,restore=pane?.restoreColumnsState;
   if(typeof original!=='function')return {close(){}};
   const saved=new WeakMap();
-  const order=['selectCol','threadCol','flaggedCol','senderCol','subjectCol','attachmentCol','dateCol'];
+  const order=['selectCol','flaggedCol','senderCol','subjectCol','attachmentCol','dateCol'];
   const snapshot=columns=>columns.map(column=>({column,hidden:column.hidden,ordinal:column.ordinal}));
   function restoreColumnsState(...args){
     const result=restore.apply(this,args);
