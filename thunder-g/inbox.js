@@ -100,6 +100,15 @@ function installSenderDraftLabels(win,mail=globalThis.MailServices,interfaces=ty
   for(const name of ['msgAdded','msgsDeleted','msgsMoveCopyCompleted','folderAdded','folderDeleted','folderRenamed','msgKeyChanged']) {
     listener[name]=refresh;flags|=interfaces.nsIMsgFolderNotificationService[name] || 0;
   }
+  // Unrelated arrivals/deletions must not rescan every Drafts folder or
+  // recreate visible sender cells. Unknown notification shapes stay conservative.
+  const changed=folder=>{if(!folder || isDraft(folder))refresh();};
+  listener.msgAdded=header=>changed(header?.folder);
+  listener.msgsDeleted=headers=>{if(!headers || Array.from(headers).some(header=>!header?.folder || isDraft(header.folder)))refresh();};
+  listener.msgsMoveCopyCompleted=(_move,headers,destination)=>{
+    if(!headers || !destination || isDraft(destination) || Array.from(headers).some(header=>!header?.folder || isDraft(header.folder)))refresh();
+  };
+  listener.msgKeyChanged=(_oldKey,header)=>changed(header?.folder);
   mail.mfn?.addListener(listener,flags);
   const style=doc.createElement('style');style.textContent=`
     #threadTree .gm-draft-sender-content { display:inline-flex; max-width:100%; align-items:center; gap:4px; vertical-align:bottom; }

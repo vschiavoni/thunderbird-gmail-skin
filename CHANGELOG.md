@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Avoid invalidating Sent and draft indexes for unrelated mailbox notifications; reuse the Sent reference index across conversations and release discarded translation elements and incrementally clean their bindings during normal rendering. Ignore unrelated conversation label/security updates.
+
 ## 0.22.1
 
 - Upload release assets before publishing immutable GitHub releases. Include the label-backup guide in source archives. Supersedes the assetless 0.22.0 release with the same three merged PRs.
