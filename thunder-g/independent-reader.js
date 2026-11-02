@@ -715,6 +715,10 @@ function installIndependentReader(win) {
         if(closed || token!==ticket || browser!==frame)return;
         if(timeout!==null)win.clearTimeout(timeout);timeout=null;ready=true;error.hidden=true;
         frames.set(independentMessageKey(header),frame);updateActions();
+        // Keep visual and keyboard order aligned, retaining native star behavior.
+        const star=frame.contentDocument.getElementById('starMessageButton');
+        const replyControl=frame.contentDocument.getElementById('hdrReplyToSenderButton');
+        if(star && replyControl && star.parentNode===replyControl.parentNode)star.parentNode.insertBefore(star,replyControl);
         const replyButton=frame.contentDocument.getElementById('hdrReplyToSenderButton');
         if(replyButton && replyButton.getAttribute('data-gm-reply-bound')!=='true'){
           replyButton.setAttribute('data-gm-reply-bound','true');
@@ -764,11 +768,13 @@ function installIndependentReader(win) {
           #messagepaneboxwrapper, #messagepanebox { min-block-size:0; }
           #messagepane { min-block-size:0; flex:1; }
           .message-header-view-button { border-radius:16px !important; }
-          #header-view-toolbar { column-gap:6px; align-items:center; }
+          #header-view-toolbar { column-gap:0 !important; align-items:center; }
+          #starMessageButton { inline-size:36px !important; block-size:36px !important; min-inline-size:36px !important; padding:8px !important; margin:0 !important; border-radius:50% !important; }
+          #starMessageButton img { inline-size:20px !important; block-size:20px !important; }
 #otherActionsButton {
   min-inline-size:36px !important; max-inline-size:36px !important;
   min-block-size:36px !important; padding:8px !important;
-  margin-inline:4px !important; border:0 !important;
+  margin-inline:0 !important; border:0 !important;
   border-radius:50% !important; background:transparent !important;
   justify-content:center !important;
 }

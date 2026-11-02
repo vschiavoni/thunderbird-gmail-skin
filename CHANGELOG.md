@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Match Gmail’s message action order: star, reply, then More, with consistent compact button sizing and keyboard order.
+
+
+
 ## 0.22.1
 
 - Upload release assets before publishing immutable GitHub releases. Include the label-backup guide in source archives. Supersedes the assetless 0.22.0 release with the same three merged PRs.
