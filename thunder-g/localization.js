@@ -5,6 +5,18 @@ var gmSourceKeys = new Map();
 var gmCurrentLanguage = 'en';
 var gmRenderedMessages = new Map();
 var gmLiveBindings = new Set();
+var gmBindingSweep = null;
+// Recycled rows create short-lived bindings. Incrementally release dead weak
+// targets during normal rendering, without waiting for a language change or
+// adding a timer. Keep each insertion's cleanup work bounded.
+function gmSweepBindings(){
+  gmBindingSweep ||= gmLiveBindings.values();
+  for(let i=0;i<4;i++){
+    const next=gmBindingSweep.next();
+    if(next.done){gmBindingSweep=null;break;}
+    if(!next.value.node.deref())gmLiveBindings.delete(next.value);
+  }
+}
 var gmNodeBindings = new WeakMap();
 var gmLanguageListeners = new Set();
 function gmResolveLanguage(preference, uiLanguage = 'en') {
@@ -37,13 +49,13 @@ function gmText(source, ...substitutions) {
   return rendered;
 }
 function gmApplyBinding(node,binding){
-  const value=binding.compute();
+  const value=binding.compute(),textNode=binding.textNode?.deref();
   if(binding.attribute)node.setAttribute(binding.property,value);
-  else if(binding.property==='textContent' && binding.textNode && binding.textNode.parentNode===node){
-    binding.textNode.nodeValue=value;
+  else if(binding.property==='textContent' && textNode && textNode.parentNode===node){
+    textNode.nodeValue=value;
   }else{
     node[binding.property]=value;
-    if(binding.property==='textContent' && node.firstChild?.nodeType===3)binding.textNode=node.firstChild;
+    if(binding.property==='textContent' && node.firstChild?.nodeType===3)binding.textNode=new WeakRef(node.firstChild);
   }
 }
 function gmBind(node,property,compute,attribute=false){
@@ -51,7 +63,7 @@ function gmBind(node,property,compute,attribute=false){
   if(!bindings){bindings=new Map();gmNodeBindings.set(node,bindings);}
   const key=(attribute?'attr:':'value:')+property;
   let binding=bindings.get(key);
-  if(!binding){binding={node:new WeakRef(node),property,attribute};bindings.set(key,binding);gmLiveBindings.add(binding);}
+  if(!binding){binding={node:new WeakRef(node),property,attribute};bindings.set(key,binding);gmLiveBindings.add(binding);gmSweepBindings();}
   binding.compute=compute;gmApplyBinding(node,binding);return node;
 }
 function gmBindValue(node,property,compute){return gmBind(node,property,compute);}

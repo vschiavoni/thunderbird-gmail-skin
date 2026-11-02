@@ -57,7 +57,8 @@ function readerFixture({photo=null,tagged=false,verifyIndependentDkim}={}) {
       content.createRange=()=>({selectNodeContents(){},getBoundingClientRect:()=>({bottom:content.bottom})});
       content.defaultView={getComputedStyle:()=>({marginTop:'8px',marginBottom:'8px',paddingBottom:'0px'})};
       const pane={clientHeight:400,contentDocument:content};
-      browser.contentDocument={...node('document'),documentURI:'about:message',createElement:node,documentElement:node(),getElementById:id=>id==='messagepane'?pane:id==='hdrReplyToSenderButton'?browser.replyButton:null};
+      browser.messageMenu=node('menupopup');browser.messageMenu.append(node('native-menuitem'));browser.forwardButton=node('button');
+      browser.contentDocument={...node('document'),createXULElement:node,documentURI:'about:message',createElement:node,documentElement:node(),getElementById:id=>id==='messagepane'?pane:id==='hdrReplyToSenderButton'?browser.replyButton:id==='otherActionsPopup'?browser.messageMenu:id==='hdrForwardButton'?browser.forwardButton:null};
       browser.contentWindow={displayMessage:uri=>{loads.push(uri);browser.uri=uri},commandController:{isCommandEnabled:()=>true,doCommand:name=>commands.push([name,browser.uri])}};
       browser.replyButton=node('button');browser.pane=pane;browser.content=content;browsers.push(browser);return browser;
     }};
@@ -207,6 +208,8 @@ test('title aggregates labels across incoming and sent cards and stays synchroni
   await f.reader.open(f.anchor);
   const titleTags=f.conversation.children[0].children[0];
   assert.equal(titleTags.className,'title-tags');assert.equal(titleTags.children.length,0,'message-only label is absent from title');
+  const unrelated=message(999,'unrelated','other',3),beforeTags=titleTags.children;
+  f.tagListener.msgPropertyChanged(unrelated,'keywords');assert.equal(titleTags.children,beforeTags,'unrelated notifications must not rebuild the visible title');
   assert.equal(f.cards.children[0].children[0].children[0].children[1].children[3].children.length,1);
   f.anchor.tagged=false;sent.tagged=true;f.tagListener.msgPropertyChanged(sent,'keywords');
   assert.equal(titleTags.children.length,0,'sent-only labels stay on the sent message');
@@ -694,4 +697,54 @@ test('resumed inline drafts retain conversation label sources after reader navig
  await f.reader.open(f.anchor,{draft});
  assert.equal(placement.labelMessages()[0],f.anchor);assert.equal(typeof placement.onSendState,'function');
  f.reader.hide();assert.equal(placement.labelMessages()[0],f.anchor,'navigation retains the original conversation, not another thread');f.reader.close();
+});
+
+test('each message menu forwards its own header, including an earlier message, and cleans up on collapse',async()=>{
+ const f=readerFixture(),older=f.prepare(message(2,'older','inbox',0));
+ f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:2,getChildHdrAt:i=>[older,f.anchor][i]})};
+ await f.reader.open(f.anchor);
+ // Expand the earlier card; the footer continues to target the latest message.
+ f.cards.children[0].children[0].children[0].emit('click',{});
+ const earlier=f.browsers.at(-1);f.loaded(earlier);
+ const calls=[];f.scope.inlineReplyEnabled=true;
+ f.scope.inlineComposeControllers=new WeakMap([[f.win,{float(){},open(header,command,placement){calls.push({header,command,placement})}}]]);
+ const forward=earlier.messageMenu.children.find(node=>node.id==='gm-message-cmd_forwardInline');
+ assert.ok(forward);assert.equal(forward.getAttribute('label'),'Forward');
+ const event={preventDefault(){},stopImmediatePropagation(){}};
+ forward.emit('command',event);
+ assert.equal(calls[0].header,older);assert.equal(calls[0].command,'cmd_forwardInline');
+ earlier.forwardButton.emit('command',event);assert.equal(calls[1].header,older);
+ const readyCount=earlier.messageMenu.children.length;earlier.emit('MsgLoaded');
+ assert.equal(earlier.messageMenu.children.length,readyCount,'reload does not duplicate injected menu items');
+ f.reader.hide();forward.emit('command',event);
+ assert.equal(calls.length,2,'discarded message menus cannot trigger actions');
+ assert.equal(earlier.messageMenu.children.length,1,'native menu entries are preserved and injected entries removed');
+ f.reader.close();
+});
+
+
+test('unrelated mailbox notifications preserve Sent scans; relevant folders and unknown events invalidate them',async()=>{
+ const scope=context();let reads=0;
+ const folder={URI:'sent',get messages(){reads++;return [references(message(2,'reply','sent',2),'a')]}};
+ const cache=scope.createSentCandidateCache({},()=>0);
+ await cache.get([folder]);
+ for(let i=0;i<100;i++){cache.invalidateFolders([{URI:'inbox'}]);await cache.get([folder])}
+ assert.equal(reads,1,'100 unrelated arrivals must not rescan Sent');
+ cache.invalidateFolders([folder]);await cache.get([folder]);assert.equal(reads,2);
+ cache.invalidateFolders([{URI:'inbox'},folder]);await cache.get([folder]);assert.equal(reads,3,'moves into or out of Sent invalidate');
+ cache.invalidateFolders([undefined]);await cache.get([folder]);assert.equal(reads,4,'unknown notification shapes stay conservative');
+ cache.close();
+});
+
+test('conversation reference lookups reuse the cached index without rescanning candidates',()=>{
+ const scope=context(),anchor=message(1,'root','inbox',1);let indexed=0;
+ const candidates=Array.from({length:5000},(_,i)=>({header:message(i+2,'sent-'+i,'sent',i+2),get ids(){indexed++;return i===0?['root','sent-0']:['unrelated-'+i]}}));
+ const first=scope.independentRelatedSent([anchor],candidates);
+ assert.equal(first.length,2);assert.equal(indexed,5001);
+ // The matched candidate's references still participate in transitive matching.
+ const before=indexed;
+ for(let i=0;i<20;i++)assert.equal(scope.independentRelatedSent([anchor],candidates).length,2);
+ assert.equal(indexed-before,20,'only matched references are traversed after the first lookup');
+ const replacement=[{header:message(9,'new','sent',9),ids:['root']}];
+ assert.equal(scope.independentRelatedSent([anchor],replacement)[1].messageId,'new','a new snapshot gets a fresh index');
 });
