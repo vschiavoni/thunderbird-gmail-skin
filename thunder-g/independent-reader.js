@@ -237,6 +237,34 @@ function independentBimiDomain(address,result,baseDomain) {
   if(!from || !result?.dkim?.some(signature=>signature.result==='SUCCESS' && signature.sdid && baseDomain(signature.sdid.toLowerCase())===baseDomain(from)))return null;
   return from;
 }
+// Keep native message-menu actions and add compose actions scoped to this card.
+// The header is captured here: expanding another card must never redirect Forward.
+function installIndependentMessageActions(frame,header,isCurrent,runCommand){
+  const doc=frame.contentDocument,popup=doc.getElementById('otherActionsPopup');
+  const removers=[],items=[];
+  function bind(node,command){
+    const handler=event=>{
+      if(!isCurrent())return;
+      event.preventDefault();event.stopImmediatePropagation();
+      popup?.hidePopup?.();runCommand(command,header);
+    };
+    node.addEventListener('command',handler,true);
+    removers.push(()=>node.removeEventListener('command',handler,true));
+  }
+  if(popup && doc.createXULElement){
+    const before=popup.firstChild;
+    for(const [label,command] of [['Reply','cmd_replySender'],['Reply all','cmd_replyall'],['Forward','cmd_forwardInline']]){
+      const item=doc.createXULElement('menuitem');
+      item.id='gm-message-'+command;gmBindAction(item,'label',gmText(label),true);
+      bind(item,command);popup.insertBefore(item,before);items.push(item);
+    }
+    const separator=doc.createXULElement('menuseparator');popup.insertBefore(separator,before);items.push(separator);
+  }
+  // Also honor an exposed native Forward button, independent of the global
+  // forwarding preference (our conversation action always forwards inline).
+  const forward=doc.getElementById('hdrForwardButton');if(forward)bind(forward,'cmd_forwardInline');
+  return {close(){for(const remove of removers)remove();for(const item of items)item.remove();}};
+}
 // ContextMenuParent routes message-body events to about:3pane, even for our
 // embedded readers. Use the originating message's menu and command controller.
 function installIndependentContextMenu(win, resolve) {
@@ -663,7 +691,7 @@ function installIndependentReader(win) {
     let pendingBody=hydration?.body || null;
     if(pendingBody){article.append(pendingBody);body.style.position='absolute';body.style.visibility='hidden';body.style.inlineSize='100%';}
     function revealSavedBody(){if(!pendingBody)return;preserveReaderPosition(host,article,()=>{pendingBody.remove();pendingBody=null;body.style.position='';body.style.visibility='';body.style.inlineSize='';});}
-    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null;
+    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null;
     const quoteButton=text('button','quote-toggle','…');quoteButton.type='button';quoteButton.hidden=true;
     gmBindAttribute(quoteButton, 'aria-label', () => gmText("Show quoted text"));quoteButton.setAttribute('aria-expanded','false');
     quoteButton.addEventListener('click',()=>toggleQuotes?.());
@@ -678,6 +706,7 @@ function installIndependentReader(win) {
       contentChanges?.disconnect();contentChanges=null;
       contentLoad?.();contentLoad=null;toggleQuotes=null;
       if(resizeFrame!==null)win.cancelAnimationFrame(resizeFrame);resizeFrame=null;
+      messageActions?.close();messageActions=null;
       restoreCommands?.();restoreCommands=null;focusCleanup?.();focusCleanup=null;
       scrollCleanup?.();scrollCleanup=null;
       for(const [document,message] of messageDocs)if(message===header)messageDocs.delete(document);
@@ -715,6 +744,7 @@ function installIndependentReader(win) {
         if(closed || token!==ticket || browser!==frame)return;
         if(timeout!==null)win.clearTimeout(timeout);timeout=null;ready=true;error.hidden=true;
         frames.set(independentMessageKey(header),frame);updateActions();
+        messageActions?.close();messageActions=installIndependentMessageActions(frame,header,isCurrent,runCommand);
         const replyButton=frame.contentDocument.getElementById('hdrReplyToSenderButton');
         if(replyButton && replyButton.getAttribute('data-gm-reply-bound')!=='true'){
           replyButton.setAttribute('data-gm-reply-bound','true');

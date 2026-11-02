@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Reply, Reply all and Forward to each conversation message’s three-dot menu. Forward the selected message’s original body and attachments, including earlier messages in the thread.
+
+
 ## 0.22.1
 
 - Upload release assets before publishing immutable GitHub releases. Include the label-backup guide in source archives. Supersedes the assetless 0.22.0 release with the same three merged PRs.
