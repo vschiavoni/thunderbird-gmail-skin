@@ -4,6 +4,7 @@
 
 - Add Reply, Reply all and Forward to each conversation message’s three-dot menu. Forward the selected message’s original body and attachments, including earlier messages in the thread.
 
+- Avoid invalidating Sent and draft indexes for unrelated mailbox notifications; reuse the Sent reference index across conversations and release discarded translation elements and incrementally clean their bindings during normal rendering. Ignore unrelated conversation label/security updates.
 
 ## 0.22.1
 
