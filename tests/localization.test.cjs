@@ -84,3 +84,20 @@ test('existing built-in action labels follow the override while Thunderbird stay
  assert.deepEqual(nodes.map(node=>node.textContent),['Tutti','Nessuno','Già letti','Da leggere','Speciali','Non speciali']);
  scope.ThunderGI18n.setPreference('auto');assert.equal(nodes[0].textContent,'All');
 });
+
+
+test('recycled localization targets and text nodes are weak and swept during ordinary rendering',()=>{
+ const refs=[];
+ class WeakTarget{constructor(value){this.value=value;refs.push(this)}deref(){return this.value}}
+ const scope=context({WeakRef:WeakTarget});
+ const text={nodeType:3,parentNode:null},node={firstChild:text,set textContent(value){text.nodeValue=value}};text.parentNode=node;
+ scope.gmBindValue(node,'textContent',()=>scope.gmText('Reply'));
+ const binding=[...scope.gmLiveBindings][0];
+ assert.ok(binding.textNode instanceof WeakTarget,'the registry must not strongly retain a child whose parent is the target');
+ assert.equal(binding.textNode.deref(),text);
+ refs.forEach(ref=>{ref.value=undefined});
+ for(let i=0;i<8;i++)scope.gmBindValue({},'textContent',()=>scope.gmText('Reply'));
+ assert.equal(scope.gmLiveBindings.has(binding),false,'dead bindings are released without a language change');
+ scope.gmSetLanguage('it');
+ assert.equal(scope.gmLiveBindings.size,8,'live targets survive cleanup and remain translatable');
+});

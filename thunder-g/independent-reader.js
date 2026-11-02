@@ -57,11 +57,12 @@ async function independentSentCandidates(win,folders,cancelled) {
 }
 // Only local summary metadata is retained; message bodies remain native.
 function createSentCandidateCache(win,now=()=>Date.now(),limit=10000,ttl=30000) {
-  let entry=null,pending=null,generation=0,closed=false;
+  let entry=null,pending=null,generation=0,closed=false,folderURIs=new Set();
   function invalidate(){generation++;entry=null;pending=null;}
   return {
     get(folders){
       if(closed)return Promise.resolve([]);
+      folderURIs=new Set(folders.map(folder=>folder.URI));
       const key=JSON.stringify(folders.map(folder=>{
         let count=null;try{count=folder.getTotalMessages?.(false) ?? null}catch(_){}
         return [folder.URI,count];
@@ -76,14 +77,25 @@ function createSentCandidateCache(win,now=()=>Date.now(),limit=10000,ttl=30000) 
       pending=job;return job.promise;
     },
     invalidate,
-    close(){closed=true;invalidate();}
+    invalidateFolders(folders){
+      if(!folders || folders.some(folder=>!folder?.URI || folderURIs.has(folder.URI)))invalidate();
+    },
+    close(){closed=true;invalidate();folderURIs.clear();}
   };
 }
+// Candidate arrays are immutable snapshots. Reuse their reference index while
+// the bounded Sent cache owns the snapshot; weak keys release expired indexes.
+var relatedSentIndexes=new WeakMap();
 function independentRelatedSent(messages,candidates) {
-  const byId=new Map(),seen=new Set(),result=[...messages];
-  for(const candidate of candidates)for(const id of candidate.ids) {
-    if(!byId.has(id))byId.set(id,[]);byId.get(id).push(candidate);
+  let byId=relatedSentIndexes.get(candidates);
+  if(!byId){
+    byId=new Map();
+    for(const candidate of candidates)for(const id of candidate.ids) {
+      if(!byId.has(id))byId.set(id,[]);byId.get(id).push(candidate);
+    }
+    relatedSentIndexes.set(candidates,byId);
   }
+  const seen=new Set(),result=[...messages];
   const pending=messages.flatMap(independentReferenceIds),visited=new Set();
   for(let i=0;i<pending.length;i++) {
     const id=pending[i];if(visited.has(id))continue;visited.add(id);
@@ -236,6 +248,34 @@ function independentBimiDomain(address,result,baseDomain) {
   const from=address.split('@').at(-1)?.toLowerCase();
   if(!from || !result?.dkim?.some(signature=>signature.result==='SUCCESS' && signature.sdid && baseDomain(signature.sdid.toLowerCase())===baseDomain(from)))return null;
   return from;
+}
+// Keep native message-menu actions and add compose actions scoped to this card.
+// The header is captured here: expanding another card must never redirect Forward.
+function installIndependentMessageActions(frame,header,isCurrent,runCommand){
+  const doc=frame.contentDocument,popup=doc.getElementById('otherActionsPopup');
+  const removers=[],items=[];
+  function bind(node,command){
+    const handler=event=>{
+      if(!isCurrent())return;
+      event.preventDefault();event.stopImmediatePropagation();
+      popup?.hidePopup?.();runCommand(command,header);
+    };
+    node.addEventListener('command',handler,true);
+    removers.push(()=>node.removeEventListener('command',handler,true));
+  }
+  if(popup && doc.createXULElement){
+    const before=popup.firstChild;
+    for(const [label,command] of [['Reply','cmd_replySender'],['Reply all','cmd_replyall'],['Forward','cmd_forwardInline']]){
+      const item=doc.createXULElement('menuitem');
+      item.id='gm-message-'+command;gmBindAction(item,'label',gmText(label),true);
+      bind(item,command);popup.insertBefore(item,before);items.push(item);
+    }
+    const separator=doc.createXULElement('menuseparator');popup.insertBefore(separator,before);items.push(separator);
+  }
+  // Also honor an exposed native Forward button, independent of the global
+  // forwarding preference (our conversation action always forwards inline).
+  const forward=doc.getElementById('hdrForwardButton');if(forward)bind(forward,'cmd_forwardInline');
+  return {close(){for(const remove of removers)remove();for(const item of items)item.remove();}};
 }
 // ContextMenuParent routes message-body events to about:3pane, even for our
 // embedded readers. Use the originating message's menu and command controller.
@@ -530,13 +570,23 @@ function installIndependentReader(win) {
       chip.append(remove);titleTags.append(chip);
     }
   }
-  const tagListener={msgPropertyChanged(header,property){if(['keywords','label'].includes(property))refreshTags();if(property==='dkim_verifier@pl-result')for(const render of securityRenderers)render()}};
+  const tagListener={msgPropertyChanged(header,property){
+    // Keyword and verification notifications are global. Other conversations
+    // cannot change these cards; avoid rebuilding every chip and security badge.
+    if(header && !currentHeaders.some(message=>independentMessageKey(message)===independentMessageKey(header) ||
+      (message.messageId && message.messageId===header.messageId)))return;
+    if(['keywords','label'].includes(property))refreshTags();
+    if(property==='dkim_verifier@pl-result')for(const render of securityRenderers)render();
+  }};
   let notifications=Ci.nsIMsgFolderNotificationService.msgPropertyChanged;
   for(const name of ['msgAdded','msgsDeleted','msgsMoveCopyCompleted','folderDeleted','folderRenamed','msgKeyChanged']){
     tagListener[name]=()=>sentCache.invalidate();notifications|=Ci.nsIMsgFolderNotificationService[name] || 0;
   }
+  tagListener.msgsDeleted=headers=>sentCache.invalidateFolders(headers?Array.from(headers,header=>header.folder):null);
+  tagListener.msgsMoveCopyCompleted=(_move,headers,destination)=>sentCache.invalidateFolders(headers?[...Array.from(headers,header=>header.folder),destination]:null);
+  tagListener.msgKeyChanged=(_oldKey,header)=>sentCache.invalidateFolders([header?.folder]);
   tagListener.msgAdded=header=>{
-    sentCache.invalidate();
+    sentCache.invalidateFolders([header?.folder]);
     if(closed || host.hidden || !currentHeaders.length || !header?.folder)return;
     // Draft saves also emit msgAdded. Only actual Sent copies can become a
     // sent message. Replies match References; forwards match this composer’s ID.
@@ -663,7 +713,7 @@ function installIndependentReader(win) {
     let pendingBody=hydration?.body || null;
     if(pendingBody){article.append(pendingBody);body.style.position='absolute';body.style.visibility='hidden';body.style.inlineSize='100%';}
     function revealSavedBody(){if(!pendingBody)return;preserveReaderPosition(host,article,()=>{pendingBody.remove();pendingBody=null;body.style.position='';body.style.visibility='';body.style.inlineSize='';});}
-    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null;
+    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null;
     const quoteButton=text('button','quote-toggle','…');quoteButton.type='button';quoteButton.hidden=true;
     gmBindAttribute(quoteButton, 'aria-label', () => gmText("Show quoted text"));quoteButton.setAttribute('aria-expanded','false');
     quoteButton.addEventListener('click',()=>toggleQuotes?.());
@@ -678,6 +728,7 @@ function installIndependentReader(win) {
       contentChanges?.disconnect();contentChanges=null;
       contentLoad?.();contentLoad=null;toggleQuotes=null;
       if(resizeFrame!==null)win.cancelAnimationFrame(resizeFrame);resizeFrame=null;
+      messageActions?.close();messageActions=null;
       restoreCommands?.();restoreCommands=null;focusCleanup?.();focusCleanup=null;
       scrollCleanup?.();scrollCleanup=null;
       for(const [document,message] of messageDocs)if(message===header)messageDocs.delete(document);
@@ -719,6 +770,7 @@ function installIndependentReader(win) {
         const star=frame.contentDocument.getElementById('starMessageButton');
         const replyControl=frame.contentDocument.getElementById('hdrReplyToSenderButton');
         if(star && replyControl && star.parentNode===replyControl.parentNode)star.parentNode.insertBefore(star,replyControl);
+        messageActions?.close();messageActions=installIndependentMessageActions(frame,header,isCurrent,runCommand);
         const replyButton=frame.contentDocument.getElementById('hdrReplyToSenderButton');
         if(replyButton && replyButton.getAttribute('data-gm-reply-bound')!=='true'){
           replyButton.setAttribute('data-gm-reply-bound','true');
