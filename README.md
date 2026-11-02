@@ -36,7 +36,8 @@ or `inline-labels` extension? Read the [migration guide](docs/updates.md#migrati
 | For users | For developers |
 | --- | --- |
 | [Settings and optional features](docs/settings.md) | [Setup, architecture and testing](docs/development.md) |
-| [Labels and shortcuts](docs/labels.md) | [Release publishing](docs/updates.md#publishing-a-release) |
+| [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [Performance review](docs/performance.md) |
+| [Labels](docs/labels.md) | [Release publishing](docs/updates.md#publishing-a-release) |
 | [Troubleshooting and reporting issues](docs/troubleshooting.md) | [DKIM/BIMI integration](integrations/README.md) |
 | [Updates, removal and migration](docs/updates.md) | [Changelog](CHANGELOG.md) |
 
