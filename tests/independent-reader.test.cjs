@@ -57,7 +57,8 @@ function readerFixture({photo=null,tagged=false,verifyIndependentDkim}={}) {
       content.createRange=()=>({selectNodeContents(){},getBoundingClientRect:()=>({bottom:content.bottom})});
       content.defaultView={getComputedStyle:()=>({marginTop:'8px',marginBottom:'8px',paddingBottom:'0px'})};
       const pane={clientHeight:400,contentDocument:content};
-      browser.contentDocument={...node('document'),documentURI:'about:message',createElement:node,documentElement:node(),getElementById:id=>id==='messagepane'?pane:id==='hdrReplyToSenderButton'?browser.replyButton:null};
+      browser.messageMenu=node('menupopup');browser.messageMenu.append(node('native-menuitem'));browser.forwardButton=node('button');
+      browser.contentDocument={...node('document'),createXULElement:node,documentURI:'about:message',createElement:node,documentElement:node(),getElementById:id=>id==='messagepane'?pane:id==='hdrReplyToSenderButton'?browser.replyButton:id==='otherActionsPopup'?browser.messageMenu:id==='hdrForwardButton'?browser.forwardButton:null};
       browser.contentWindow={displayMessage:uri=>{loads.push(uri);browser.uri=uri},commandController:{isCommandEnabled:()=>true,doCommand:name=>commands.push([name,browser.uri])}};
       browser.replyButton=node('button');browser.pane=pane;browser.content=content;browsers.push(browser);return browser;
     }};
@@ -696,6 +697,29 @@ test('resumed inline drafts retain conversation label sources after reader navig
  await f.reader.open(f.anchor,{draft});
  assert.equal(placement.labelMessages()[0],f.anchor);assert.equal(typeof placement.onSendState,'function');
  f.reader.hide();assert.equal(placement.labelMessages()[0],f.anchor,'navigation retains the original conversation, not another thread');f.reader.close();
+});
+
+test('each message menu forwards its own header, including an earlier message, and cleans up on collapse',async()=>{
+ const f=readerFixture(),older=f.prepare(message(2,'older','inbox',0));
+ f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:2,getChildHdrAt:i=>[older,f.anchor][i]})};
+ await f.reader.open(f.anchor);
+ // Expand the earlier card; the footer continues to target the latest message.
+ f.cards.children[0].children[0].children[0].emit('click',{});
+ const earlier=f.browsers.at(-1);f.loaded(earlier);
+ const calls=[];f.scope.inlineReplyEnabled=true;
+ f.scope.inlineComposeControllers=new WeakMap([[f.win,{float(){},open(header,command,placement){calls.push({header,command,placement})}}]]);
+ const forward=earlier.messageMenu.children.find(node=>node.id==='gm-message-cmd_forwardInline');
+ assert.ok(forward);assert.equal(forward.getAttribute('label'),'Forward');
+ const event={preventDefault(){},stopImmediatePropagation(){}};
+ forward.emit('command',event);
+ assert.equal(calls[0].header,older);assert.equal(calls[0].command,'cmd_forwardInline');
+ earlier.forwardButton.emit('command',event);assert.equal(calls[1].header,older);
+ const readyCount=earlier.messageMenu.children.length;earlier.emit('MsgLoaded');
+ assert.equal(earlier.messageMenu.children.length,readyCount,'reload does not duplicate injected menu items');
+ f.reader.hide();forward.emit('command',event);
+ assert.equal(calls.length,2,'discarded message menus cannot trigger actions');
+ assert.equal(earlier.messageMenu.children.length,1,'native menu entries are preserved and injected entries removed');
+ f.reader.close();
 });
 
 
