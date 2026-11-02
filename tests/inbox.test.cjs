@@ -481,6 +481,13 @@ test('sender draft labels follow local save/delete notifications, locale, row re
   const controller=scope.installSenderDraftLabels(win,mail,interfaces);
   async function flush(){for(const header of draftFolder.messages)header.folder=draftFolder;for(const [id,fn] of [...timers]){timers.delete(id);await fn()}}
   await flush();assert.equal(row.querySelector('.gm-sender-draft').textContent,'Bozza');
+  const incoming={URI:'inbox',isSpecialFolder:()=>false};
+  for(let i=0;i<100;i++)listener.msgAdded({folder:incoming});
+  listener.msgsDeleted([{folder:incoming}]);listener.msgsMoveCopyCompleted(true,[{folder:incoming}],incoming);
+  assert.equal(timers.size,0,'unrelated mailbox events must not schedule draft scans');
+  listener.msgsMoveCopyCompleted(true,[{folder:incoming}],draftFolder);
+  assert.equal(timers.size,1,'moving into Drafts must refresh the index');await flush();
+
   controller.render(row);assert.equal(cell.children.length,1,'refresh wraps the sender only once');
   assert.deepEqual(row.querySelector('.gm-sender-draft').events,{},'draft label is plain text');
   const click=()=>controller.openRow(row);

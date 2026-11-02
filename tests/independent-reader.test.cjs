@@ -207,6 +207,8 @@ test('title aggregates labels across incoming and sent cards and stays synchroni
   await f.reader.open(f.anchor);
   const titleTags=f.conversation.children[0].children[0];
   assert.equal(titleTags.className,'title-tags');assert.equal(titleTags.children.length,0,'message-only label is absent from title');
+  const unrelated=message(999,'unrelated','other',3),beforeTags=titleTags.children;
+  f.tagListener.msgPropertyChanged(unrelated,'keywords');assert.equal(titleTags.children,beforeTags,'unrelated notifications must not rebuild the visible title');
   assert.equal(f.cards.children[0].children[0].children[0].children[1].children[3].children.length,1);
   f.anchor.tagged=false;sent.tagged=true;f.tagListener.msgPropertyChanged(sent,'keywords');
   assert.equal(titleTags.children.length,0,'sent-only labels stay on the sent message');
@@ -694,4 +696,31 @@ test('resumed inline drafts retain conversation label sources after reader navig
  await f.reader.open(f.anchor,{draft});
  assert.equal(placement.labelMessages()[0],f.anchor);assert.equal(typeof placement.onSendState,'function');
  f.reader.hide();assert.equal(placement.labelMessages()[0],f.anchor,'navigation retains the original conversation, not another thread');f.reader.close();
+});
+
+
+test('unrelated mailbox notifications preserve Sent scans; relevant folders and unknown events invalidate them',async()=>{
+ const scope=context();let reads=0;
+ const folder={URI:'sent',get messages(){reads++;return [references(message(2,'reply','sent',2),'a')]}};
+ const cache=scope.createSentCandidateCache({},()=>0);
+ await cache.get([folder]);
+ for(let i=0;i<100;i++){cache.invalidateFolders([{URI:'inbox'}]);await cache.get([folder])}
+ assert.equal(reads,1,'100 unrelated arrivals must not rescan Sent');
+ cache.invalidateFolders([folder]);await cache.get([folder]);assert.equal(reads,2);
+ cache.invalidateFolders([{URI:'inbox'},folder]);await cache.get([folder]);assert.equal(reads,3,'moves into or out of Sent invalidate');
+ cache.invalidateFolders([undefined]);await cache.get([folder]);assert.equal(reads,4,'unknown notification shapes stay conservative');
+ cache.close();
+});
+
+test('conversation reference lookups reuse the cached index without rescanning candidates',()=>{
+ const scope=context(),anchor=message(1,'root','inbox',1);let indexed=0;
+ const candidates=Array.from({length:5000},(_,i)=>({header:message(i+2,'sent-'+i,'sent',i+2),get ids(){indexed++;return i===0?['root','sent-0']:['unrelated-'+i]}}));
+ const first=scope.independentRelatedSent([anchor],candidates);
+ assert.equal(first.length,2);assert.equal(indexed,5001);
+ // The matched candidate's references still participate in transitive matching.
+ const before=indexed;
+ for(let i=0;i<20;i++)assert.equal(scope.independentRelatedSent([anchor],candidates).length,2);
+ assert.equal(indexed-before,20,'only matched references are traversed after the first lookup');
+ const replacement=[{header:message(9,'new','sent',9),ids:['root']}];
+ assert.equal(scope.independentRelatedSent([anchor],replacement)[1].messageId,'new','a new snapshot gets a fresh index');
 });

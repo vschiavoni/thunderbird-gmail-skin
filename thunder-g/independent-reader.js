@@ -57,11 +57,12 @@ async function independentSentCandidates(win,folders,cancelled) {
 }
 // Only local summary metadata is retained; message bodies remain native.
 function createSentCandidateCache(win,now=()=>Date.now(),limit=10000,ttl=30000) {
-  let entry=null,pending=null,generation=0,closed=false;
+  let entry=null,pending=null,generation=0,closed=false,folderURIs=new Set();
   function invalidate(){generation++;entry=null;pending=null;}
   return {
     get(folders){
       if(closed)return Promise.resolve([]);
+      folderURIs=new Set(folders.map(folder=>folder.URI));
       const key=JSON.stringify(folders.map(folder=>{
         let count=null;try{count=folder.getTotalMessages?.(false) ?? null}catch(_){}
         return [folder.URI,count];
@@ -76,14 +77,25 @@ function createSentCandidateCache(win,now=()=>Date.now(),limit=10000,ttl=30000) 
       pending=job;return job.promise;
     },
     invalidate,
-    close(){closed=true;invalidate();}
+    invalidateFolders(folders){
+      if(!folders || folders.some(folder=>!folder?.URI || folderURIs.has(folder.URI)))invalidate();
+    },
+    close(){closed=true;invalidate();folderURIs.clear();}
   };
 }
+// Candidate arrays are immutable snapshots. Reuse their reference index while
+// the bounded Sent cache owns the snapshot; weak keys release expired indexes.
+var relatedSentIndexes=new WeakMap();
 function independentRelatedSent(messages,candidates) {
-  const byId=new Map(),seen=new Set(),result=[...messages];
-  for(const candidate of candidates)for(const id of candidate.ids) {
-    if(!byId.has(id))byId.set(id,[]);byId.get(id).push(candidate);
+  let byId=relatedSentIndexes.get(candidates);
+  if(!byId){
+    byId=new Map();
+    for(const candidate of candidates)for(const id of candidate.ids) {
+      if(!byId.has(id))byId.set(id,[]);byId.get(id).push(candidate);
+    }
+    relatedSentIndexes.set(candidates,byId);
   }
+  const seen=new Set(),result=[...messages];
   const pending=messages.flatMap(independentReferenceIds),visited=new Set();
   for(let i=0;i<pending.length;i++) {
     const id=pending[i];if(visited.has(id))continue;visited.add(id);
@@ -530,13 +542,23 @@ function installIndependentReader(win) {
       chip.append(remove);titleTags.append(chip);
     }
   }
-  const tagListener={msgPropertyChanged(header,property){if(['keywords','label'].includes(property))refreshTags();if(property==='dkim_verifier@pl-result')for(const render of securityRenderers)render()}};
+  const tagListener={msgPropertyChanged(header,property){
+    // Keyword and verification notifications are global. Other conversations
+    // cannot change these cards; avoid rebuilding every chip and security badge.
+    if(header && !currentHeaders.some(message=>independentMessageKey(message)===independentMessageKey(header) ||
+      (message.messageId && message.messageId===header.messageId)))return;
+    if(['keywords','label'].includes(property))refreshTags();
+    if(property==='dkim_verifier@pl-result')for(const render of securityRenderers)render();
+  }};
   let notifications=Ci.nsIMsgFolderNotificationService.msgPropertyChanged;
   for(const name of ['msgAdded','msgsDeleted','msgsMoveCopyCompleted','folderDeleted','folderRenamed','msgKeyChanged']){
     tagListener[name]=()=>sentCache.invalidate();notifications|=Ci.nsIMsgFolderNotificationService[name] || 0;
   }
+  tagListener.msgsDeleted=headers=>sentCache.invalidateFolders(headers?Array.from(headers,header=>header.folder):null);
+  tagListener.msgsMoveCopyCompleted=(_move,headers,destination)=>sentCache.invalidateFolders(headers?[...Array.from(headers,header=>header.folder),destination]:null);
+  tagListener.msgKeyChanged=(_oldKey,header)=>sentCache.invalidateFolders([header?.folder]);
   tagListener.msgAdded=header=>{
-    sentCache.invalidate();
+    sentCache.invalidateFolders([header?.folder]);
     if(closed || host.hidden || !currentHeaders.length || !header?.folder)return;
     // Draft saves also emit msgAdded. Only actual Sent copies can become a
     // sent message. Replies match References; forwards match this composer’s ID.
