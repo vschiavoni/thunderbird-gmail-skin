@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.23.0
+
 - Add optional Gmail keyboard shortcuts for composing, sending, conversation actions, selection and navigation. Off by default; writing fields are excluded from letter shortcuts.
 
 - Match Gmail’s message action order: star, reply, then More, with consistent compact button sizing and keyboard order.
