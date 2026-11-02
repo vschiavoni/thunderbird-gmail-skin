@@ -2033,5 +2033,11 @@
   "label_backup_preview_ready": {
     "message": "Anteprima completata. Nessuna modifica applicata. Scegli Ripristina etichette per applicare le modifiche in attesa. I messaggi mancanti o ambigui vengono ignorati.",
     "description": "Preview complete. No changes have been made. Choose Restore labels to apply the pending changes. Missing or ambiguous messages are skipped."
+  },
+  "gmail_keyboard_shortcuts": {
+    "message": "Scorciatoie da tastiera Gmail"
+  },
+  "gmail_keyboard_shortcuts_help": {
+    "message": "Usa le scorciatoie essenziali di Gmail e Command+Invio (Mac) o Ctrl+Invio (Windows/Linux) per inviare. Disattivate per impostazione predefinita. Le scorciatoie con lettere non si attivano durante la scrittura. Premi ? nella lista dei messaggi per la guida. Le scorciatoie native di Thunderbird restano disponibili."
   }
 }

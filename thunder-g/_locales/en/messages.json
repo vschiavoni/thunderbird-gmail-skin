@@ -2033,5 +2033,11 @@
   "label_backup_preview_ready": {
     "message": "Preview complete. No changes have been made. Choose Restore labels to apply the pending changes. Missing or ambiguous messages are skipped.",
     "description": "Preview complete. No changes have been made. Choose Restore labels to apply the pending changes. Missing or ambiguous messages are skipped."
+  },
+  "gmail_keyboard_shortcuts": {
+    "message": "Gmail keyboard shortcuts"
+  },
+  "gmail_keyboard_shortcuts_help": {
+    "message": "Use Gmail’s essential mail shortcuts and Command+Enter (Mac) or Ctrl+Enter (Windows/Linux) to send. Off by default. Letter shortcuts do not run while typing. Press ? in the message list for help. Existing Thunderbird shortcuts remain available."
   }
 }

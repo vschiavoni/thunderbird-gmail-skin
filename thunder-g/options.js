@@ -239,3 +239,13 @@ recommendedButton.addEventListener('click',async()=>{
     recommendedButton.disabled=false;recommendedButton.textContent=gmText('Apply recommended');
   }
 });
+
+const gmailShortcuts=document.getElementById('gmail-shortcuts');
+gmailShortcuts.disabled=true;
+browser.storage.local.get({gmailShortcuts:false}).then(settings=>{gmailShortcuts.checked=settings.gmailShortcuts===true;gmailShortcuts.disabled=false;}).catch(()=>reportStatus(gmText('Unable to load settings.')));
+gmailShortcuts.addEventListener('change',async()=>{
+ gmailShortcuts.disabled=true;
+ try{await browser.storage.local.set({gmailShortcuts:gmailShortcuts.checked});reportStatus(gmText('Saved.'));}
+ catch(_){gmailShortcuts.checked=!gmailShortcuts.checked;reportStatus(gmText('Unable to save. Please try again.'));}
+ finally{gmailShortcuts.disabled=false;}
+});

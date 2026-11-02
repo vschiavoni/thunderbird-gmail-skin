@@ -183,6 +183,7 @@ function installNativePagination(win, reader) {
     reader.selectIndices([]);page=target;
     paint(true);
   }
+  const shortcutPage=event=>turn(event.detail);tree.addEventListener('gm-shortcut-page',shortcutPage);
   previous.addEventListener('click',()=>turn(-1));next.addEventListener('click',()=>turn(1));
   function viewChanged(){lastView=null;rowMap=null;page=0;schedule()}
   function structureChanged(){rowMap=null;schedule()}
@@ -241,7 +242,7 @@ function installNativePagination(win, reader) {
       }
     },
     close(){
-      closed=true;clear();delete tree._gmPageSelectionBounds;
+      closed=true;tree.removeEventListener('gm-shortcut-page',shortcutPage);clear();delete tree._gmPageSelectionBounds;
       tree.removeEventListener('scroll',schedule);tree.removeEventListener('viewchange',viewChanged);tree.removeEventListener('select',selectionChanged);
       for(const name of ['rowcountchange','expanded','collapsed'])tree.removeEventListener(name,structureChanged);
       tree.removeEventListener('gm-select-page',selectPage);tree.removeEventListener('click',selectPage,true);tree.removeEventListener('keydown',selectPage,true);

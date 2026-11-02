@@ -303,7 +303,7 @@ function installReadingMode(win) {
       if (active) leave(true); else clearBulk();
     }
   });
-  action(gmText("Move to…"), 'M3 6h7l2 2h9v12H3z M12 10v7 m-3-3 3 3 3-3',
+  const moveButton = action(gmText("Move to…"), 'M3 6h7l2 2h9v12H3z M12 10v7 m-3-3 3 3 3-3',
     button => movePopup.openPopup(button, 'after_start', 0, 0, false, false));
   const tagPopup = doc.createXULElement('panel');
   tagPopup.classList.add('gm-label-panel');
@@ -495,7 +495,71 @@ function installReadingMode(win) {
     // Consume the shortcut even while loading, so it cannot resize the UI.
     return true;
   }
+  const shortcutRouter=typeof createGmailShortcutRouter==='function'?createGmailShortcutRouter(runGmailAction):null;
+  let shortcutHelp=null;
+  function runGmailAction(action){
+    const tabmail=win.top.document.getElementById('tabmail');
+    if(closed || pickerOpen || (tabmail && tabmail.currentAbout3Pane!==win))return false;
+    const view=win.gDBView;
+    if(action==='back'){if(active)leave(true);return true;}
+    if(action==='compose'){win.commandController.doCommand('cmd_newMessage');return true;}
+    if(action==='search'){
+      const search=win.top.document.getElementById('unifiedGlobalSearch') || win.top.document.querySelector?.('search-bar input');
+      if(search)search.focus();else win.top.goDoCommand?.('cmd_searchAllMessages');return true;
+    }
+    if(action==='help'){
+      if(!shortcutHelp){
+        shortcutHelp=doc.createXULElement('panel');shortcutHelp.setAttribute('aria-label',gmText('Gmail keyboard shortcuts'));
+        const content=doc.createElement('pre');content.style.cssText='padding:20px;margin:0;font:14px/1.8 sans-serif;white-space:pre-wrap;';
+        content.textContent='Gmail keyboard shortcuts\n\nCompose: c     Search: /\nReply: r     Reply all: a     Forward: f\nShift + r/a/f: separate window\nArchive: e     Delete: #     Spam: !\nStar: s     Read: Shift+i     Unread: Shift+u\nNext/previous conversation: j / k\nOpen: o or Enter     Return to list: u\nNext/previous message: n / p     Expand/collapse all: ; / :\nSelect focused row: x     Labels: l     Move: v\nSnooze: b     Undo: z     Focus toolbar: ,\nSelect: * then a / n / r / u / s / t\n  all / none / read / unread / starred / unstarred\nGo to Inbox / Sent / Drafts: g then i / t / d\n\nComposer (⌘ on Mac, Ctrl elsewhere):\nEnter: Send     Shift+c/b: Cc/Bcc     Shift+f: From\nb/i/u: Bold/Italic/Underline (native)\nShift+7/8: Numbered/Bulleted list\nShift+l/e/r: Align left/center/right\n[ / ]: Outdent/Indent     \\: Remove formatting\n\nEscape: close this help';
+        shortcutHelp.append(content);doc.documentElement.append(shortcutHelp);popups.push(shortcutHelp);
+      }
+      shortcutHelp.openPopup(toolbar.hidden?tree:back,'after_start',0,0,false,false);return true;
+    }
+    if(action.startsWith('folder-')){
+      const name=action.slice(7),flags={inbox:Ci.nsMsgFolderFlags.Inbox,sent:Ci.nsMsgFolderFlags.SentMail,drafts:Ci.nsMsgFolderFlags.Drafts};
+      const folder=win.gFolder?.server?.rootFolder?.getFolderWithFlags(flags[name]);
+      if(folder){leave(false);win.displayFolder(folder.URI);}return true;
+    }
+    if(action==='toolbar'){(toolbar.hidden?doc.querySelector('.gm-inbox-select-group input'):back)?.focus();return true;}
+    if(!view?.rowCount)return true;
+    const index=tree.currentIndex>=0?tree.currentIndex:tree.selectedIndex>=0?tree.selectedIndex:0;
+    if(action==='next' || action==='previous'){
+      if(active)navigate(action==='next'?1:-1);
+      else {const next=adjacentMessageIndex(view,index,action==='next'?1:-1);if(next>=0){tree.selectedIndex=next;tree.scrollToIndex?.(next);}}return true;
+    }
+    if(action==='message-next' || action==='message-previous'){if(active && useIndependent)independent.navigateMessage?.(action==='message-next'?1:-1);return true;}
+    if(action==='expand-all' || action==='collapse-all'){if(active && useIndependent)independent.expandAll?.(action==='expand-all');return true;}
+    if(action==='page-next' || action==='page-previous'){tree.dispatchEvent(new win.CustomEvent('gm-shortcut-page',{detail:action==='page-next'?1:-1}));return true;}
+    if(action==='open'){if(!active)open({index,dataset:{}});return true;}
+    if(action.startsWith('select-') || action==='toggle-selection'){
+      const selected=new Set(bulk?tree.selectedIndices:[]);
+      if(action==='toggle-selection'){if(selected.has(index))selected.delete(index);else selected.add(index);}
+      else {
+        selected.clear();const mode=action.slice(7),range=tree._gmPageSelectionBounds?.() || {rowStart:0,rowEnd:view.rowCount};
+        for(let i=range.rowStart;mode!=='none' && i<range.rowEnd;i++){
+          const flags=view.getFlagsAt(i);if(flags&0x20000000)continue;
+          if(mode==='all' || mode==='read' && (flags&1) || mode==='unread' && !(flags&1) || mode==='starred' && (flags&4) || mode==='unstarred' && !(flags&4))selected.add(i);
+        }
+      }
+      if(active)leave(false);tree.selectedIndices=[...selected];bulk=selected.size>0;win.threadPaneHeader?.updateSelectedCount();syncBulk();return true;
+    }
+    if(active && useIndependent && !independent?.getMessages().length)return true;
+    if(action.startsWith('reply') || action.startsWith('forward')){
+      const separate=action.endsWith('-window'),kind=action.replace('-window',''),name={reply:'cmd_replySender','reply-all':'cmd_replyall',forward:'cmd_forwardInline'}[kind];
+      if(active && useIndependent)independent.compose?.(name,separate);
+      else if(win.commandController.isCommandEnabled(name))win.commandController.doCommand(name);
+      return true;
+    }
+    if(action==='labels'){showLabels(toolbar.hidden?tree:labelsButton);return true;}
+    if(action==='move'){movePopup.openPopup(toolbar.hidden?tree:moveButton,'after_start',0,0,false,false);return true;}
+    if(action==='snooze'){if(!snoozeButton.disabled)snoozeButton.click();return true;}
+    const commands={archive:'cmd_archive',delete:'cmd_deleteMessage',spam:'cmd_markAsJunk',star:'cmd_markAsFlagged',read:'cmd_markAsRead',unread:'cmd_markAsUnread',undo:'cmd_undo'};
+    if(commands[action]){command(commands[action],['archive','delete','spam','unread'].includes(action));return true;}
+    return false;
+  }
   function labelKey(event) {
+    if(shortcutRouter?.handle(event))return;
     const action=mailZoomAction(event);
     if(action && zoomReading(action)){event.preventDefault();event.stopImmediatePropagation();return;}
     if(active && useIndependent && !pickerOpen && independent?.handleTagKey?.(event))return;

@@ -119,10 +119,11 @@ function installChangeDrivenAutosave(native,clock,modes=Ci.nsIMsgCompDeliverMode
   changeAutosaveControllers.add(controller);return controller;
 }
 function installNativeChangeAutosave(native) {
+  const shortcuts=typeof installGmailComposeShortcuts==='function'?installGmailComposeShortcuts(native):null;
   let controller=null,closed=false;
   function ready(){if(!closed && !controller && native.gMsgCompose && native.GetCurrentEditor?.())controller=installChangeDrivenAutosave(native,native)}
   native.addEventListener('compose-startup-done',ready);ready();
-  return {close(){closed=true;native.removeEventListener('compose-startup-done',ready);controller?.close()}};
+  return {close(){closed=true;shortcuts?.close();native.removeEventListener('compose-startup-done',ready);controller?.close()}};
 }
 
 // Keep the full native compose document alive independently of conversation navigation.
@@ -712,12 +713,13 @@ function createInlineCompose(win) {
   const doc=win.document;let browser=null,panel=null,originalHeader=null,originalCommand=null,ready=false,observer=null;
   let restoreChrome=null,loadingTimer=null,inlineContainer=null,scrollHost=null,presentation='inline',bar=null,title=null,floatButton=null,windowButton=null,transferBusy=false,attachmentPicker=null,draftStatus=null,floatingResize=null,sendStatus=null;
   let sendNotice=null,noticeTimer=null,scrim=null,minimized=false,minimizeButton=null,bodyReadyWatcher=null,bodySheet=null,composeContentBridge=null;
-  let changeAutosave=null,attachmentDrop=null,pendingForward=null;
+  let changeAutosave=null,attachmentDrop=null,pendingForward=null,composeShortcuts=null;
   const main=win.browsingContext.topChromeWindow;
   function stopObserver(){if(observer){Services.obs.removeObserver(observer,'chrome-document-global-created');observer=null;}}
   function dispose(){
     pendingForward=null;
     bodyReadyWatcher?.close();bodyReadyWatcher=null;bodySheet?.close();bodySheet=null;
+    composeShortcuts?.close();composeShortcuts=null;
     changeAutosave?.close();changeAutosave=null;
     sendStatus?.close();sendStatus=null;
     draftStatus?.close();draftStatus=null;floatingResize?.close();floatingResize=null;
@@ -1056,6 +1058,7 @@ function createInlineCompose(win) {
             if(replyRow && identity){
               try{const addresses=MailServices.headerParser.parseDecodedHeader(replyTo);replyRow.toggleAttribute('data-gm-redundant',addresses.length>0 && addresses.every(item=>item.email?.toLowerCase()===identity.toLowerCase()));}catch(_){}
             }
+            composeShortcuts=typeof installGmailComposeShortcuts==='function'?installGmailComposeShortcuts(native):null;
             ready=true;save.disabled=false;windowButton.disabled=false;changeAutosave=installChangeDrivenAutosave(native,win);draftStatus=installComposeDraftStatus(native,savedStatus,win,Ci.nsIMsgCompDeliverMode,state=>{if(state==='saved')sendStatus?.draftSaved()});sendStatus=installInlineSendStatus(native,win,onSendState);if(loadingTimer!==null)win.clearTimeout(loadingTimer);loadingTimer=null;native.SetMsgBodyFrameFocus?.();placement.onReady?.();if(command==='cmd_editDraft')revealInlineDraft(win,panel,()=>browser===frame && presentation==='inline' && (!placement.isCurrent || placement.isCurrent()));return;}
           if(Date.now()-started>20000){
             gmBindValue(title, "textContent", () => gmText("Editor could not finish starting. Close and use a classic reply."));restoreChrome?.();restoreChrome=null;return;
