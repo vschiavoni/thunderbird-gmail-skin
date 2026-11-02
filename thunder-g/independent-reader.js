@@ -1040,6 +1040,27 @@ function installIndependentReader(win) {
     hide(){if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();++ticket;query?.cancel();query=null;resolving=false;host.hidden=true;layout.classList.remove('gm-independent-open');clearCards()},
     close(){this.hide();closed=true;contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
     refresh:refreshTags,
+    navigateMessage(direction){
+      if(resolving || !currentHeaders.length)return;
+      const index=currentHeaders.indexOf(activeHeader || actionHeader),target=currentHeaders[index+direction];
+      if(!target)return;const card=messageCards.get(target),toggle=card?.querySelector('.toggle');
+      if(card)card.hidden=false;
+      if(toggle?.getAttribute('aria-expanded')!=='true')toggle?.click();
+      activateMessage(target);toggle?.focus();card?.scrollIntoView({block:'nearest'});
+    },
+    expandAll(expand){
+      if(resolving)return;
+      historyExpanded=true;cards.querySelector?.('.history-gap')?.remove();
+      for(const card of messageCards.values()){
+        card.hidden=false;const toggle=card.querySelector('.toggle');
+        if((toggle?.getAttribute('aria-expanded')==='true')!==expand)toggle?.click();
+      }
+    },
+    compose(command,separate=false){
+      const target=activeHeader || actionHeader;if(!target || resolving)return;
+      if(separate){const controller=frames.get(independentMessageKey(target))?.contentWindow?.commandController;if(controller?.isCommandEnabled(command))controller.doCommand(command);}
+      else runCommand(command,target);
+    },
     print(){runCommand('cmd_print')},
     getMessages(){return resolving?[]:currentHeaders.slice()}
   };

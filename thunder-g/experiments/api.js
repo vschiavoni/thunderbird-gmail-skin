@@ -355,6 +355,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         for (const doc of documents.keys()) doc.documentElement.toggleAttribute('data-gm-hide-column-headers', !showColumnHeaders);
       },
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},
+      async setGmailShortcuts(enabled){gmailShortcutsEnabled=enabled===true;},
       async setInlineReplyEnabled(enabled){inlineReplyEnabled=enabled===true;},
       async setInlineNewMessageEnabled(enabled){inlineNewMessageEnabled=enabled===true;},
       async setBimiEnabled(enabled){independentBimiEnabled=enabled===true;for(const refresh of independentBimiListeners)refresh();},

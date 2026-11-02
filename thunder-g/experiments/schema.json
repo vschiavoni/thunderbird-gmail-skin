@@ -106,6 +106,12 @@
         ]
       },
       {
+        "name": "setGmailShortcuts",
+        "type": "function",
+        "async": true,
+        "parameters": [{"name":"enabled","type":"boolean"}]
+      },
+      {
         "name": "setInlineReplyEnabled",
         "type": "function",
         "async": true,

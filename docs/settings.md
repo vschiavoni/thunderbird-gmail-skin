@@ -113,3 +113,39 @@ never overwritten. See the [Gmail import guide](gmail-import.md) for setup, Goog
 permissions, session-only credentials, conflict handling and safe retries.
 
 Global searches open in the styled message list by default. Turn off **Inbox → Always show search results as a list** to use Thunderbird’s timeline and faceted search view for new searches. The option uses the complete native result set and does not change Thunderbird’s global preferences.
+
+
+### Gmail keyboard shortcuts (optional)
+
+Under **Writing**, enable **Gmail keyboard shortcuts**. It is off by default and
+applies to existing and new mail panes and composers. Letter shortcuts are ignored
+inside text fields, editable message bodies, menus and dialogs. The existing `L`
+label shortcut remains available independently of this setting. Native Thunderbird
+shortcuts are not disabled when this option is off.
+
+Supported mail shortcuts:
+
+| Keys | Action |
+| --- | --- |
+| `c`, `/`, `?` | Compose, search, shortcut help |
+| `r`, `a`, `f` | Reply, reply all, forward |
+| `Shift+r/a/f` | Corresponding action in a separate window when reading a conversation |
+| `e`, `#`, `!`, `s` | Archive, delete, spam, toggle star |
+| `Shift+i`, `Shift+u`, `z` | Mark read, mark unread, undo |
+| `j/k`, `o` or `Enter`, `u` | Next/previous conversation, open, return to list |
+| `n/p`, `;`, `:` | Next/previous message, expand/collapse conversation cards |
+| `x`, `l`, `v`, `b`, `,` | Select focused row, labels, move, snooze, focus toolbar |
+| `*` then `a/n/r/u/s/t` | Select all/none/read/unread/starred/unstarred on the current page |
+| `g` then `i/t/d` | Current account’s Inbox/Sent/Drafts |
+| `g` then `n/p` | Next/previous page when pagination is enabled |
+
+In native and embedded composers, use **Command** on macOS and **Ctrl** on
+Windows/Linux: `Enter` sends through the normal Send command; `Shift+c/b` reveals
+Cc/Bcc, `Shift+f` focuses From; `Shift+7/8` inserts numbered/bulleted lists;
+`Shift+l/e/r` aligns left/center/right; `[` and `]` outdent/indent; `\` removes
+formatting. Native bold/italic/underline shortcuts continue to work.
+
+Send still requires valid native composer state and recipients; native prompts,
+account security checks, error handling and draft recovery remain in effect.
+Unsupported Gmail services (chat, Keep, Gmail Tasks, importance and superstars)
+are not emulated. Two-key sequences expire after one second.

@@ -9,13 +9,14 @@ async function startThunderG() {
   await ThunderGI18n.ready;
   await browser.inlineLabels.setLanguage?.(ThunderGI18n.language);
   // Optional settings must never prevent the companion from starting.
-  let compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
+  let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
   try {
-    const settings = await browser.storage.local.get({compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
+    const settings = await browser.storage.local.get({gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
     searchResultsAsList=settings.searchResultsAsList!==false;
     showColumnHeaders = settings.showColumnHeaders === true;
     threadGuides = settings.threadGuides !== false;
     bimiEnabled = settings.bimiEnabled === true;
+    gmailShortcuts=settings.gmailShortcuts===true;
     inlineReplyEnabled = settings.inlineReplyEnabled === true;
     inlineNewMessageEnabled = settings.inlineNewMessageEnabled === true;
     hideTodayPane = settings.hideTodayPane === true;
@@ -37,8 +38,10 @@ async function startThunderG() {
   await browser.inlineLabels.setBimiEnabled?.(bimiEnabled);
   await browser.inlineLabels.setInlineReplyEnabled?.(inlineReplyEnabled);
   await browser.inlineLabels.setInlineNewMessageEnabled?.(inlineNewMessageEnabled);
+  await browser.inlineLabels.setGmailShortcuts?.(gmailShortcuts);
   await browser.inlineLabels.start();
   browser.storage.onChanged.addListener((changes, area) => {
+    if(area==='local' && changes.gmailShortcuts)browser.inlineLabels.setGmailShortcuts(changes.gmailShortcuts.newValue===true).catch(console.error);
     if(area==='local' && changes.interfaceLanguage){ThunderGI18n.setPreference(changes.interfaceLanguage.newValue);browser.inlineLabels.setLanguage(ThunderGI18n.language).catch(console.error);}
     if(area==='local' && changes.searchResultsAsList)browser.inlineLabels.setSearchResultsAsList(changes.searchResultsAsList.newValue!==false).catch(console.error);
     if(area==='local' && changes.showColumnHeaders)browser.inlineLabels.setShowColumnHeaders(changes.showColumnHeaders.newValue===true).catch(console.error);
