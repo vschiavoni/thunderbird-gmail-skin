@@ -850,6 +850,7 @@ function installFolderPaneToggle(win) {
   const body=doc.body,button=doc.createElement('button');
   button.type='button';button.className='gm-folder-pane-toggle';button.textContent='';
   button.setAttribute('aria-controls','folderPane');
+  const spaces=win.top?.document?.getElementById('spacesToolbar');
   let animation,compact=false,toolbarEntry=null;
   function sync(){
     const expanded=!compact&&!splitter.isCollapsed;
@@ -857,6 +858,7 @@ function installFolderPaneToggle(win) {
     button.setAttribute('aria-expanded',String(expanded));
     button.setAttribute('aria-label',label);button.title=label;
     body.toggleAttribute('data-gm-folder-pane-closed',!expanded);
+    body.toggleAttribute('data-gm-spaces-visible',!!spaces&&!spaces.hidden);
     if(toolbarEntry?.activeDocument()===doc){toolbarEntry.menu.disabled=false;toolbarEntry.menu.setAttribute('aria-expanded',String(expanded));toolbarEntry.menu.setAttribute('aria-label',label);toolbarEntry.menu.title=label;}
   }
   function toggle(){
@@ -874,6 +876,7 @@ function installFolderPaneToggle(win) {
   button.addEventListener('click',toggle);
   const observer=new win.MutationObserver(sync);
   observer.observe(doc.getElementById('folderPane'),{attributes:true,attributeFilter:['class']});
+  if(spaces)observer.observe(spaces,{attributes:true,attributeFilter:['hidden']});
   const brand=doc.createElement('span');
   brand.className='gm-sidebar-brand';
   const logo=doc.createElement('img');logo.alt='';
@@ -909,7 +912,7 @@ function installFolderPaneToggle(win) {
   sync();
   return {close(){
     animation?.cancel();observer.disconnect();button.remove();if(!toolbar)brand.remove();releaseBrand();
-    body.removeAttribute('data-gm-folder-pane-closed');
+    body.removeAttribute('data-gm-folder-pane-closed');body.removeAttribute('data-gm-spaces-visible');
   }};
 }
 
@@ -1014,10 +1017,12 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     body:has(> .gm-folder-pane-toggle) #folderPane {
       padding-block-start: 54px !important;
     }
-    body[data-gm-folder-pane-closed] { --folderPaneSplitter-width: 64px !important; }
-    body[data-gm-folder-pane-closed]:not(.layout-vertical), body[data-gm-folder-pane-closed].account-central { grid-template-columns: 64px min-content minmax(0,1fr) !important; }
-    body[data-gm-folder-pane-closed].layout-vertical:not(.account-central) { grid-template-columns: 64px min-content minmax(0,1fr) min-content minmax(0,var(--messagePaneSplitter-width)) !important; }
-    body[data-gm-folder-pane-closed] #folderPane { min-inline-size: 0 !important; inline-size: 64px !important; }
+    body[data-gm-folder-pane-closed] { --gm-rail-width: 64px; --folderPaneSplitter-width: var(--gm-rail-width) !important; --gm-folder-pane-min-width: var(--gm-rail-width); }
+    body[data-gm-folder-pane-closed][data-gm-spaces-visible] { --gm-rail-width: 0px; }
+    body[data-gm-folder-pane-closed][data-gm-spaces-visible] :is(#folderPane,#folderPaneSplitter) { display: none !important; }
+    body[data-gm-folder-pane-closed]:not(.layout-vertical), body[data-gm-folder-pane-closed].account-central { grid-template-columns: var(--gm-rail-width) min-content minmax(0,1fr) !important; }
+    body[data-gm-folder-pane-closed].layout-vertical:not(.account-central) { grid-template-columns: var(--gm-rail-width) min-content minmax(0,1fr) min-content minmax(0,var(--messagePaneSplitter-width)) !important; }
+    body[data-gm-folder-pane-closed] #folderPane { min-inline-size: 0 !important; inline-size: var(--gm-rail-width) !important; }
     body[data-gm-folder-pane-closed] #folderPaneSplitter { pointer-events: none; }
     body[data-gm-folder-pane-closed] #folderPaneHeaderBar { padding-inline: 10px !important; flex-direction: column !important; }
     body[data-gm-folder-pane-closed] #folderPaneMoreButton { display: none !important; }

@@ -610,7 +610,7 @@ test('star lists can reorder, activate and remove markers while retaining one ac
   assert.deepEqual(Array.from(scope.gmMoveStar(['blue-star'],'blue-star',false)),['blue-star']);
 });
 
-test('folder menu toggles a compact rail without changing the native pane width',()=>{
+for(const spacesVisible of [false,true])test(`folder menu respects Spaces visibility (${spacesVisible}) without changing native width`,()=>{
   const attributes=new Map(),events=new Map(),animations=[];
   const button={setAttribute:(key,value)=>attributes.set(key,value),
     addEventListener:(name,fn)=>events.set(name,fn),remove(){this.removed=true}};
@@ -622,7 +622,9 @@ test('folder menu toggles a compact rail without changing the native pane width'
     animate(frames){animations.push(frames);return {cancel(){}}}};
   const splitter={isCollapsed:false,width:260,toggleCollapsed(){this.isCollapsed=!this.isCollapsed}};
   let reduced=false,notify;
+  const spaces={hidden:!spacesVisible};
   const win={
+    top:{document:{getElementById:id=>id==='spacesToolbar'?spaces:null}},
     document:{body,createElement:tag=>tag==='img'?logo:tag==='span'?(spanCount++===0?brand:wordmark):button,getElementById:id=>id==='folderPaneSplitter'?splitter:{}},
     MutationObserver:class{constructor(callback){notify=callback}observe(){}disconnect(){}},
     getComputedStyle:()=>({gridTemplateColumns:splitter.isCollapsed?'0px 900px':'260px 640px'}),
@@ -634,6 +636,9 @@ test('folder menu toggles a compact rail without changing the native pane width'
   assert.equal(splitter.isCollapsed,false);
   assert.equal(attributes.get('aria-expanded'),'false');
   assert.equal(attributes.get('data-gm-folder-pane-closed'),true);
+  assert.equal(attributes.get('data-gm-spaces-visible'),spacesVisible);
+  spaces.hidden=!spaces.hidden;notify();
+  assert.equal(attributes.get('data-gm-spaces-visible'),!spacesVisible);
   assert.equal(animations.length,0);
   reduced=true;
   events.get('click')();
