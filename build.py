@@ -1,6 +1,7 @@
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import json
+import base64
 
 root = Path(__file__).resolve().parent
 source = root / 'thunder-g'
@@ -34,6 +35,8 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             data += b'\n' + (source / 'dates.js').read_bytes()
             data += b'\n' + (source / 'startup.js').read_bytes()
             data += b'\n' + (source / 'stars.js').read_bytes()
+            brand = base64.b64encode((source / 'icons/sidebar-brand.jpg').read_bytes()).decode()
+            data += ('\nvar GM_SIDEBAR_BRAND = "data:image/jpeg;base64,' + brand + '";\n').encode()
             data += b'\n' + (source / 'inbox.js').read_bytes()
             data += b'\n' + (source / 'conversation.js').read_bytes()
             data += b'\n' + (source / 'compose.js').read_bytes()

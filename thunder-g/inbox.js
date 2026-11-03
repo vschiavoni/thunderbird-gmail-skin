@@ -809,10 +809,50 @@ function installCollapsedThreadDefaults(win) {
   }};
 }
 
+function installFolderPaneToggle(win) {
+  const doc=win.document,splitter=doc.getElementById('folderPaneSplitter');
+  if(!splitter?.toggleCollapsed || !doc.body)return {close(){}};
+  const body=doc.body,button=doc.createElement('button');
+  button.type='button';button.className='gm-folder-pane-toggle';button.textContent='';
+  button.setAttribute('aria-controls','folderPane');
+  let animation;
+  function sync(){
+    const expanded=!splitter.isCollapsed;
+    const label=expanded?gmText("Hide main menu"):gmText("Show main menu");
+    button.setAttribute('aria-expanded',String(expanded));
+    button.setAttribute('aria-label',label);button.title=label;
+    body.toggleAttribute('data-gm-folder-pane-closed',!expanded);
+  }
+  function toggle(){
+    const before=win.getComputedStyle(body).gridTemplateColumns;
+    animation?.cancel();
+    splitter.toggleCollapsed();
+    sync();
+    const after=win.getComputedStyle(body).gridTemplateColumns;
+    if(before!==after && !win.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      animation=body.animate([{gridTemplateColumns:before},{gridTemplateColumns:after}],{
+        duration:180,easing:'ease-out'
+      });
+    }
+  }
+  button.addEventListener('click',toggle);
+  const observer=new win.MutationObserver(sync);
+  observer.observe(doc.getElementById('folderPane'),{attributes:true,attributeFilter:['class']});
+  const brand=doc.createElement('img');
+  brand.className='gm-sidebar-brand';brand.alt='Thunder-G';
+  if(typeof GM_SIDEBAR_BRAND!=='undefined')brand.src=GM_SIDEBAR_BRAND;
+  body.append(button,brand);sync();
+  return {close(){
+    animation?.cancel();observer.disconnect();button.remove();brand.remove();
+    body.removeAttribute('data-gm-folder-pane-closed');
+  }};
+}
+
 function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
+  const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
   const drafts = installSenderDraftLabels(win);
   reader?.setDraftOpener?.(drafts.openRow,drafts.getRowDraft);
@@ -844,6 +884,51 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   const style = doc.createElement('style');
   style.textContent = `
     #threadTree[data-gm-hide-thread-arrows] tr:not([data-properties~="dummy"]) .twisty { display: none !important; }
+    .gm-folder-pane-toggle {
+      position: absolute;
+      inset-block-start: 5px;
+      inset-inline-start: 5px;
+      z-index: 2;
+      box-sizing: border-box !important;
+      inline-size: 32px !important;
+      min-inline-size: 32px !important;
+      max-inline-size: 32px !important;
+      block-size: 32px !important;
+      min-block-size: 32px !important;
+      max-block-size: 32px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      border-radius: 50% !important;
+      display: grid !important;
+      place-items: center;
+      background: light-dark(#e8eaed, #41454a) !important;
+      color: var(--gm-ink);
+      cursor: pointer;
+    }
+    .gm-folder-pane-toggle::before {
+      content: "" !important;
+      inline-size: 14px;
+      block-size: 2px;
+      background: currentColor;
+      box-shadow: 0 -4px currentColor, 0 4px currentColor;
+    }
+    .gm-folder-pane-toggle:hover { background: var(--gm-hover) !important; }
+    .gm-sidebar-brand {
+      position: absolute;
+      inset-block-start: 5px;
+      inset-inline-start: 44px;
+      inline-size: 98px;
+      block-size: 32px;
+      object-fit: contain;
+      z-index: 2;
+    }
+    body:has(> .gm-sidebar-brand) #folderPane {
+      padding-block-start: 42px !important;
+    }
+    body[data-gm-folder-pane-closed] #threadPaneHeaderBar > .list-header-bar-container-start {
+      padding-inline-start: 150px !important;
+    }
     #threadTree button[data-gm-star] { background-image: none !important; }
     #threadTree button[data-gm-star] img { visibility: hidden; }
     #threadTree button[data-gm-star]::after {
@@ -1050,6 +1135,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     style.remove();
     previews.close();
     reader?.setDraftOpener?.(null);
+    folderToggle.close();
     stars.close();
     drafts.close();
     compose.close();

@@ -609,3 +609,46 @@ test('star lists can reorder, activate and remove markers while retaining one ac
   assert.deepEqual(Array.from(scope.gmMoveStar(removed,'green-star',true,'blue-star')),['red-star','green-star','blue-star']);
   assert.deepEqual(Array.from(scope.gmMoveStar(['blue-star'],'blue-star',false)),['blue-star']);
 });
+
+test('folder menu toggles the native pane, updates accessibility and respects reduced motion',()=>{
+  const attributes=new Map(),events=new Map(),animations=[];
+  const button={setAttribute:(key,value)=>attributes.set(key,value),
+    addEventListener:(name,fn)=>events.set(name,fn),remove(){this.removed=true}};
+  const brand={remove(){this.removed=true}};
+  const body={append(...nodes){assert.deepEqual(nodes,[button,brand])},toggleAttribute:(key,value)=>attributes.set(key,value),
+    removeAttribute:key=>attributes.delete(key),
+    animate(frames){animations.push(frames);return {cancel(){}}}};
+  const splitter={isCollapsed:false,width:260,toggleCollapsed(){this.isCollapsed=!this.isCollapsed}};
+  let reduced=false,notify;
+  const win={
+    document:{body,createElement:tag=>tag==='img'?brand:button,getElementById:id=>id==='folderPaneSplitter'?splitter:{}},
+    MutationObserver:class{constructor(callback){notify=callback}observe(){}disconnect(){}},
+    getComputedStyle:()=>({gridTemplateColumns:splitter.isCollapsed?'0px 900px':'260px 640px'}),
+    matchMedia:()=>({matches:reduced}),
+  };
+  const controller=scope.installFolderPaneToggle(win);
+  assert.equal(attributes.get('aria-expanded'),'true');
+  events.get('click')();
+  assert.equal(splitter.isCollapsed,true);
+  assert.equal(attributes.get('aria-expanded'),'false');
+  assert.equal(animations.length,1);
+  reduced=true;
+  events.get('click')();
+  assert.equal(splitter.isCollapsed,false);
+  assert.equal(splitter.width,260);
+  assert.equal(animations.length,1);
+  splitter.toggleCollapsed();notify();
+  assert.equal(attributes.get('aria-expanded'),'false');
+  controller.close();
+  assert.equal(button.removed,true);
+  assert.equal(brand.alt,'Thunder-G');
+  assert.equal(brand.removed,true);
+});
+
+test('sidebar toggle overrides native minimum sizes and draws three visible bars',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8');
+  const rule=source.match(/\.gm-folder-pane-toggle \{([^}]+)\}/)[1];
+  for(const axis of ['inline','block'])assert.match(rule,new RegExp('min-'+axis+'-size: 32px !important'));
+  assert.match(rule,/border-radius: 50% !important/);
+  assert.match(source,/box-shadow: 0 -4px currentColor, 0 4px currentColor/);
+});
