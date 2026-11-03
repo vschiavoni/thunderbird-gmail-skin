@@ -20,6 +20,11 @@ test('nested creation validates duplicates, missing parents and empty segments w
  assert.equal(tags.length,6);
 });
 
+test('a full path under the selected parent is used as entered',()=>{
+ assert.equal(scope.nestedLabelName('Work/PhD/New project','Work/PhD',tags),'Work/PhD/New project');
+ assert.throws(()=>scope.nestedLabelName('Work/PhD/Project','Work/PhD',tags),/already exists/);
+});
+
 test('sidebar visibility keeps parent paths and selected labels reachable',()=>{
  const definitions=[{key:'p',tag:'Parent'},{key:'c',tag:'Parent/Child'},{key:'u',tag:'Unread'},{key:'s',tag:'Shown'}];
  const tree=scope.nestedLabelTree(definitions),modes=new Map([['p','hide'],['c','hide'],['u','unread']]);

@@ -31,7 +31,7 @@ function nestedLabelName(name,parent,tags) {
   name=name.trim();parent=parent || '';
   if(!name || name.split('/').some(part=>!part.trim()))throw new Error(gmText("Enter a label name without empty path segments."));
   if(parent && !tags.some(tag=>tag.tag===parent))throw new Error(gmText("The parent label no longer exists. Choose another label."));
-  const path=parent?`${parent}/${name}`:name;
+  const path=parent && !name.startsWith(parent+'/')?`${parent}/${name}`:name;
   if(tags.some(tag=>tag.tag.normalize('NFKC').toLocaleLowerCase()===path.normalize('NFKC').toLocaleLowerCase()))throw new Error(gmText("A label with this name already exists."));
   return path;
 }
@@ -122,6 +122,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
     if(definitionsDirty){definitions=mailServices.tags.getAllTags();hierarchy=nestedLabelTree(definitions);definitionsDirty=false;rowsDirty=true;}
     if(rowsDirty){
       const keys=new Set(definitions.map(tag=>tag.key));
+      saved.clear();
       for(const row of list.querySelectorAll('[data-tag-key]'))saved.set(row.dataset.tagKey,row);
       for(const [key,row] of saved)if(!keys.has(key)){saved.delete(key);rowStates.delete(row);unread.delete(key);}
       const currentRows=new Set(saved.values());for(const [row] of rowStates)if(!currentRows.has(row))rowStates.delete(row);
@@ -146,6 +147,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
   const observer=new win.MutationObserver(records=>{
     let relevant=false;
     for(const record of records){
+      if(record.target?.closest?.('[data-tag-key]'))rowsDirty=true;
       if(record.target===tree || record.target?.closest?.('[data-mode="tags"]'))relevant=true;
       for(const node of [...(record.addedNodes || []),...(record.removedNodes || [])]){
         if(node.matches?.('[data-tag-key],[data-mode="tags"]') || node.querySelector?.('[data-tag-key]')){rowsDirty=true;relevant=true;}

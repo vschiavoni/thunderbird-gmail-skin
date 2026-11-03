@@ -208,6 +208,30 @@ function installSidebarLabelMenu(win,service,prefs) {
     text(child?gmText("Nest label under: $1", item.tag):gmText("Changing this path also updates its sublabels."));
     const form=doc.createElement('form'),label=doc.createElement('label'),input=doc.createElement('input');
     gmBindValue(label, "textContent", () => child?gmText("Label name"):gmText("Full label path"));input.type='text';input.value=child?'':item.tag;gmBindAttribute(input, 'aria-label', () => child?gmText("Sublabel name"):gmText("Full label path"));label.append(input);form.append(label);
+    if(!child){
+      const parentLabel=doc.createElement('label'),parent=doc.createElement('select');
+      gmBindValue(parentLabel,'textContent',()=>gmText("Select parent label"));
+      const root=doc.createElement('option');root.value='';gmBindValue(root,'textContent',()=>gmText("No parent (top level)"));parent.append(root);
+      const parents=service.getAllTags()
+        .filter(candidate=>candidate.key!==item.key && !candidate.tag.startsWith(item.tag+'/'))
+        .sort((a,b)=>a.tag.localeCompare(b.tag,undefined,{numeric:true}));
+      for(const candidate of parents){
+        const option=doc.createElement('option');option.value=candidate.tag;option.textContent=candidate.tag;parent.append(option);
+      }
+      const syncParent=()=>{
+        const path=input.value.trim();
+        const parentPath=path.includes('/')?path.slice(0,path.lastIndexOf('/')):'';
+        const match=parents.find(candidate=>candidate.tag===parentPath);
+        parent.value=match?.tag || '';
+      };
+      syncParent();
+      input.addEventListener('input',syncParent);
+      parent.addEventListener('change',()=>{
+        const name=input.value.trim().split('/').pop();
+        input.value=parent.value?`${parent.value}/${name}`:name;
+      });
+      parentLabel.append(parent);form.append(parentLabel);
+    }
     const save=doc.createElement('button');save.type='submit';gmBindValue(save, "textContent", () => child?gmText("Create"):gmText("Save"));const cancel=doc.createElement('button');cancel.type='button';gmBindValue(cancel, "textContent", () => gmText("Cancel"));cancel.addEventListener('click',()=>panel.hidePopup());form.append(cancel,save);content.append(form);
     form.addEventListener('submit',event=>{event.preventDefault();try{
       const current=tag(),tags=service.getAllTags();
