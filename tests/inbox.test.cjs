@@ -652,3 +652,21 @@ test('sidebar toggle overrides native minimum sizes and draws three visible bars
   assert.match(rule,/border-radius: 50% !important/);
   assert.match(source,/box-shadow: 0 -4px currentColor, 0 4px currentColor/);
 });
+
+test('settings gear sits immediately after Quick Filter and opens settings once per click',()=>{
+  const events=new Map(),attrs=new Map();
+  let inserted,opens=0;
+  const button={setAttribute:(key,value)=>attrs.set(key,value),
+    addEventListener:(name,fn)=>events.set(name,fn),
+    removeEventListener:name=>events.delete(name),remove(){this.removed=true}};
+  const filter={after(node){inserted=node}};
+  const doc={getElementById:id=>id==='threadPaneQuickFilterButton'?filter:null,createElement:()=>button};
+  const control=scope.installInboxSettingsButton(doc,()=>opens++);
+  assert.equal(inserted,button);
+  assert.equal(attrs.get('aria-label'),'Thunder-G settings');
+  events.get('click')();
+  assert.equal(opens,1);
+  control.close();
+  assert.equal(button.removed,true);
+  assert.equal(events.size,0);
+});

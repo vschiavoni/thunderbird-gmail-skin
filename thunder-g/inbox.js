@@ -848,10 +848,25 @@ function installFolderPaneToggle(win) {
   }};
 }
 
-function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null}={}) {
+function installInboxSettingsButton(doc,openSettings) {
+  const filter=doc.getElementById('threadPaneQuickFilterButton');
+  if(!filter || !openSettings)return {close(){}};
+  const button=doc.createElement('button');
+  button.type='button';
+  button.className='button icon-button unified-toolbar-button gm-inbox-settings';
+  gmBindAttribute(button,'aria-label',()=>gmText("Thunder-G settings"));
+  gmBindAttribute(button,'title',()=>gmText("Thunder-G settings"));
+  button.textContent='⚙';
+  button.addEventListener('click',openSettings);
+  filter.after(button);
+  return {close(){button.removeEventListener('click',openSettings);button.remove();}};
+}
+
+function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
+  const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
   const drafts = installSenderDraftLabels(win);
@@ -884,6 +899,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   const style = doc.createElement('style');
   style.textContent = `
     #threadTree[data-gm-hide-thread-arrows] tr:not([data-properties~="dummy"]) .twisty { display: none !important; }
+    .gm-inbox-settings { font-size: 19px; line-height: 1; }
     .gm-folder-pane-toggle {
       position: absolute;
       inset-block-start: 5px;
@@ -1135,6 +1151,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     style.remove();
     previews.close();
     reader?.setDraftOpener?.(null);
+    settingsButton.close();
     folderToggle.close();
     stars.close();
     drafts.close();
