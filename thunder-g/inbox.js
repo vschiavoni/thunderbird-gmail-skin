@@ -838,9 +838,12 @@ function installFolderPaneToggle(win) {
   button.addEventListener('click',toggle);
   const observer=new win.MutationObserver(sync);
   observer.observe(doc.getElementById('folderPane'),{attributes:true,attributeFilter:['class']});
-  const brand=doc.createElement('img');
-  brand.className='gm-sidebar-brand';brand.alt='Thunder-G';
-  if(typeof GM_SIDEBAR_BRAND!=='undefined')brand.src=GM_SIDEBAR_BRAND;
+  const brand=doc.createElement('span');
+  brand.className='gm-sidebar-brand';
+  const logo=doc.createElement('img');logo.alt='';
+  if(typeof GM_SIDEBAR_BRAND!=='undefined')logo.src=GM_SIDEBAR_BRAND;
+  const wordmark=doc.createElement('span');wordmark.textContent='Thunder-G';
+  brand.append(logo,wordmark);
   body.append(button,brand);sync();
   return {close(){
     animation?.cancel();observer.disconnect();button.remove();brand.remove();
@@ -887,7 +890,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     .gm-folder-pane-toggle {
       position: absolute;
       inset-block-start: 5px;
-      inset-inline-start: 5px;
+      inset-inline-start: 16px;
       z-index: 2;
       box-sizing: border-box !important;
       inline-size: 32px !important;
@@ -902,7 +905,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
       border-radius: 50% !important;
       display: grid !important;
       place-items: center;
-      background: light-dark(#e8eaed, #41454a) !important;
+      background: transparent !important;
       color: var(--gm-ink);
       cursor: pointer;
     }
@@ -917,17 +920,24 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     .gm-sidebar-brand {
       position: absolute;
       inset-block-start: 5px;
-      inset-inline-start: 44px;
-      inline-size: 98px;
+      inset-inline-start: 54px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
       block-size: 32px;
-      object-fit: contain;
+      color: light-dark(#5f6368, #e8eaed);
+      font: 400 21px/1 "Google Sans", "Product Sans", system-ui, sans-serif;
+      letter-spacing: -.7px;
+      white-space: nowrap;
+      pointer-events: none;
       z-index: 2;
     }
+    .gm-sidebar-brand img { inline-size: 30px; block-size: 30px; object-fit: contain; }
     body:has(> .gm-sidebar-brand) #folderPane {
-      padding-block-start: 42px !important;
+      padding-block-start: 54px !important;
     }
     body[data-gm-folder-pane-closed] #threadPaneHeaderBar > .list-header-bar-container-start {
-      padding-inline-start: 150px !important;
+      padding-inline-start: 210px !important;
     }
     #threadTree button[data-gm-star] { background-image: none !important; }
     #threadTree button[data-gm-star] img { visibility: hidden; }

@@ -20,6 +20,11 @@ with Google.
 3. Use the built-in **System theme**, **Classic layout** and **Table View**.
 4. Open **Add-ons Manager → Thunder-G → Preferences** to configure optional features.
 
+For the intended sidebar wordmark appearance, install
+[Google Sans](https://fonts.google.com/specimen/Google+Sans) as a system font.
+This is optional: Thunder-G falls back to an available system font. The font is
+not bundled or downloaded by the extension.
+
 No Python, Node.js or profile CSS is needed. Coming from the old Python installer
 or `inline-labels` extension? Read the [migration guide](docs/updates.md#migrating-an-older-installer-managed-profile) first.
 

@@ -614,14 +614,16 @@ test('folder menu toggles the native pane, updates accessibility and respects re
   const attributes=new Map(),events=new Map(),animations=[];
   const button={setAttribute:(key,value)=>attributes.set(key,value),
     addEventListener:(name,fn)=>events.set(name,fn),remove(){this.removed=true}};
-  const brand={remove(){this.removed=true}};
+  const logo={},wordmark={};
+  const brand={append(...nodes){assert.deepEqual(nodes,[logo,wordmark])},remove(){this.removed=true}};
+  let spanCount=0;
   const body={append(...nodes){assert.deepEqual(nodes,[button,brand])},toggleAttribute:(key,value)=>attributes.set(key,value),
     removeAttribute:key=>attributes.delete(key),
     animate(frames){animations.push(frames);return {cancel(){}}}};
   const splitter={isCollapsed:false,width:260,toggleCollapsed(){this.isCollapsed=!this.isCollapsed}};
   let reduced=false,notify;
   const win={
-    document:{body,createElement:tag=>tag==='img'?brand:button,getElementById:id=>id==='folderPaneSplitter'?splitter:{}},
+    document:{body,createElement:tag=>tag==='img'?logo:tag==='span'?(spanCount++===0?brand:wordmark):button,getElementById:id=>id==='folderPaneSplitter'?splitter:{}},
     MutationObserver:class{constructor(callback){notify=callback}observe(){}disconnect(){}},
     getComputedStyle:()=>({gridTemplateColumns:splitter.isCollapsed?'0px 900px':'260px 640px'}),
     matchMedia:()=>({matches:reduced}),
@@ -641,7 +643,7 @@ test('folder menu toggles the native pane, updates accessibility and respects re
   assert.equal(attributes.get('aria-expanded'),'false');
   controller.close();
   assert.equal(button.removed,true);
-  assert.equal(brand.alt,'Thunder-G');
+  assert.equal(logo.alt,'');assert.equal(wordmark.textContent,'Thunder-G');
   assert.equal(brand.removed,true);
 });
 
