@@ -11,6 +11,8 @@ test('native keyword notifications refresh open conversations and unsubscribe on
     Services:{prefs:{addObserver(){},removeObserver(){}}},
     Ci:{nsIDOMWindowUtils:{USER_SHEET:1},nsIMsgFolderNotificationService:{msgPropertyChanged:8}},
     sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    createSnoozeOrder:()=>({close(){}}),
+    createNativeSnooze:()=>({close(){}}),
     createComposeAutosave:()=>({set(enabled,minutes){assert.equal(enabled,true);assert.equal(minutes,1)},close(){}}),
     installMailZoom:()=>({close(){}}),
     installConversationStyle:()=>({refresh(){refreshed++},close(){disposed++}})});
@@ -18,8 +20,8 @@ test('native keyword notifications refresh open conversations and unsubscribe on
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),scope);
   const api=new scope.inlineLabels().getAPI({extension:{id:'test'},callOnClose(value){cleanup=value}});
   await api.inlineLabels.start();
-  const sheets=new Set(),events=new Map();
-  const win={windowUtils:{loadSheetUsingURIString(uri){sheets.add(uri)},removeSheetUsingURIString(uri){sheets.delete(uri)}},addEventListener(name,fn){events.set(name,fn)},removeEventListener(name){events.delete(name)}};
+  const sheets=new Set(['data:text/css;charset=utf-8,']),events=new Map();
+  const win={windowUtils:{loadSheetUsingURIString(uri){if(sheets.has(uri))throw {result:0x80070057};sheets.add(uri)},removeSheetUsingURIString(uri){sheets.delete(uri)}},addEventListener(name,fn){events.set(name,fn)},removeEventListener(name){events.delete(name)}};
   win.top=win;
   let todayPaneWrites=0;
   const pane={setVisible(){todayPaneWrites++}};
@@ -72,6 +74,8 @@ test('mail-window startup uses the packaged logo, runs once and closes on unload
     MailServices:{mfn:{addListener(){},removeListener(){}}}})},
     Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIDOMWindowUtils:{USER_SHEET:1},nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
     sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    createSnoozeOrder:()=>({close(){}}),
+    createNativeSnooze:()=>({close(){}}),
     createComposeAutosave:()=>({set(){},close(){}}),installMailZoom:()=>({close(){}}),
     installStartupSplash(win,options){const record={win,options,closed:0,refreshed:0};startups.push(record);return {close(){record.closed++},refresh(){record.refreshed++}}}});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);

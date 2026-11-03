@@ -1,3 +1,5 @@
+var thunderGSnooze=null;
+var thunderGSnoozeOrder=null;
 var { setTimeout, clearTimeout } = ChromeUtils.importESModule("resource://gre/modules/Timer.sys.mjs");
 var verifyIndependentDkim = null,openIndependentDkimPopup=null;
 var compactConversationsEnabled=true;
@@ -145,9 +147,18 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const todayWindows = new Set();
     const todayURI = 'data:text/css;charset=utf-8,' + encodeURIComponent(
       '#today-pane-panel, #today-splitter, #calendar-show-todaypane-panel { display:none !important; }');
+    function loadWindowSheet(win,cssURI){
+      try{win.windowUtils.loadSheetUsingURIString(cssURI, Ci.nsIDOMWindowUtils.USER_SHEET);}
+      catch(error){
+        if(error.result!==0x80070057)throw error;
+        // Recover our identical sheet after an interrupted extension upgrade.
+        win.windowUtils.removeSheetUsingURIString(cssURI,Ci.nsIDOMWindowUtils.USER_SHEET);
+        win.windowUtils.loadSheetUsingURIString(cssURI,Ci.nsIDOMWindowUtils.USER_SHEET);
+      }
+    }
     function applyTodayPane(win) {
       if (hideTodayPane && !todayWindows.has(win)) {
-        win.windowUtils.loadSheetUsingURIString(todayURI, Ci.nsIDOMWindowUtils.USER_SHEET);
+        loadWindowSheet(win,todayURI);
         todayWindows.add(win);
       } else if (!hideTodayPane) removeTodayPaneStyle(win);
     }
@@ -159,7 +170,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const skinURI = 'data:text/css;charset=utf-8,' + encodeURIComponent(GMAIL_SKIN_CSS);
     function loadSkin(win, cssURI = skinURI) {
       if (skinWindows.has(win)) return;
-      win.windowUtils.loadSheetUsingURIString(cssURI, Ci.nsIDOMWindowUtils.USER_SHEET);
+      loadWindowSheet(win,cssURI);
       skinWindows.set(win, cssURI);
     }
     function unloadSkin(win) {
@@ -218,6 +229,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       const labels = installInlineLabels(doc.defaultView, MailServices, Services.prefs);
       const nestedLabels = installNestedLabelSidebar(doc.defaultView);
       const reader = installReadingMode(doc.defaultView);
+      const snoozeOrder=thunderGSnoozeOrder?.attach(doc.defaultView);
       readers.set(doc,reader); reader.setIndependent(independentReader);
       const pages = installNativePagination(doc.defaultView,reader);
       pagedDocuments.set(doc,pages); pages.setSize(messagesPerPage);
@@ -225,8 +237,12 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       const dates = installCompactDates(doc.defaultView);
       const inbox = installInboxControls(doc.defaultView,{threadGuides,reader});
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
+      const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
+      doc.defaultView.addEventListener('unload',detach,{once:true});
       documents.set(doc, { setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
+        doc.defaultView.removeEventListener('unload',detach);
         readers.delete(doc);
+        snoozeOrder?.close();
         pages.close(); pagedDocuments.delete(doc); zoom.close();
         nestedLabels.close(); conversationBrowser.close(); inbox.close(); dates.close(); reader.close(); labels.close();
       }});
@@ -291,6 +307,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
     };
     context.callOnClose({ close() {
+      thunderGSnooze?.close();thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
       labelBackupController?.close();labelBackupController=null;
       for(const close of [...dkimPopups])close();openIndependentDkimPopup=null;
@@ -312,7 +329,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       for (const controller of startupWindows.values()) controller.close(); startupWindows.clear();
       for (const controller of pendingDocuments.values()) controller.close();
       pendingDocuments.clear();
-      for (const controller of documents.values()) controller.close();
+      for (const controller of documents.values()){try{controller.close();}catch(error){console.warn('Thunder-G closed mail pane:',error);}}
+      thunderGSnoozeOrder?.close();thunderGSnoozeOrder=null;
       for (const controller of conversationDocuments.values()) controller.close();
       conversationDocuments.clear();
       for (const zoom of zoomWindows.values()) zoom.close(); zoomWindows.clear();
@@ -392,6 +410,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         autosaveController = createComposeAutosave(Services.prefs);
         autosaveController.set(composeAutosave,composeAutosaveMinutes);
       } catch (_) { console.warn('Thunder-G: could not configure draft autosave settings.'); }
+      try{thunderGSnooze=createNativeSnooze();thunderGSnoozeOrder=createSnoozeOrder();}
+      catch(error){console.error('Thunder-G snooze initialization:',error);}
       started = true;
       Services.prefs.addObserver("mailnews.tags.", observer);
       Services.prefs.addObserver(HIDDEN_MESSAGE_LABELS_PREF, observer);
