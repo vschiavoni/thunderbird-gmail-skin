@@ -379,7 +379,7 @@ test('conversation tag add/remove writes exact headers to every folder, includin
 });
 
 test('L accepts selection checkboxes and radio controls but still ignores writing fields and composer documents',()=>{
- const selector='input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox';
+ const selector='input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, dialog, [role="dialog"], [role="menu"]';
  for(const type of ['checkbox','radio','text','search']){
   const target={closest:value=>{assert.equal(value,selector);return ['checkbox','radio'].includes(type)?null:{};}};
   assert.equal(scope.isLabelShortcut({key:'l',target}),['checkbox','radio'].includes(type));
@@ -402,3 +402,5 @@ test('labels reach hidden physical Sent copies without matching subjects or scan
  Object.defineProperty(sent,'msgDatabase',{get(){throw Error('offline')}});assert.equal(scope.conversationPhysicalMessages([original],[sent]).length,1);
  delete scope.independentSentFolders;
 });
+
+test('label shortcuts cannot escape a snooze dialog or time-picker popover',()=>{for(const container of ['dialog','[role="dialog"]','[role="menu"]']){const target={closest:selector=>selector.split(', ').includes(container)?{}:null};assert.equal(scope.isLabelShortcut({key:'l',target}),false);}});

@@ -1003,10 +1003,6 @@
     "message": "Mark as unread",
     "description": "Mark as unread"
   },
-  "snooze_follow_up_7cee0a2": {
-    "message": "Snooze / Follow-Up…",
-    "description": "Snooze / Follow-Up…"
-  },
   "move_to_c0a3ef6": {
     "message": "Move to…",
     "description": "Move to…"
@@ -2039,5 +2035,149 @@
   },
   "gmail_keyboard_shortcuts_help": {
     "message": "Use Gmail’s essential mail shortcuts and Command+Enter (Mac) or Ctrl+Enter (Windows/Linux) to send. Off by default. Letter shortcuts do not run while typing. Press ? in the message list for help. Existing Thunderbird shortcuts remain available."
+  },
+  "snooze_1": {
+    "message": "Snoozed"
+  },
+  "snooze_2": {
+    "message": "Snooze until…"
+  },
+  "snooze_3": {
+    "message": "Later today"
+  },
+  "snooze_4": {
+    "message": "Tomorrow"
+  },
+  "snooze_5": {
+    "message": "Next week"
+  },
+  "snooze_6": {
+    "message": "Pick date & time"
+  },
+  "snooze_7": {
+    "message": "No snoozed conversations."
+  },
+  "snooze_8": {
+    "message": "Change time"
+  },
+  "snooze_9": {
+    "message": "Unsnooze"
+  },
+  "snooze_10": {
+    "message": "Snoozed conversation returned"
+  },
+  "snooze_11": {
+    "message": "Inbox order"
+  },
+  "snooze_12": {
+    "message": "Returns to Inbox at the selected time, or when a new reply arrives. Thunderbird must be running; overdue reminders return when it opens."
+  },
+  "snooze_13": {
+    "message": "Choose a future date and time."
+  },
+  "snooze_14": {
+    "message": "Too many snoozed conversations."
+  },
+  "snooze_15": {
+    "message": "Select a message to snooze."
+  },
+  "snooze_16": {
+    "message": "This conversation is already snoozed."
+  },
+  "snooze_17": {
+    "message": "Snooze no longer available."
+  },
+  "snooze_18": {
+    "message": "The snoozed account is unavailable."
+  },
+  "snooze_19": {
+    "message": "The snoozed folder is unavailable."
+  },
+  "snooze_20": {
+    "message": "Ambiguous snoozed message."
+  },
+  "snooze_21": {
+    "message": "The Snoozed folder could not be created."
+  },
+  "snooze_22": {
+    "message": "Too many messages to snooze at once."
+  },
+  "snooze_23": {
+    "message": "This message cannot be snoozed."
+  },
+  "snooze_24": {
+    "message": "Move this conversation out of Trash, Spam or Drafts first."
+  },
+  "snooze_25": {
+    "message": "Use Snoozed to change this reminder."
+  },
+  "snooze_26": {
+    "message": "A snoozed message was moved or deleted."
+  },
+  "snooze_27": {
+    "message": "The original message is unavailable."
+  },
+  "snooze_28": {
+    "message": "This account has no Inbox."
+  },
+  "snooze_29": {
+    "message": "The snoozed message is unavailable."
+  },
+  "snooze_30": {
+    "message": "This message is already in Inbox. Move the Snoozed copy manually."
+  },
+  "snooze_31": {
+    "message": "Snooze storage is full."
+  },
+  "snooze_thread_order": {
+    "message": "Inbox thread order"
+  },
+  "snooze_bulk_retry": {
+    "message": "Some conversations are still being moved. Saved snoozes will be retried."
+  },
+  "snooze_already_returning": {
+    "message": "This conversation is already returning to Inbox."
+  },
+  "snooze_picker_0": {
+    "message": "Later this week"
+  },
+  "snooze_picker_1": {
+    "message": "This weekend"
+  },
+  "snooze_picker_2": {
+    "message": "Date"
+  },
+  "snooze_picker_3": {
+    "message": "Time"
+  },
+  "snooze_picker_4": {
+    "message": "Previous month"
+  },
+  "snooze_picker_5": {
+    "message": "Next month"
+  },
+  "snooze_picker_6": {
+    "message": "Choose a valid date and time."
+  },
+  "snooze_time_0": {
+    "message": "Hours"
+  },
+  "snooze_time_1": {
+    "message": "Minutes"
+  },
+  "snooze_time_2": {
+    "message": "Done"
+  },
+  "snooze_time_3": {
+    "message": "Snoozing conversation…"
+  },
+  "snooze_time_4": {
+    "message": "Conversation snoozed"
+  },
+  "snooze_time_5": {
+    "message": "Returning conversation to Inbox…"
+  },
+  "snooze_time_6": {
+    "message": "Conversation returned to Inbox"
   }
 }
