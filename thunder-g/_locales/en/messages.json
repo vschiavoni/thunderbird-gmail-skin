@@ -2202,5 +2202,14 @@
   },
   "settings_appearance": {
     "message": "Appearance"
+  },
+  "settings_search": {
+    "message": "Search settings"
+  },
+  "settings_search_placeholder": {
+    "message": "Search settings…"
+  },
+  "settings_no_results": {
+    "message": "No matching settings. Try another search."
   }
 }

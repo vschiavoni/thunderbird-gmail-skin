@@ -149,6 +149,12 @@ summary { width: fit-content; max-width: 100%; padding: 13px 0; color: var(--acc
 }
 .star-marker-list button { cursor: grab; }
 
+.settings-search { margin-bottom: 20px; }
+.settings-search label { display: block; margin-bottom: 7px; font-weight: 600; }
+.settings-search input { box-sizing: border-box; width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; }
+#settings-no-results { color: var(--muted); }
+.search-hidden { display: none !important; }
+
 .dock-icon-picker { min-width: 0; padding: 8px 0; margin: 0; border: 0; display: flex; align-items: center; gap: 12px; }
 .dock-icon-picker legend { float: inline-start; padding: 0; min-width: 120px; font-weight: 600; font-size: 12px; line-height: 48px; }
 .dock-icon-choices { display: flex; flex-wrap: wrap; gap: 10px; }

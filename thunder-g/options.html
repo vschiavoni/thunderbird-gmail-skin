@@ -34,6 +34,11 @@
       </aside>
 
       <main>
+        <div class="settings-search" role="search">
+          <label for="settings-search" data-i18n="settings_search">Search settings</label>
+          <input id="settings-search" type="search" autocomplete="off" data-i18n-placeholder="settings_search_placeholder" placeholder="Search settings…" aria-controls="language recommended appearance inbox conversations import-export writing sender-logos">
+          <p id="settings-no-results" role="status" hidden data-i18n="settings_no_results">No matching settings. Try another search.</p>
+        </div>
         <section id="language" aria-labelledby="language-title">
           <div class="setting-row">
             <div class="setting-copy"><label id="language-title" for="interface-language"><span data-i18n="interface_language_9407e9c">Interface language</span></label><p id="language-help"><span data-i18n="automatically_follow_thunderbird_s_language_choose_e_560b31b">Automatically follow Thunderbird’s language, or choose English or Italian for Thunder-G. Changes apply immediately, independently of Thunderbird’s language.</span></p></div>
@@ -217,5 +222,6 @@
   <script src="star-options.js"></script>
   <script src="localization.js"></script>
   <script src="localization-options.js"></script>
+  <script src="options-search.js"></script>
 </body>
 </html>

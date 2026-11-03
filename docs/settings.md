@@ -3,6 +3,10 @@
 Open **Add-ons Manager → Thunder-G → Preferences**. Changes save automatically
 and stay after restart.
 
+Use **Search settings** to filter sections by their names and descriptions.
+Matching sections include their expanded help text. Press **Esc** or clear the
+search field to show everything again. **Appearance** in the sidebar opens the
+macOS Dock icon settings.
 
 ## Interface language
 
