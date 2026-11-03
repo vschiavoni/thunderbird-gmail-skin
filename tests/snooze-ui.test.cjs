@@ -36,3 +36,15 @@ test('a pre-acceptance failure leaves the date picker editable and preserves dis
   const f=operationFixture();const disabled=f.dialog.querySelectorAll('button').filter(button=>button.disabled);f.dialog.querySelector('.gm-snooze-save').click();f.reject(Error('Could not save reminder.'));await new Promise(setImmediate);
   assert.equal(f.doc.modals.size,1);assert.equal(f.dialog.querySelector('.gm-snooze-save').disabled,false);assert.equal(disabled.every(button=>button.disabled),true);assert.match(f.dialog.querySelector('[role="alert"]').textContent,/Could not save/);f.ui.close();
 });
+
+test('keyboard-opened snooze menu closes on Escape and outside pointer, releasing listeners on unload',()=>{
+  const f=require('./snooze-ui-fixture.cjs')();const service={list:()=>[],subscribe:()=>()=>{}};
+  const ui=scope.installSnoozeUI(f.win,service),anchor=f.doc.createElement('button');f.doc.documentElement.append(anchor);
+  ui.choose([{}],null,anchor);let prevented=false;
+  f.doc.emit('keydown',{key:'Escape',preventDefault(){prevented=true},stopImmediatePropagation(){}});
+  assert.equal(prevented,true);assert.equal(f.doc.querySelector('.gm-snooze-menu'),null);assert.equal(f.doc.activeElement,anchor);
+  ui.choose([{}],null,anchor);const menu=f.doc.querySelector('.gm-snooze-menu');
+  f.doc.emit('pointerdown',{target:menu});assert.equal(menu.isConnected,true);
+  f.doc.emit('pointerdown',{target:anchor});assert.equal(menu.isConnected,false);
+  ui.close();f.doc.emit('keydown',{key:'Escape'});
+});

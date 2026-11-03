@@ -31,9 +31,10 @@ module.exports=function uiFixture(){
       querySelector(selector){return this.querySelectorAll(selector)[0]||null},
       click(){if(!this.disabled)this.onclick?.();},
     };
-    node.classList={toggle(name,on){if(on)classes.add(name);else classes.delete(name)}};
+    node.classList={contains(name){return node.className?.split(' ').includes(name)||classes.has(name)},toggle(name,on){if(on)classes.add(name);else classes.delete(name)}};
     return node;
   }
+  const listeners={};doc.addEventListener=(name,callback)=>{(listeners[name]||=[]).push(callback)};doc.removeEventListener=(name,callback)=>{listeners[name]=(listeners[name]||[]).filter(fn=>fn!==callback)};doc.emit=(name,event={})=>{for(const fn of listeners[name]||[])fn({type:name,...event})};
   doc.createElement=element;doc.createElementNS=(_namespace,tag)=>element(tag);doc.documentElement=element('html');
   doc.querySelector=selector=>doc.documentElement.querySelector(selector);doc.getElementById=()=>null;
   return {doc,win};

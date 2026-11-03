@@ -197,6 +197,15 @@ function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs
 function installSnoozeUI(win,service) {
   const doc=win.document;
   let dialog=null,toast=null,toastTimer=null;
+  function dismissMenu(event){
+    if(!dialog?.classList.contains('gm-snooze-menu'))return;
+    if(event.type==='keydown'){
+      if(event.key!=='Escape')return;
+      event.preventDefault();event.stopImmediatePropagation();
+      const anchor=dialog._snoozeAnchor;closeDialog();anchor?.focus();
+    }else if(!dialog.contains(event.target))closeDialog();
+  }
+  doc.addEventListener('keydown',dismissMenu,true);doc.addEventListener('pointerdown',dismissMenu,true);
   const style=doc.createElement('style');style.textContent=SNOOZE_PICKER_CSS;doc.documentElement.append(style);
   const button=doc.createElement('button');button.className='gm-snoozed-folder';
   button.style.cssText='display:block;width:100%;text-align:start;padding:9px 24px;border:0;background:transparent;color:inherit;cursor:pointer';
@@ -246,7 +255,7 @@ function installSnoozeUI(win,service) {
     const bounds=(anchor||fallback)?.getBoundingClientRect();
     closeDialog();
     const menu=doc.createElement('div');dialog=menu;menu.className='gm-snooze-menu';menu.setAttribute('popover','auto');menu.setAttribute('role','menu');
-    menu.setAttribute('aria-label',gmText('Snooze until…'));
+    menu.setAttribute('aria-label',gmText('Snooze until…'));menu._snoozeAnchor=anchor||fallback;
     const heading=doc.createElement('div');heading.className='gm-snooze-menu-heading';heading.textContent=gmText('Snooze until…');menu.append(heading);
     const add=(label,date)=>{
       const row=doc.createElement('button');row.type='button';row.className='gm-snooze-option';row.setAttribute('role','menuitem');
@@ -335,5 +344,5 @@ function installSnoozeUI(win,service) {
     }
   }
   button.onclick=manage;
-  return {choose,close(){folderMode.close();unsubscribe();closeDialog();button.remove();style.remove();toast?.remove();if(toastTimer!==null)win.clearTimeout(toastTimer);}};
+  return {choose,close(){doc.removeEventListener('keydown',dismissMenu,true);doc.removeEventListener('pointerdown',dismissMenu,true);folderMode.close();unsubscribe();closeDialog();button.remove();style.remove();toast?.remove();if(toastTimer!==null)win.clearTimeout(toastTimer);}};
 }
