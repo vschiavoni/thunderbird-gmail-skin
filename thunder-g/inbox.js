@@ -809,24 +809,26 @@ function installCollapsedThreadDefaults(win) {
   }};
 }
 
+var gmToolbarBrands=new WeakMap();
 function installFolderPaneToggle(win) {
   const doc=win.document,splitter=doc.getElementById('folderPaneSplitter');
   if(!splitter?.toggleCollapsed || !doc.body)return {close(){}};
   const body=doc.body,button=doc.createElement('button');
   button.type='button';button.className='gm-folder-pane-toggle';button.textContent='';
   button.setAttribute('aria-controls','folderPane');
-  let animation;
+  let animation,compact=false,toolbarEntry=null;
   function sync(){
-    const expanded=!splitter.isCollapsed;
+    const expanded=!compact&&!splitter.isCollapsed;
     const label=expanded?gmText("Hide main menu"):gmText("Show main menu");
     button.setAttribute('aria-expanded',String(expanded));
     button.setAttribute('aria-label',label);button.title=label;
     body.toggleAttribute('data-gm-folder-pane-closed',!expanded);
+    if(toolbarEntry?.activeDocument()===doc){toolbarEntry.menu.disabled=false;toolbarEntry.menu.setAttribute('aria-expanded',String(expanded));toolbarEntry.menu.setAttribute('aria-label',label);toolbarEntry.menu.title=label;}
   }
   function toggle(){
     const before=win.getComputedStyle(body).gridTemplateColumns;
     animation?.cancel();
-    splitter.toggleCollapsed();
+    if(splitter.isCollapsed){splitter.toggleCollapsed();compact=false;}else compact=!compact;
     sync();
     const after=win.getComputedStyle(body).gridTemplateColumns;
     if(before!==after && !win.matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -844,9 +846,35 @@ function installFolderPaneToggle(win) {
   if(typeof GM_SIDEBAR_BRAND!=='undefined')logo.src=GM_SIDEBAR_BRAND;
   const wordmark=doc.createElement('span');wordmark.textContent='Thunder-G';
   brand.append(logo,wordmark);
-  body.append(button,brand);sync();
+  const toolbar=win.top?.document?.getElementById('unifiedToolbar');
+  let releaseBrand=()=>{};
+  if(toolbar){
+    let entry=gmToolbarBrands.get(toolbar);
+    if(!entry){
+      brand.className='gm-toolbar-brand';
+      const style=doc.createElement('style');
+      style.textContent=`.gm-toolbar-brand{display:inline-flex;align-items:center;flex:none;gap:4px;margin-inline:12px 18px;white-space:nowrap;color:light-dark(#5f6368,#e8eaed);font:400 21px/1 "Google Sans","Product Sans",system-ui,sans-serif;letter-spacing:-.7px;-moz-window-dragging:no-drag}.gm-toolbar-brand img{width:30px;height:30px;object-fit:contain}`;
+      const topDoc=toolbar.ownerDocument;
+      const menu=topDoc.createElementNS('http://www.w3.org/1999/xhtml','button');
+      menu.type='button';menu.className='gm-toolbar-menu';
+      const handlers=new Map();
+      const activeDocument=()=>topDoc.getElementById('tabmail')?.currentAbout3Pane?.document;
+      menu.addEventListener('click',()=>handlers.get(activeDocument())?.toggle());
+      const refresh=()=>{const active=handlers.get(activeDocument());menu.disabled=!active;active?.sync();};
+      const tabs=topDoc.getElementById('tabmail')?.tabContainer;
+      tabs?.addEventListener('TabSelect',refresh);
+      style.textContent+=`#spacesPinnedButton{display:none!important}.gm-toolbar-menu{appearance:none;display:grid;place-items:center;box-sizing:border-box!important;flex:0 0 32px!important;width:32px!important;min-width:32px!important;max-width:32px!important;height:32px!important;min-height:32px!important;max-height:32px!important;margin-inline:12px 0;padding:0!important;border:0!important;border-radius:50%!important;background:transparent;color:light-dark(#202124,#e8eaed);cursor:pointer;-moz-window-dragging:no-drag}.gm-toolbar-menu::before{content:"";width:16px;height:2px;background:currentColor;box-shadow:0 -4px currentColor,0 4px currentColor}.gm-toolbar-menu:hover{background:light-dark(#e9eef6,#353941)}.gm-toolbar-menu:focus-visible{outline:2px solid light-dark(#0b57d0,#a8c7fa);outline-offset:2px}.gm-toolbar-menu:disabled{opacity:.4;cursor:default}`;
+      const content=topDoc.getElementById('unifiedToolbarContent');
+      toolbar.insertBefore(menu,content);
+      toolbar.insertBefore(brand,content);toolbar.append(style);
+      entry={brand,style,menu,handlers,activeDocument,tabs,refresh,users:0};gmToolbarBrands.set(toolbar,entry);
+    }
+    toolbarEntry=entry;entry.handlers.set(doc,{toggle,sync});entry.users++;
+    releaseBrand=()=>{entry.handlers.delete(doc);if(--entry.users===0){entry.tabs?.removeEventListener('TabSelect',entry.refresh);entry.menu.remove();entry.brand.remove();entry.style.remove();gmToolbarBrands.delete(toolbar);}else entry.refresh();};
+  }else body.append(button,brand);
+  sync();
   return {close(){
-    animation?.cancel();observer.disconnect();button.remove();brand.remove();
+    animation?.cancel();observer.disconnect();button.remove();if(!toolbar)brand.remove();releaseBrand();
     body.removeAttribute('data-gm-folder-pane-closed');
   }};
 }
@@ -933,12 +961,25 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
       z-index: 2;
     }
     .gm-sidebar-brand img { inline-size: 30px; block-size: 30px; object-fit: contain; }
-    body:has(> .gm-sidebar-brand) #folderPane {
+    body:has(> .gm-folder-pane-toggle) #folderPane {
       padding-block-start: 54px !important;
     }
-    body[data-gm-folder-pane-closed] #threadPaneHeaderBar > .list-header-bar-container-start {
-      padding-inline-start: 210px !important;
-    }
+    body[data-gm-folder-pane-closed] { --folderPaneSplitter-width: 64px !important; }
+    body[data-gm-folder-pane-closed]:not(.layout-vertical), body[data-gm-folder-pane-closed].account-central { grid-template-columns: 64px min-content minmax(0,1fr) !important; }
+    body[data-gm-folder-pane-closed].layout-vertical:not(.account-central) { grid-template-columns: 64px min-content minmax(0,1fr) min-content minmax(0,var(--messagePaneSplitter-width)) !important; }
+    body[data-gm-folder-pane-closed] #folderPane { min-inline-size: 0 !important; inline-size: 64px !important; }
+    body[data-gm-folder-pane-closed] #folderPaneSplitter { pointer-events: none; }
+    body[data-gm-folder-pane-closed] #folderPaneHeaderBar { padding-inline: 10px !important; flex-direction: column !important; }
+    body[data-gm-folder-pane-closed] #folderPaneMoreButton { display: none !important; }
+    body[data-gm-folder-pane-closed] #folderPaneWriteMessage:not([hidden]) { font-size: 0 !important; gap: 0 !important; inline-size: 44px !important; min-inline-size: 44px !important; padding: 10px 12px !important; }
+    body[data-gm-folder-pane-closed] #folderPaneGetMessages:not([hidden]) { inline-size: 44px !important; min-inline-size: 44px !important; }
+    body[data-gm-folder-pane-closed] #folderTree .mode-container { display: none !important; }
+    body[data-gm-folder-pane-closed] #folderTree li > ul { display: none !important; }
+    body[data-gm-folder-pane-closed] #folderTree > li > ul { display: block !important; }
+    body[data-gm-folder-pane-closed] #folderTree .container { padding-inline: 0 !important; margin-inline: 10px !important; justify-content: center; border-radius: 12px !important; }
+    body[data-gm-folder-pane-closed] #folderTree .container > :not(.icon) { display: none !important; }
+    body[data-gm-folder-pane-closed] #folderTree .container > .icon { margin: 0 !important; }
+
     #threadTree button[data-gm-star] { background-image: none !important; }
     #threadTree button[data-gm-star] img { visibility: hidden; }
     #threadTree button[data-gm-star]::after {

@@ -610,7 +610,7 @@ test('star lists can reorder, activate and remove markers while retaining one ac
   assert.deepEqual(Array.from(scope.gmMoveStar(['blue-star'],'blue-star',false)),['blue-star']);
 });
 
-test('folder menu toggles the native pane, updates accessibility and respects reduced motion',()=>{
+test('folder menu toggles a compact rail without changing the native pane width',()=>{
   const attributes=new Map(),events=new Map(),animations=[];
   const button={setAttribute:(key,value)=>attributes.set(key,value),
     addEventListener:(name,fn)=>events.set(name,fn),remove(){this.removed=true}};
@@ -631,14 +631,15 @@ test('folder menu toggles the native pane, updates accessibility and respects re
   const controller=scope.installFolderPaneToggle(win);
   assert.equal(attributes.get('aria-expanded'),'true');
   events.get('click')();
-  assert.equal(splitter.isCollapsed,true);
+  assert.equal(splitter.isCollapsed,false);
   assert.equal(attributes.get('aria-expanded'),'false');
-  assert.equal(animations.length,1);
+  assert.equal(attributes.get('data-gm-folder-pane-closed'),true);
+  assert.equal(animations.length,0);
   reduced=true;
   events.get('click')();
   assert.equal(splitter.isCollapsed,false);
   assert.equal(splitter.width,260);
-  assert.equal(animations.length,1);
+  assert.equal(animations.length,0);
   splitter.toggleCollapsed();notify();
   assert.equal(attributes.get('aria-expanded'),'false');
   controller.close();
