@@ -142,12 +142,65 @@ var SNOOZE_PICKER_CSS=`
 @media(max-width:560px){.gm-snooze-calendar-content{grid-template-columns:1fr;gap:16px}.gm-snooze-calendar{justify-self:center}.gm-snooze-fields{gap:16px}}
 `;
 
+function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs=globalThis.Services?.prefs){
+  const doc=win.document,pane=win.folderPane,tree=doc.getElementById('folderTree');
+  const menu=doc.getElementById('folderModesContextMenuPopup');
+  if(!pane?._modes||!tree||!menu)return {close(){}};
+  const name='gmSnoozed',pref='extensions.thunderg.snooze.folderMode';
+  let closed=false;
+  const mode={name,active:false,canBeCompact:false,
+    init(){
+      const heading=this.containerHeader.querySelector('.mode-name');
+      heading.removeAttribute('data-l10n-id');heading.removeAttribute('data-l10n-args');
+      heading.textContent=gmText('Snoozed');
+      this.containerList.replaceChildren();
+      for(const server of mail.accounts.allServers){
+        const root=server.rootFolder;if(!root.containsChildNamed('Thunder-G Snoozed'))continue;
+        const folder=root.getChildNamed('Thunder-G Snoozed');
+        const row=pane._createFolderRow(name,folder,'server');
+        this.containerList.append(row);
+      }
+    },
+    addFolder(){refresh();},removeFolder(){refresh();},changeAccountOrder(){refresh();},
+  };
+  pane._modes[name]=mode;
+  const item=doc.createXULElement('menuitem');item.id='gm-snoozed-folder-mode';
+  for(const [key,value] of Object.entries({class:'folder-pane-mode',value:name,type:'checkbox',closemenu:'none',label:gmText('Snoozed')}))item.setAttribute(key,value);
+  menu.insertBefore(item,doc.getElementById('separatorAfterFolderModes'));
+  const style=doc.createElement('style');style.textContent=`
+    #folderTree [data-mode="gmSnoozed"]{--gm-snoozed-icon-color:var(--layout-color,CanvasText);--gm-snoozed-clock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm1-13h-2v6l5 3 1-1.7-4-2.3V7z'/%3E%3C/svg%3E")}
+    #folderTree [data-mode="gmSnoozed"] .mode-name::before{content:"";display:inline-block;width:16px;height:16px;margin-inline-end:8px;vertical-align:-3px;background:var(--gm-snoozed-icon-color);mask:var(--gm-snoozed-clock) center/contain no-repeat}
+    #folderTree [data-mode="gmSnoozed"] .icon{content:none!important;fill:var(--gm-snoozed-icon-color)!important;stroke:var(--gm-snoozed-icon-color)!important;--icon-color:var(--gm-snoozed-icon-color)!important;color:var(--gm-snoozed-icon-color)!important;background:var(--gm-snoozed-icon-color)!important;mask:var(--gm-snoozed-clock) center/contain no-repeat!important}
+  `;doc.head.append(style);
+  function refresh(){
+    if(closed||!mode.active)return;
+    const wanted=[...mail.accounts.allServers].flatMap(server=>server.rootFolder.containsChildNamed('Thunder-G Snoozed')?[server.rootFolder.getChildNamed('Thunder-G Snoozed').URI]:[]);
+    const existing=[...mode.containerList.children].map(row=>row.uri);
+    if(JSON.stringify(wanted)!==JSON.stringify(existing))mode.init();
+  }
+  function command(event){
+    pane.toggleFolderMode(event);
+    prefs?.setBoolPref(pref,pane.activeModes.includes(name));
+    pane.updateContextCheckedFolderMode();
+  }
+  item.addEventListener('command',command);
+  const unsubscribe=service.subscribe(refresh);
+  if(prefs?.getBoolPref(pref,true)!==false)pane.activeModes=[...pane.activeModes,name];
+  pane.updateContextCheckedFolderMode();
+  return {close(){
+    closed=true;unsubscribe();item.removeEventListener('command',command);item.remove();style.remove();
+    if(mode.active)pane.activeModes=pane.activeModes.filter(value=>value!==name);
+    delete pane._modes[name];
+  }};
+}
+
 function installSnoozeUI(win,service) {
   const doc=win.document;
   let dialog=null,toast=null,toastTimer=null;
   const style=doc.createElement('style');style.textContent=SNOOZE_PICKER_CSS;doc.documentElement.append(style);
   const button=doc.createElement('button');button.className='gm-snoozed-folder';
   button.style.cssText='display:block;width:100%;text-align:start;padding:9px 24px;border:0;background:transparent;color:inherit;cursor:pointer';
+  const folderMode=installSnoozedFolderMode(win,service);
   function refresh(){button.textContent=gmText('Snoozed')+' ('+service.list().length+')';}
   const unsubscribe=service.subscribe(refresh);refresh();
   function closeDialog(){
@@ -282,5 +335,5 @@ function installSnoozeUI(win,service) {
     }
   }
   button.onclick=manage;
-  return {choose,close(){unsubscribe();closeDialog();button.remove();style.remove();toast?.remove();if(toastTimer!==null)win.clearTimeout(toastTimer);}};
+  return {choose,close(){folderMode.close();unsubscribe();closeDialog();button.remove();style.remove();toast?.remove();if(toastTimer!==null)win.clearTimeout(toastTimer);}};
 }

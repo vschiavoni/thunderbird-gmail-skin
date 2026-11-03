@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a Snoozed folder mode that groups account holding folders in a sidebar section, with matching clock icons and remembered visibility.
+
 - Add built-in conversation snooze with date/time selection, manual time entry and an optional hour/minute picker. Preserve read/unread state and Sent originals, return conversations early on a new Inbox reply, and recover persisted reminders at startup. Date-sorted Inbox views use the return time without rewriting message dates. Thunderbird must be running to process deadlines.
 
 ## 0.23.0

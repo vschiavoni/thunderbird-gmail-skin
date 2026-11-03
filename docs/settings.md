@@ -51,6 +51,11 @@ date and time. Enter the time manually, or use the clock button to open separate
 scrollable hour and minute lists with keyboard navigation. Saving closes the
 picker once the reminder is stored; the account transfer continues in the background.
 
+**Folder Modes → Snoozed** shows a dedicated sidebar section with a clock icon
+and the holding folders for all accounts. Its visibility is remembered. Open an
+account row to browse its postponed messages. To return a message immediately,
+move it from **Thunder-G Snoozed** to that account’s Inbox.
+
 Read/unread state is preserved. A new reply in the same account returns its
 conversation early and clears the reminder. Sent originals stay in Sent.
 Returned messages rise by their return time in date-sorted Inbox views; their
