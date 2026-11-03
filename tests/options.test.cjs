@@ -9,8 +9,8 @@ test('settings confirmations expire, newer feedback replaces timers, and errors 
     return elements.get(id);
   };
   const scope=require('./localization-context.cjs').createContext({
-    document:{getElementById:element},window:{addEventListener:(name,fn)=>events[name]=fn},
-    browser:{runtime:{getManifest:()=>({version:'test'})},storage:{local:{get:()=>new Promise(()=>{})}}},
+    document:{getElementById:element,querySelectorAll:()=>[]},window:{addEventListener:(name,fn)=>events[name]=fn},
+    browser:{runtime:{getPlatformInfo:async()=>({os:'mac'}),getManifest:()=>({version:'test'})},storage:{local:{get:()=>new Promise(()=>{})}}},
     setTimeout(fn,delay){timers.set(++sequence,{fn,delay});return sequence},
     clearTimeout:id=>timers.delete(id)
   });
@@ -40,8 +40,8 @@ for(const fail of [false,true])test(`recommended preset updates settings atomica
   if(!elements.has(id))elements.set(id,{dataset:{},textContent:'',disabled:false,events:{},addEventListener(name,fn){this.events[name]=fn}});
   return elements.get(id);
  };
- const scope=require('./localization-context.cjs').createContext({document:{getElementById:element},window:{addEventListener(){}},
- browser:{runtime:{getManifest:()=>({version:'test'})},storage:{local:{get:async defaults=>({...defaults,...settings}),set:async values=>{writes.push(values);if(fail)throw Error('storage failure')}}}},setTimeout(){},clearTimeout(){}});
+ const scope=require('./localization-context.cjs').createContext({document:{getElementById:element,querySelectorAll:()=>[]},window:{addEventListener(){}},
+ browser:{runtime:{getPlatformInfo:async()=>({os:'mac'}),getManifest:()=>({version:'test'})},storage:{local:{get:async defaults=>({...defaults,...settings}),set:async values=>{writes.push(values);if(fail)throw Error('storage failure')}}}},setTimeout(){},clearTimeout(){}});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/options.js'),'utf8'),scope);
  await Promise.resolve();await Promise.resolve();
  await element('apply-recommended').events.click();

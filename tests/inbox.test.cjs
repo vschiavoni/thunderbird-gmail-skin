@@ -610,18 +610,22 @@ test('star lists can reorder, activate and remove markers while retaining one ac
   assert.deepEqual(Array.from(scope.gmMoveStar(['blue-star'],'blue-star',false)),['blue-star']);
 });
 
-test('folder menu toggles the native pane, updates accessibility and respects reduced motion',()=>{
+for(const spacesVisible of [false,true])test(`folder menu respects Spaces visibility (${spacesVisible}) without changing native width`,()=>{
   const attributes=new Map(),events=new Map(),animations=[];
   const button={setAttribute:(key,value)=>attributes.set(key,value),
     addEventListener:(name,fn)=>events.set(name,fn),remove(){this.removed=true}};
-  const brand={remove(){this.removed=true}};
+  const logo={},wordmark={};
+  const brand={append(...nodes){assert.deepEqual(nodes,[logo,wordmark])},remove(){this.removed=true}};
+  let spanCount=0;
   const body={append(...nodes){assert.deepEqual(nodes,[button,brand])},toggleAttribute:(key,value)=>attributes.set(key,value),
     removeAttribute:key=>attributes.delete(key),
     animate(frames){animations.push(frames);return {cancel(){}}}};
   const splitter={isCollapsed:false,width:260,toggleCollapsed(){this.isCollapsed=!this.isCollapsed}};
   let reduced=false,notify;
+  const spaces={hidden:!spacesVisible};
   const win={
-    document:{body,createElement:tag=>tag==='img'?brand:button,getElementById:id=>id==='folderPaneSplitter'?splitter:{}},
+    top:{document:{getElementById:id=>id==='spacesToolbar'?spaces:null}},
+    document:{body,createElement:tag=>tag==='img'?logo:tag==='span'?(spanCount++===0?brand:wordmark):button,getElementById:id=>id==='folderPaneSplitter'?splitter:{}},
     MutationObserver:class{constructor(callback){notify=callback}observe(){}disconnect(){}},
     getComputedStyle:()=>({gridTemplateColumns:splitter.isCollapsed?'0px 900px':'260px 640px'}),
     matchMedia:()=>({matches:reduced}),
@@ -629,19 +633,23 @@ test('folder menu toggles the native pane, updates accessibility and respects re
   const controller=scope.installFolderPaneToggle(win);
   assert.equal(attributes.get('aria-expanded'),'true');
   events.get('click')();
-  assert.equal(splitter.isCollapsed,true);
+  assert.equal(splitter.isCollapsed,false);
   assert.equal(attributes.get('aria-expanded'),'false');
-  assert.equal(animations.length,1);
+  assert.equal(attributes.get('data-gm-folder-pane-closed'),true);
+  assert.equal(attributes.get('data-gm-spaces-visible'),spacesVisible);
+  spaces.hidden=!spaces.hidden;notify();
+  assert.equal(attributes.get('data-gm-spaces-visible'),!spacesVisible);
+  assert.equal(animations.length,0);
   reduced=true;
   events.get('click')();
   assert.equal(splitter.isCollapsed,false);
   assert.equal(splitter.width,260);
-  assert.equal(animations.length,1);
+  assert.equal(animations.length,0);
   splitter.toggleCollapsed();notify();
   assert.equal(attributes.get('aria-expanded'),'false');
   controller.close();
   assert.equal(button.removed,true);
-  assert.equal(brand.alt,'Thunder-G');
+  assert.equal(logo.alt,'');assert.equal(wordmark.textContent,'Thunder-G');
   assert.equal(brand.removed,true);
 });
 

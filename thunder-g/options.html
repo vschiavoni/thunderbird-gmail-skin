@@ -23,6 +23,7 @@
     <div class="settings-layout">
       <aside>
         <nav aria-label="Settings sections" data-i18n-aria-label="settings_sections_2e7109b">
+          <a id="appearance-nav" href="#appearance" hidden><span data-i18n="settings_appearance">Appearance</span></a>
           <a href="#inbox"><span data-i18n="inbox_44caf74">Inbox</span></a>
           <a href="#conversations"><span data-i18n="conversations_07c59b4">Conversations</span></a>
           <a href="#import-export"><span data-i18n="import_export_title">Import/Export</span></a>
@@ -33,6 +34,11 @@
       </aside>
 
       <main>
+        <div class="settings-search" role="search">
+          <label for="settings-search" data-i18n="settings_search">Search settings</label>
+          <input id="settings-search" type="search" autocomplete="off" data-i18n-placeholder="settings_search_placeholder" placeholder="Search settings…" aria-controls="language recommended appearance inbox conversations import-export writing sender-logos">
+          <p id="settings-no-results" role="status" hidden data-i18n="settings_no_results">No matching settings. Try another search.</p>
+        </div>
         <section id="language" aria-labelledby="language-title">
           <div class="setting-row">
             <div class="setting-copy"><label id="language-title" for="interface-language"><span data-i18n="interface_language_9407e9c">Interface language</span></label><p id="language-help"><span data-i18n="automatically_follow_thunderbird_s_language_choose_e_560b31b">Automatically follow Thunderbird’s language, or choose English or Italian for Thunder-G. Changes apply immediately, independently of Thunderbird’s language.</span></p></div>
@@ -48,6 +54,22 @@
           <p id="recommended-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </section>
 
+        <section id="appearance" aria-labelledby="appearance-title" hidden>
+          <div class="section-heading"><h2 id="appearance-title" data-i18n="settings_appearance">Appearance</h2></div>
+          <div id="dock-icon-setting">
+          <div class="setting-row">
+            <div class="setting-copy"><label for="dock-icon" data-i18n="use_thunder_g_dock_icon">Use Thunder-G Dock icon</label><p id="dock-icon-help" data-i18n="dock_icon_help">Choose an icon or match it to macOS appearance. The original icon returns when disabled.</p></div>
+            <input class="switch" id="dock-icon" type="checkbox" role="switch" aria-describedby="dock-icon-help">
+          </div>
+          <div id="dock-icon-customization" hidden>
+<fieldset class="dock-icon-picker" id="dock-icon-mode"><legend data-i18n="dock_icon_style">Icon style</legend><div class="dock-icon-choices"><label class="dock-icon-choice"><input type="radio" name="dock-icon-mode" value="auto"><span class="dock-icon-preview dock-icon-auto" aria-hidden="true"><img src="icons/dock/light.png" alt=""><img src="icons/dock/dark.png" alt=""></span><span data-i18n="dock_icon_auto">Auto (follow macOS)</span></label><label class="dock-icon-choice"><input type="radio" name="dock-icon-mode" value="light"><span class="dock-icon-preview"><img src="icons/dock/light.png" alt=""></span><span>Light</span></label><label class="dock-icon-choice"><input type="radio" name="dock-icon-mode" value="dark"><span class="dock-icon-preview"><img src="icons/dock/dark.png" alt=""></span><span>Dark</span></label></div></fieldset>
+            <div id="dock-icon-themes">
+  <fieldset class="dock-icon-picker" id="dock-icon-light"><legend data-i18n="dock_icon_light_theme">In light appearance</legend><div class="dock-icon-choices"><label class="dock-icon-choice"><input type="radio" name="dock-icon-light" value="light"><span class="dock-icon-preview"><img src="icons/dock/light.png" alt=""></span><span>Light</span></label><label class="dock-icon-choice"><input type="radio" name="dock-icon-light" value="dark"><span class="dock-icon-preview"><img src="icons/dock/dark.png" alt=""></span><span>Dark</span></label></div></fieldset>
+  <fieldset class="dock-icon-picker" id="dock-icon-dark"><legend data-i18n="dock_icon_dark_theme">In dark appearance</legend><div class="dock-icon-choices"><label class="dock-icon-choice"><input type="radio" name="dock-icon-dark" value="light"><span class="dock-icon-preview"><img src="icons/dock/light.png" alt=""></span><span>Light</span></label><label class="dock-icon-choice"><input type="radio" name="dock-icon-dark" value="dark"><span class="dock-icon-preview"><img src="icons/dock/dark.png" alt=""></span><span>Dark</span></label></div></fieldset>
+            </div>
+          </div>
+          </div>
+        </section>
         <section id="inbox" aria-labelledby="inbox-title">
           <div class="section-heading"><h2 id="inbox-title"><span data-i18n="inbox_44caf74">Inbox</span></h2><p><span data-i18n="a_little_more_room_for_your_messages_c21d065">A little more room for your messages.</span></p></div>
           <div class="setting-row">
@@ -200,5 +222,6 @@
   <script src="star-options.js"></script>
   <script src="localization.js"></script>
   <script src="localization-options.js"></script>
+  <script src="options-search.js"></script>
 </body>
 </html>

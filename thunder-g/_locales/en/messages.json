@@ -2179,5 +2179,37 @@
   },
   "snooze_time_6": {
     "message": "Conversation returned to Inbox"
+  },
+  "use_thunder_g_dock_icon": {
+    "message": "Use Thunder-G Dock icon",
+    "description": "Use Thunder-G Dock icon"
+  },
+  "dock_icon_help": {
+    "message": "Choose an icon or match it to macOS appearance. The original icon returns when disabled.",
+    "description": "Automatically follows macOS light and dark appearance. The original icon returns when disabled."
+  },
+  "dock_icon_style": {
+    "message": "Icon style"
+  },
+  "dock_icon_auto": {
+    "message": "Auto (follow macOS)"
+  },
+  "dock_icon_light_theme": {
+    "message": "In light appearance"
+  },
+  "dock_icon_dark_theme": {
+    "message": "In dark appearance"
+  },
+  "settings_appearance": {
+    "message": "Appearance"
+  },
+  "settings_search": {
+    "message": "Search settings"
+  },
+  "settings_search_placeholder": {
+    "message": "Search settings…"
+  },
+  "settings_no_results": {
+    "message": "No matching settings. Try another search."
   }
 }

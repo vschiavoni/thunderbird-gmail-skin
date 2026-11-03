@@ -139,7 +139,7 @@ function installReadingMode(win) {
       grid-template:
         "folders folderPaneSplitter readingbar" 44px
         "folders folderPaneSplitter message" minmax(0, 1fr)
-        / minmax(100px, var(--folderPaneSplitter-width)) min-content minmax(0, 1fr) !important;
+        / minmax(var(--gm-folder-pane-min-width, 100px), var(--folderPaneSplitter-width)) min-content minmax(0, 1fr) !important;
     }
     #paneLayout.gm-reading > :is(#threadPane, #messagePaneSplitter) { display:none !important; }
     #paneLayout.gm-reading > #messagePane { min-height:0 !important; min-width:0 !important; }

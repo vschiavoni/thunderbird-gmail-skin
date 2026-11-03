@@ -3,6 +3,11 @@
 Open **Add-ons Manager → Thunder-G → Preferences**. Changes save automatically
 and stay after restart.
 
+Use **Search settings** to filter sections by their names and descriptions.
+Matching sections include their expanded help text. Press **Esc** or clear the
+search field to show everything again. **Appearance** in the sidebar opens the
+macOS Dock icon settings.
+
 ## Interface language
 
 **Interface language** defaults to **Automatic (Thunderbird language)**. Italian
@@ -22,6 +27,20 @@ It hides Today Pane and column headers. Language, Gmail connection and BIMI
 preferences are preserved. The switches update together; open a conversation to
 try the reader and reply settings. Disable Thunderbird Conversations first, as
 with manually enabling Thunder-G’s reader.
+
+## Dock icon (macOS)
+
+**Use Thunder-G Dock icon** is off by default and appears only on macOS.
+Enable it to use the Thunder-G icon while Thunderbird is running. It follows
+macOS light/dark appearance, including Auto, within about two seconds. Choose
+**Light** or **Dark** to keep one style, or **Auto (follow macOS)**
+to select a separate icon for light and dark appearance. Auto defaults to Light
+for light and Dark for dark. The choice
+is saved and reapplied at startup. Disabling it or unloading Thunder-G restores
+Thunderbird's original icon without changing the application bundle.
+
+The icon uses flattened Apple exports. It does not follow the separate macOS
+Clear/Tinted icon styles or provide dynamic Liquid Glass rendering.
 
 ## Inbox
 

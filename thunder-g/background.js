@@ -10,12 +10,14 @@ async function startThunderG() {
   await ThunderGI18n.ready;
   await browser.inlineLabels.setLanguage?.(ThunderGI18n.language);
   // Optional settings must never prevent the companion from starting.
-  let coloredStars=null;
+  let coloredStars=null,dockIconEnabled=false,dockIconPreferences={};
   let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
   try {
-    const settings = await browser.storage.local.get({coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
+    const settings = await browser.storage.local.get({dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
     searchResultsAsList=settings.searchResultsAsList!==false;
     coloredStars=settings.coloredStars;
+    dockIconEnabled=settings.dockIconEnabled===true;
+    dockIconPreferences=settings.dockIconPreferences;
     threadExpandArrows=settings.threadExpandArrows===true;
     showColumnHeaders = settings.showColumnHeaders === true;
     threadGuides = settings.threadGuides !== false;
@@ -34,6 +36,7 @@ async function startThunderG() {
   await browser.inlineLabels.setSearchResultsAsList?.(searchResultsAsList);
   await browser.inlineLabels.setShowColumnHeaders?.(showColumnHeaders);
   await browser.inlineLabels.setColoredStars?.(coloredStars);
+  try{await browser.inlineLabels.setDockIcon?.(dockIconEnabled,dockIconPreferences);}catch(error){console.error('Thunder-G Dock icon:',error);}
   await browser.inlineLabels.setThreadExpandArrows?.(threadExpandArrows);
   await browser.inlineLabels.setThreadGuides?.(threadGuides);
   await browser.inlineLabels.setHideTodayPane(hideTodayPane);
@@ -47,6 +50,7 @@ async function startThunderG() {
   await browser.inlineLabels.setGmailShortcuts?.(gmailShortcuts);
   await browser.inlineLabels.start();
   browser.storage.onChanged.addListener((changes, area) => {
+    if(area==='local' && (changes.dockIconEnabled||changes.dockIconPreferences))browser.storage.local.get({dockIconEnabled:false,dockIconPreferences:{}}).then(settings=>browser.inlineLabels.setDockIcon(settings.dockIconEnabled===true,settings.dockIconPreferences)).catch(console.error);
     if(area==='local' && changes.gmailShortcuts)browser.inlineLabels.setGmailShortcuts(changes.gmailShortcuts.newValue===true).catch(console.error);
     if(area==='local' && changes.interfaceLanguage){ThunderGI18n.setPreference(changes.interfaceLanguage.newValue);browser.inlineLabels.setLanguage(ThunderGI18n.language).catch(console.error);}
     if(area==='local' && changes.searchResultsAsList)browser.inlineLabels.setSearchResultsAsList(changes.searchResultsAsList.newValue!==false).catch(console.error);
