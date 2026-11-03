@@ -153,9 +153,13 @@
     box-shadow: inset 0 -1px var(--gm-border) !important;
   }
 
-  #threadTree tbody > tr.table-layout[data-properties~="unread"] {
+  #threadTree tbody > tr.table-layout:is([data-properties~="unread"], .children.collapsed[data-properties~="hasUnread"]) {
     background: var(--gm-surface) !important;
     font-weight: 700 !important;
+  }
+
+  #threadTree tbody > tr.table-layout.children.collapsed[data-properties~="hasUnread"] :is(td, td *) {
+    text-decoration: none !important;
   }
 
   #threadTree tbody > tr.table-layout:hover {
@@ -169,12 +173,19 @@
     color: var(--gm-ink) !important;
   }
 
+  #threadTree .gm-thread-count {
+    margin-inline-start: 0.35em;
+    color: var(--gm-muted) !important;
+    font-size: 0.8em;
+    font-weight: 400 !important;
+  }
+
   #threadTree .datecol-column {
     font-size: 0.86em !important;
     color: var(--gm-muted) !important;
   }
 
-  #threadTree tr[data-properties~="unread"] .datecol-column {
+  #threadTree tr:is([data-properties~="unread"], .children.collapsed[data-properties~="hasUnread"]) .datecol-column {
     color: var(--gm-ink) !important;
     font-weight: 700 !important;
   }

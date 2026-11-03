@@ -1,3 +1,21 @@
+function renderThreadCount(win,row) {
+  row.querySelector('.gm-thread-count')?.remove();
+  try {
+    const view=win.gDBView;
+    const sender=row.querySelector('.sendercol-column, .correspondentcol-column');
+    if(sender && view?.isContainer(row.index) && !view.isContainerOpen(row.index) &&
+        !(row.dataset.properties || '').split(' ').includes('dummy')){
+      const count=view.getThreadContainingIndex(row.index)?.numChildren;
+      if(count>1){
+        const badge=win.document.createElement('span');
+        badge.className='gm-thread-count';
+        badge.textContent=count.toLocaleString();
+        sender.append(badge);
+      }
+    }
+  }catch(_){/* The view can change while a row is being recycled. */}
+}
+
 // Index local draft summary headers, including replies stored outside the inbox.
 // References identify conversations; subjects alone must never match a draft.
 function draftMessageIds(header) {
@@ -868,6 +886,7 @@ function installInboxControls(win,{threadGuides=true,reader=null}={}) {
   function render(row) {
     renderThreadGuide(row);
     drafts.render(row);
+    renderThreadCount(win,row);
     row.querySelector('.gm-row-actions')?.remove();
     row.querySelector('.gm-message-snippet')?.remove();
     row.querySelector('.subject-line')?.classList?.remove('gm-has-snippet');

@@ -504,3 +504,36 @@ test('sender draft labels follow local save/delete notifications, locale, row re
   row.dataset.properties='';controller.render(row);listener.msgAdded();controller.close();
   assert.equal(removed,true);assert.equal(timers.size,0);assert.equal(head.children.length,0);assert.equal(cell.children[0],sender);assert.equal(row.querySelector('.gm-sender-draft'),null);
 });
+
+test('thread counts show the total for collapsed threads and clear when rows are reused',()=>{
+  let badge,container=true,open=false,count=27;
+  const sender={append(node){badge=node}};
+  const row={index:4,dataset:{},querySelector(selector){
+    return selector==='.gm-thread-count'?badge:sender;
+  }};
+  const win={
+    document:{createElement(){return {remove(){badge=undefined}}}},
+    gDBView:{
+      isContainer:()=>container,
+      isContainerOpen:()=>open,
+      getThreadContainingIndex(index){assert.equal(index,row.index);return {numChildren:count}},
+    },
+  };
+  scope.renderThreadCount(win,row);
+  assert.equal(badge.className,'gm-thread-count');
+  assert.equal(badge.textContent,'27');
+  row.index=5;
+  container=false;
+  scope.renderThreadCount(win,row);
+  assert.equal(badge,undefined);
+  container=true;
+  count=1;
+  scope.renderThreadCount(win,row);
+  assert.equal(badge,undefined);
+  count=10;
+  scope.renderThreadCount(win,row);
+  assert.equal(badge.textContent,'10');
+  open=true;
+  scope.renderThreadCount(win,row);
+  assert.equal(badge,undefined);
+});
