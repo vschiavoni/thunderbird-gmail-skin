@@ -1024,14 +1024,11 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     body[data-gm-folder-pane-closed].layout-vertical:not(.account-central) { grid-template-columns: var(--gm-rail-width) min-content minmax(0,1fr) min-content minmax(0,var(--messagePaneSplitter-width)) !important; }
     body[data-gm-folder-pane-closed] #folderPane { min-inline-size: 0 !important; inline-size: var(--gm-rail-width) !important; }
     body[data-gm-folder-pane-closed] #folderPaneSplitter { pointer-events: none; }
-    body[data-gm-folder-pane-closed] #folderPaneHeaderBar { padding-inline: 10px !important; flex-direction: column !important; }
     body[data-gm-folder-pane-closed] #folderPaneMoreButton { display: none !important; }
-    body[data-gm-folder-pane-closed] #folderPaneWriteMessage:not([hidden]) { font-size: 0 !important; gap: 0 !important; inline-size: 44px !important; min-inline-size: 44px !important; padding: 10px 12px !important; }
     body[data-gm-folder-pane-closed] #folderPaneGetMessages:not([hidden]) { inline-size: 44px !important; min-inline-size: 44px !important; }
     body[data-gm-folder-pane-closed] #folderTree .mode-container { display: none !important; }
     body[data-gm-folder-pane-closed] #folderTree li > ul { display: none !important; }
     body[data-gm-folder-pane-closed] #folderTree > li > ul { display: block !important; }
-    body[data-gm-folder-pane-closed] #folderTree .container { padding-inline: 0 !important; margin-inline: 10px !important; justify-content: center; border-radius: 12px !important; }
     body[data-gm-folder-pane-closed] #folderTree .container > :not(.icon) { display: none !important; }
     body[data-gm-folder-pane-closed] #folderTree .container > .icon { margin: 0 !important; }
 

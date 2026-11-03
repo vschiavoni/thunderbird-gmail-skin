@@ -46,6 +46,11 @@
     color: var(--gm-ink) !important;
   }
 
+  /* Keep the title toolbar continuous with the surrounding shell. */
+  unified-toolbar {
+    border-block-end: 0 !important;
+  }
+
   #folderTree, #threadTree {
     font-family: Roboto, Arial, sans-serif !important;
     font-size: 14px !important;
@@ -135,6 +140,12 @@
     border-radius: 0 18px 18px 0 !important;
     margin-inline: 0 12px !important;
   }
+
+  /* Compact rail: use the same center for actions and folder icons.
+   * These rules share the user stylesheet priority of the expanded layout. */
+  body[data-gm-folder-pane-closed] #folderPaneHeaderBar { box-sizing: border-box !important; inline-size: var(--gm-rail-width) !important; padding-inline: 0 !important; flex-direction: column !important; align-items: center !important; }
+  body[data-gm-folder-pane-closed] #folderPaneWriteMessage:not([hidden]) { box-sizing: border-box !important; justify-content: center !important; font-size: 0 !important; gap: 0 !important; inline-size: 40px !important; min-inline-size: 40px !important; block-size: 40px !important; padding: 0 !important; }
+  body[data-gm-folder-pane-closed] #folderTree .container { box-sizing: border-box !important; inline-size: calc(var(--gm-rail-width) - 20px) !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 0 !important; padding-inline: 0 !important; margin-inline: 10px !important; border-radius: 12px !important; }
 
   #folderTree li.selected > .container {
     background: var(--gm-selected) !important;
