@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const scope=require('./localization-context.cjs').createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8'),scope);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/stars.js'),'utf8'),scope);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),scope);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/compose.js'),'utf8'),scope);
 test('thread arrows toggle once per activation, including rapid clicks and keyboard-generated clicks',()=>{
@@ -11,7 +12,7 @@ test('thread arrows toggle once per activation, including rapid clicks and keybo
   const row={index:3,hasAttribute:()=>outside};
   const arrow={closest:selector=>selector==='tr.table-layout, tr.card-layout'?row:null};
   const target={closest:selector=>selector==='.twisty'?arrow:null};
-  const tree={contains:()=>inside,
+  const tree={contains:()=>inside,toggleAttribute(){},
     addEventListener(name,fn,capture){assert.equal(capture,true);events[name]=fn},
     removeEventListener(name,fn,capture){assert.equal(capture,true);assert.equal(events[name],fn);delete events[name]},
     expandRowAtIndex(index){assert.equal(index,3);open=true;calls.push('expand');return 4},
@@ -19,7 +20,7 @@ test('thread arrows toggle once per activation, including rapid clicks and keybo
     scrollExpandedRowIntoView(index,count){assert.equal(index,3);assert.equal(count,4);calls.push('scroll')},
     ensureCorrectFocus(){calls.push('focus')}};
   const win={document:{getElementById:()=>tree},gDBView:{isContainer:()=>container,isContainerOpen:()=>open}};
-  const controller=scope.installThreadToggles(win);
+  const controller=scope.installThreadToggles(win,true);
   function dispatch(type,detail=1,extra={}) {
     const event={button:0,detail,target,prevented:false,stopped:false,
       preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true},...extra};
@@ -84,7 +85,7 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
   let resets=0;
   const row=Object.assign(new Row(),element());row.index=0;row.line=element();
   const native=Row.prototype.fillRow;let read=false,preview='';
-  const tree={events:{},selectedIndices:[],reset(){resets++},addEventListener(name,fn){this.events[name]=fn},removeEventListener(name){delete this.events[name]}};
+  const tree={events:{},selectedIndices:[],querySelectorAll:()=>[row],reset(){resets++},addEventListener(name,fn){this.events[name]=fn},removeEventListener(name){delete this.events[name]}};
   const doc={head:element(),getElementById:()=>tree,createElement:()=>{const e=element();nodes.push(e);return e},
     createElementNS:()=>element(),querySelectorAll:selector=>selector.includes('table-layout')?[row]:selector==='.gm-has-snippet'?[]:row.line.children.slice()};
   const visibility=[];
@@ -536,4 +537,75 @@ test('thread counts show the total for collapsed threads and clear when rows are
   open=true;
   scope.renderThreadCount(win,row);
   assert.equal(badge,undefined);
+});
+
+test('inline thread expansion is off by default and can be restored live',()=>{
+  const events=new Map(),calls=[];
+  const tree={
+    expandRowAtIndex(){calls.push('expand');return 2},
+    collapseRowAtIndex(){},
+    toggleAttribute(name,value){assert.equal(name,'data-gm-hide-thread-arrows');this.hidden=value},
+    removeAttribute(){this.hidden=false},
+    addEventListener(name,fn){events.set(name,fn)},
+    removeEventListener(name){events.delete(name)},
+  };
+  const win={document:{getElementById:()=>tree},commandController:{doCommand:name=>calls.push(name)}};
+  const controller=scope.installThreadToggles(win);
+  assert.equal(tree.hidden,true);
+  assert.equal(tree.expandRowAtIndex(0),0);
+  win.commandController.doCommand('cmd_expandAllThreads');
+  win.commandController.doCommand('cmd_openMessage');
+  assert.deepEqual(calls,['cmd_openMessage']);
+  const stopped=[];
+  for(const key of ['ArrowRight','Enter']){
+    events.get('keydown')({key,target:{},preventDefault(){},stopImmediatePropagation(){stopped.push(key)}});
+  }
+  assert.deepEqual(stopped,['ArrowRight']);
+  controller.setEnabled(true);
+  assert.equal(tree.hidden,false);
+  assert.equal(tree.expandRowAtIndex(0),2);
+  win.commandController.doCommand('cmd_expandAllThreads');
+  assert.deepEqual(calls,['cmd_openMessage','expand','cmd_expandAllThreads']);
+  controller.close();
+  assert.equal(events.size,0);
+});
+
+test('hidden thread arrows leave no layout space before inline labels',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8');
+  assert.match(source,/#threadTree\[data-gm-hide-thread-arrows\] tr:not\(\[data-properties~="dummy"\]\) \.twisty \{ display: none !important; \}/);
+});
+
+test('colored markers cycle in configured order and clear the native flag on a later click',()=>{
+  let marker='',now=0;
+  const flags=[],events={};
+  const message={messageKey:1,isFlagged:false,getStringProperty:()=>marker,setStringProperty(_key,value){marker=value}};
+  message.folder={URI:'mailbox://test',markMessagesFlagged([header],value){header.isFlagged=value;flags.push(value)}};
+  const button={dataset:{},style:{removeProperty(){},setProperty(){}},removeAttribute(){delete this.dataset.gmStar}};
+  const row={index:0,dataset:{},querySelector:()=>button};
+  const tree={querySelectorAll:()=>[row],addEventListener(name,fn){events[name]=fn},removeEventListener(){}};
+  const win={document:{getElementById:()=>tree},gDBView:{getMsgHdrAt:()=>message}};
+  const originalDate=scope.Date;
+  scope.Date={now:()=>now};
+  try{
+    const controller=scope.installColoredStars(win,{enabled:true,order:['blue-star','red-star']});
+    const click=()=>events.click({button:0,target:{closest:()=>({closest:()=>row})},preventDefault(){},stopImmediatePropagation(){}});
+    click();assert.equal(marker,'blue-star');assert.equal(message.isFlagged,true);
+    now=100;click();assert.equal(marker,'red-star');assert.deepEqual(flags,[true]);
+    now=1000;click();assert.equal(marker,'');assert.deepEqual(flags,[true,false]);
+    controller.configure({enabled:true,order:['red-star','blue-star']});
+    click();assert.equal(marker,'red-star');
+    controller.configure({enabled:false});assert.equal(button.dataset.gmStar,undefined);
+    assert.equal(message.isFlagged,true);
+    controller.close();
+  }finally{scope.Date=originalDate;}
+});
+
+test('star lists can reorder, activate and remove markers while retaining one active marker',()=>{
+  const order=['yellow-star','blue-star','red-star'];
+  const moved=scope.gmMoveStar(order,'red-star',true,'yellow-star');
+  assert.deepEqual(Array.from(moved),['red-star','yellow-star','blue-star']);
+  const removed=scope.gmMoveStar(moved,'yellow-star',false);
+  assert.deepEqual(Array.from(removed),['red-star','blue-star']);
+  assert.deepEqual(Array.from(scope.gmMoveStar(removed,'green-star',true,'blue-star')),['red-star','green-star','blue-star']);
+  assert.deepEqual(Array.from(scope.gmMoveStar(['blue-star'],'blue-star',false)),['blue-star']);
 });

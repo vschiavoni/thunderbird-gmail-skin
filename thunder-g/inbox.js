@@ -699,9 +699,34 @@ function installCompleteViewCopy(win) {
   return {close(){if(pane._applyView===applyView)pane._applyView=original;}};
 }
 
-function installThreadToggles(win) {
+function installThreadToggles(win, enabled=false) {
   const tree=win.document.getElementById('threadTree');
   if(!tree?.expandRowAtIndex || !tree.collapseRowAtIndex)return {close(){}};
+  const expand=tree.expandRowAtIndex;
+  const controller=win.commandController,command=controller?.doCommand;
+  function doCommand(name,...args){
+    if(name!=='cmd_expandAllThreads' || allowed())return command.call(this,name,...args);
+  }
+  function allowed(){return enabled || win.gViewWrapper?.showGroupedBySort;}
+  function expandRow(...args){return allowed()?expand.apply(this,args):0;}
+  function setEnabled(value){
+    enabled=value===true;
+    tree.toggleAttribute('data-gm-hide-thread-arrows',!enabled);
+    if(!allowed() && win.gViewWrapper?.showThreaded && win.gDBView){
+      win.gViewWrapper._threadExpandAll=false;
+      win.gDBView.doCommand(Ci.nsMsgViewCommandType.collapseAll);
+    }
+  }
+  function keydown(event){
+    if(!allowed() && ['ArrowRight','+','*'].includes(event.key) &&
+        !event.target.closest?.('input, textarea, [contenteditable="true"]')){
+      event.preventDefault();event.stopImmediatePropagation();
+    }
+  }
+  tree.expandRowAtIndex=expandRow;
+  if(command)controller.doCommand=doCommand;
+  tree.addEventListener('keydown',keydown,true);
+  setEnabled(enabled);
   function threadRow(event) {
     if(event.button!==0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)return null;
     const row=event.target.closest?.('.twisty')?.closest('tr.table-layout, tr.card-layout');
@@ -713,6 +738,7 @@ function installThreadToggles(win) {
     // The native row-click handler ignores detail=0 (button activation) and
     // detail>1 (rapid clicks). Each arrow activation must toggle exactly once.
     event.preventDefault();event.stopImmediatePropagation();
+    if(!allowed())return;
     if(view.isContainerOpen(row.index))tree.collapseRowAtIndex(row.index);
     else {
       const added=tree.expandRowAtIndex(row.index);
@@ -728,7 +754,11 @@ function installThreadToggles(win) {
   }
   tree.addEventListener('click',click,true);
   tree.addEventListener('dblclick',doubleClick,true);
-  return {close(){
+  return {setEnabled,close(){
+    if(controller?.doCommand===doCommand)controller.doCommand=command;
+    if(tree.expandRowAtIndex===expandRow)tree.expandRowAtIndex=expand;
+    tree.removeAttribute?.('data-gm-hide-thread-arrows');
+    tree.removeEventListener('keydown',keydown,true);
     tree.removeEventListener('click',click,true);
     tree.removeEventListener('dblclick',doubleClick,true);
   }};
@@ -779,10 +809,11 @@ function installCollapsedThreadDefaults(win) {
   }};
 }
 
-function installInboxControls(win,{threadGuides=true,reader=null}={}) {
+function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
+  const stars=installColoredStars(win,coloredStars);
   const drafts = installSenderDraftLabels(win);
   reader?.setDraftOpener?.(drafts.openRow,drafts.getRowDraft);
   const compose = installComposeLabel(doc);
@@ -791,7 +822,7 @@ function installInboxControls(win,{threadGuides=true,reader=null}={}) {
   const responsive = installResponsiveColumns(win);
   const viewCopy = installCompleteViewCopy(win);
   const newMessage = installInlineNewMessage(win);
-  const threadToggles = installThreadToggles(win);
+  const threadToggles = installThreadToggles(win,threadExpandArrows);
   const threadDefaults = installCollapsedThreadDefaults(win);
   let closed = false, prototype, original, wrapped, rowClass, originalHeight;
   let showThreadGuides=threadGuides===true;
@@ -812,6 +843,19 @@ function installInboxControls(win,{threadGuides=true,reader=null}={}) {
   if (filter?._showFilterBar) filter._showFilterBar(false);
   const style = doc.createElement('style');
   style.textContent = `
+    #threadTree[data-gm-hide-thread-arrows] tr:not([data-properties~="dummy"]) .twisty { display: none !important; }
+    #threadTree button[data-gm-star] { background-image: none !important; }
+    #threadTree button[data-gm-star] img { visibility: hidden; }
+    #threadTree button[data-gm-star]::after {
+      content: attr(data-gm-star);
+      color: var(--gm-star-color,var(--gm-muted));
+      font: 18px/1 sans-serif;
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+    }
+    #threadTree button[data-gm-star] { position: relative; }
     #quick-filter-bar .quickFilterButtons {
       gap:6px; flex-wrap:wrap; border:0 !important; box-shadow:none !important;
     }
@@ -885,6 +929,7 @@ function installInboxControls(win,{threadGuides=true,reader=null}={}) {
   doc.head.append(style);
   function render(row) {
     renderThreadGuide(row);
+    stars.render(row);
     drafts.render(row);
     renderThreadCount(win,row);
     row.querySelector('.gm-row-actions')?.remove();
@@ -1005,6 +1050,7 @@ function installInboxControls(win,{threadGuides=true,reader=null}={}) {
     style.remove();
     previews.close();
     reader?.setDraftOpener?.(null);
+    stars.close();
     drafts.close();
     compose.close();
     responsive.close();
@@ -1025,5 +1071,5 @@ function installInboxControls(win,{threadGuides=true,reader=null}={}) {
   }
   win.addEventListener('focus',refreshPreviews);
   win.addEventListener('unload',close,{once:true});
-  return {close,setThreadGuides};
+  return {close,setThreadGuides,setColoredStars:stars.configure,setThreadExpandArrows:threadToggles.setEnabled};
 }

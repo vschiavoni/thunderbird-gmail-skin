@@ -138,6 +138,25 @@ threadGuides.addEventListener('change', async () => {
   } finally { threadGuides.disabled = false; }
 });
 
+const threadExpandArrows = document.getElementById('thread-expand-arrows');
+if(threadExpandArrows){
+  threadExpandArrows.disabled=true;
+  browser.storage.local.get({threadExpandArrows:false}).then(settings=>{
+    threadExpandArrows.checked=settings.threadExpandArrows===true;
+    threadExpandArrows.disabled=false;
+  }).catch(()=>reportStatus(gmText("Unable to load settings.")));
+  threadExpandArrows.addEventListener('change',async ()=>{
+    threadExpandArrows.disabled=true;
+    try {
+      await browser.storage.local.set({threadExpandArrows:threadExpandArrows.checked});
+      reportStatus(gmText("Saved."));
+    } catch (_) {
+      threadExpandArrows.checked=!threadExpandArrows.checked;
+      reportStatus(gmText("Unable to save. Please try again."));
+    } finally {threadExpandArrows.disabled=false;}
+  });
+}
+
 const columnHeaders = document.getElementById('show-column-headers');
 columnHeaders.disabled = true;
 browser.storage.local.get({showColumnHeaders:false}).then(settings => {

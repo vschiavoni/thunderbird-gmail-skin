@@ -63,6 +63,22 @@
             <input class="switch" id="hide-today-pane" type="checkbox" role="switch" aria-describedby="today-pane-help">
           </div>
           <div class="setting-row">
+            <div class="setting-copy">
+              <label for="colored-stars">Colored stars</label>
+              <p>Drag markers between lists or reorder them. Quick clicks cycle through the markers in use.</p>
+              <div>Presets <button type="button" data-star-preset="1">1 star</button>
+                <button type="button" data-star-preset="4">4 stars</button>
+                <button type="button" data-star-preset="12">All stars</button></div>
+              <div>In use <span class="star-marker-list" id="stars-active"></span></div>
+              <div>Not in use <span class="star-marker-list" id="stars-inactive"></span></div>
+            </div>
+            <input class="switch" id="colored-stars" type="checkbox" role="switch" disabled>
+          </div>
+          <div class="setting-row">
+            <div class="setting-copy"><label for="thread-expand-arrows">Show thread expand arrows</label></div>
+            <input class="switch" id="thread-expand-arrows" type="checkbox" role="switch">
+          </div>
+          <div class="setting-row">
             <div class="setting-copy"><label for="thread-guides"><span data-i18n="show_thread_connection_lines_419dbd7">Show thread connection lines</span></label><p id="thread-guides-help"><span data-i18n="a_subtle_line_connects_messages_in_expanded_threads__34c9431">A subtle line connects messages in expanded threads. Enabled by default; applies immediately.</span></p></div>
             <input class="switch" id="thread-guides" type="checkbox" role="switch" aria-describedby="thread-guides-help">
           </div>
@@ -180,6 +196,8 @@
       </main>
     </div>
   </div>
+  <script src="stars.js"></script>
+  <script src="star-options.js"></script>
   <script src="localization.js"></script>
   <script src="localization-options.js"></script>
 </body>

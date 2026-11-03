@@ -9,10 +9,13 @@ async function startThunderG() {
   await ThunderGI18n.ready;
   await browser.inlineLabels.setLanguage?.(ThunderGI18n.language);
   // Optional settings must never prevent the companion from starting.
-  let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
+  let coloredStars=null;
+  let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
   try {
-    const settings = await browser.storage.local.get({gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
+    const settings = await browser.storage.local.get({coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
     searchResultsAsList=settings.searchResultsAsList!==false;
+    coloredStars=settings.coloredStars;
+    threadExpandArrows=settings.threadExpandArrows===true;
     showColumnHeaders = settings.showColumnHeaders === true;
     threadGuides = settings.threadGuides !== false;
     bimiEnabled = settings.bimiEnabled === true;
@@ -29,6 +32,8 @@ async function startThunderG() {
   } catch (error) { console.warn('Thunder-G: using default settings.',error); }
   await browser.inlineLabels.setSearchResultsAsList?.(searchResultsAsList);
   await browser.inlineLabels.setShowColumnHeaders?.(showColumnHeaders);
+  await browser.inlineLabels.setColoredStars?.(coloredStars);
+  await browser.inlineLabels.setThreadExpandArrows?.(threadExpandArrows);
   await browser.inlineLabels.setThreadGuides?.(threadGuides);
   await browser.inlineLabels.setHideTodayPane(hideTodayPane);
   await browser.inlineLabels.setComposeAutosave(composeAutosave,composeAutosaveMinutes || 1,composeAutosaveMode);
@@ -45,6 +50,8 @@ async function startThunderG() {
     if(area==='local' && changes.interfaceLanguage){ThunderGI18n.setPreference(changes.interfaceLanguage.newValue);browser.inlineLabels.setLanguage(ThunderGI18n.language).catch(console.error);}
     if(area==='local' && changes.searchResultsAsList)browser.inlineLabels.setSearchResultsAsList(changes.searchResultsAsList.newValue!==false).catch(console.error);
     if(area==='local' && changes.showColumnHeaders)browser.inlineLabels.setShowColumnHeaders(changes.showColumnHeaders.newValue===true).catch(console.error);
+    if(area==='local' && changes.coloredStars)browser.inlineLabels.setColoredStars?.(changes.coloredStars.newValue ?? null)?.catch(console.error);
+    if(area==='local' && changes.threadExpandArrows)browser.inlineLabels.setThreadExpandArrows?.(changes.threadExpandArrows.newValue===true)?.catch(console.error);
     if(area==='local' && changes.threadGuides)browser.inlineLabels.setThreadGuides(changes.threadGuides.newValue!==false).catch(console.error);
     if (area === 'local' && (changes.composeAutosave || changes.composeAutosaveMinutes || changes.composeAutosaveMode)) {
       if(changes.composeAutosaveMode)composeAutosaveMode=changes.composeAutosaveMode.newValue==='fixed'?'fixed':'auto';
