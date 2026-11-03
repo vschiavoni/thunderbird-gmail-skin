@@ -32,6 +32,7 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             data += b'\n' + (source / 'shortcuts.js').read_bytes()
             data += b'\n' + (source / 'snooze.js').read_bytes()
             data += b'\n' + (source / 'snooze-native.js').read_bytes()
+            data += b'\n' + (source / 'snooze-ui.js').read_bytes()
             data += b'\n' + (source / 'snooze-order.js').read_bytes()
             data += b'\n' + (source / 'reading.js').read_bytes()
             data += b'\n' + (source / 'dates.js').read_bytes()

@@ -1,5 +1,5 @@
 /* Gmail-like navigation around the native/Conversations message pane.
- * Actions delegate to native Thunderbird commands and installed Follow-Ups.
+ * Actions delegate to native Thunderbird commands and the snooze scheduler.
  */
 function isReadingClick(event) {
   return event.button === 0 && !event.ctrlKey && !event.metaKey &&
@@ -19,7 +19,7 @@ function isLabelShortcut(event) {
     !event.altKey && !event.shiftKey && !event.repeat && !event.isComposing &&
     !event.defaultPrevented && !event.target?.isContentEditable &&
     !event.target?.ownerDocument?.documentURI?.includes('/messengercompose/') &&
-    !event.target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox');
+    !event.target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, dialog, [role="dialog"], [role="menu"]');
 }
 function labelMatchesQuery(name, query) {
   return name.normalize('NFKC').toLocaleLowerCase().includes(query.trim().normalize('NFKC').toLocaleLowerCase());
@@ -284,10 +284,10 @@ function installReadingMode(win) {
     // Resolve the operation at click time, not from the initial button label.
     () => command(readAction().name, true));
   syncReadAction();
-  const snoozeButton = action(gmText("Snooze / Follow-Up…"), 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 6v6l4 3', () => {
-    const { ExtensionParent } = ChromeUtils.importESModule('resource://gre/modules/ExtensionParent.sys.mjs');
-    const extension = ExtensionParent.GlobalManager.extensionMap.get('mailmindr@arndissler.net');
-    if (extension?.shortcuts) extension.shortcuts.onCommand('mailmindr_set_follow_up');
+  const snoozeUI = typeof thunderGSnooze !== 'undefined' && thunderGSnooze ? installSnoozeUI(win,thunderGSnooze) : null;
+  const snoozeButton = action(gmText("Snooze until…"), 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 6v6l4 3', () => {
+    const headers=snoozeSelectedMessages(win.gDBView,resolveConversation(conversationDocument()),!!(win.gDBView?.viewFlags&Ci.nsMsgViewFlagsType.kThreadedDisplay));
+    if(headers.length)snoozeUI?.choose(headers,null,snoozeButton);
   });
   separator();
   const movePopup = doc.createXULElement('menupopup', {is:'folder-menupopup'});
@@ -664,7 +664,7 @@ function installReadingMode(win) {
       setBackIcon(true);
       gmBindValue(selectionLabel, "textContent", () => gmText("$1 selected", count));
       gmBindAttribute(toolbar, 'aria-label', () => gmText("Selected message actions"));
-      snoozeButton.disabled = count !== 1;
+      snoozeButton.disabled = count === 0 || !snoozeUI;
     }
   }
   function clearBulk() {
@@ -746,7 +746,7 @@ function installReadingMode(win) {
     if(selectionControl)selectionControlHome?.prepend(selectionControl);
     back.hidden=false;
     selectionLabel.textContent = '';
-    snoozeButton.disabled = false;
+    snoozeButton.disabled = !snoozeUI;
     gmBindAttribute(toolbar, 'aria-label', () => gmText("Conversation navigation"));
     toolbar.hidden = false;
     syncReadAction();
@@ -826,8 +826,9 @@ function installReadingMode(win) {
   folderTree.addEventListener('select', folderChange, true);
   back.addEventListener('click', backClick);
   function close() {
-    leave(false);
+    if(closed)return;
     closed = true;
+    leave(false);
     independent?.close();
     threadPane?.classList.remove('gm-bulk-selecting');
     layout.messagePaneVisible = originalMessagePaneVisible;
@@ -845,6 +846,7 @@ function installReadingMode(win) {
     win.removeEventListener("load", documentLoaded, true);
     tagPopup.hidePopup?.();
     for (const popup of popups) popup.remove();
+    snoozeUI?.close();
     toolbar.remove(); style.remove();
     win.removeEventListener('unload', close);
   }

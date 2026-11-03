@@ -50,7 +50,7 @@ native bindings that happen to use the same keys.
 | `z` | Undo | When the native Thunderbird action can be undone |
 | `l` | Open **Label as** | Selected messages or the resolved conversation; also available independently as `L` |
 | `v` | Open **Move to** | Current conversation or selected messages |
-| `b` | Snooze / Follow-Up | Requires the **mailmindr** add-on and an applicable single-message selection |
+| `b` | Snooze | Opens the date and time picker for the selected conversations |
 | `,` | Focus the mail action toolbar | Message list or conversation |
 
 In the independent conversation reader, reply/forward shortcuts target the active

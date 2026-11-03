@@ -55,10 +55,16 @@ provider and the other client; Exchange cross-client tag synchronization is not
 supported. Gmail import copies custom label names and hierarchy once. It does
 not synchronize Gmail assignments or import messages.
 
-## The Follow-Up clock is unavailable
+## A snoozed conversation has not returned
 
-Install and configure the separate mailmindr / Follow-Ups add-on. The clock opens
-its reminder form. Thunder-G does not implement Gmail-style snoozing.
+Keep Thunderbird running and online. If it was closed or offline at the deadline,
+Thunder-G retries when it runs again. Its messages are held in **Thunder-G Snoozed**
+in the same account; sent originals remain in Sent. Moving or deleting a held
+message manually cancels its reminder. Disabling the extension stops the scheduler;
+the holding folders remain available to recover messages manually.
+
+This is managed by Thunder-G, independently of Gmail's native Snoozed view.
+It requires no Google API authorization or external scheduling service.
 
 ## Sender logos do not appear
 

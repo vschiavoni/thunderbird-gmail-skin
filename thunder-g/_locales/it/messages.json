@@ -2039,5 +2039,149 @@
   },
   "gmail_keyboard_shortcuts_help": {
     "message": "Usa le scorciatoie essenziali di Gmail e Command+Invio (Mac) o Ctrl+Invio (Windows/Linux) per inviare. Disattivate per impostazione predefinita. Le scorciatoie con lettere non si attivano durante la scrittura. Premi ? nella lista dei messaggi per la guida. Le scorciatoie native di Thunderbird restano disponibili."
+  },
+  "snooze_1": {
+    "message": "Posticipati"
+  },
+  "snooze_2": {
+    "message": "Posticipa a…"
+  },
+  "snooze_3": {
+    "message": "Più tardi oggi"
+  },
+  "snooze_4": {
+    "message": "Domani"
+  },
+  "snooze_5": {
+    "message": "Settimana prossima"
+  },
+  "snooze_6": {
+    "message": "Scegli data e ora"
+  },
+  "snooze_7": {
+    "message": "Nessuna conversazione posticipata."
+  },
+  "snooze_8": {
+    "message": "Modifica orario"
+  },
+  "snooze_9": {
+    "message": "Annulla posticipo"
+  },
+  "snooze_10": {
+    "message": "Conversazione tornata in Posta in arrivo"
+  },
+  "snooze_11": {
+    "message": "Ordine della Posta in arrivo"
+  },
+  "snooze_12": {
+    "message": "Torna in Posta in arrivo all’orario scelto o quando arriva una nuova risposta. Thunderbird deve essere aperto; i posticipi scaduti vengono recuperati alla riapertura."
+  },
+  "snooze_13": {
+    "message": "Scegli una data e un’ora future."
+  },
+  "snooze_14": {
+    "message": "Troppe conversazioni posticipate."
+  },
+  "snooze_15": {
+    "message": "Seleziona un messaggio da posticipare."
+  },
+  "snooze_16": {
+    "message": "Questa conversazione è già posticipata."
+  },
+  "snooze_17": {
+    "message": "Il posticipo non è più disponibile."
+  },
+  "snooze_18": {
+    "message": "L’account della conversazione posticipata non è disponibile."
+  },
+  "snooze_19": {
+    "message": "La cartella della conversazione posticipata non è disponibile."
+  },
+  "snooze_20": {
+    "message": "Impossibile identificare con certezza il messaggio posticipato."
+  },
+  "snooze_21": {
+    "message": "Impossibile creare la cartella dei messaggi posticipati."
+  },
+  "snooze_22": {
+    "message": "Troppi messaggi da posticipare in una sola operazione."
+  },
+  "snooze_23": {
+    "message": "Questo messaggio non può essere posticipato."
+  },
+  "snooze_24": {
+    "message": "Sposta prima la conversazione fuori da Cestino, Spam o Bozze."
+  },
+  "snooze_25": {
+    "message": "Usa Posticipati per modificare questo posticipo."
+  },
+  "snooze_26": {
+    "message": "Un messaggio posticipato è stato spostato o eliminato."
+  },
+  "snooze_27": {
+    "message": "Il messaggio originale non è disponibile."
+  },
+  "snooze_28": {
+    "message": "Questo account non ha una cartella Posta in arrivo."
+  },
+  "snooze_29": {
+    "message": "Il messaggio posticipato non è disponibile."
+  },
+  "snooze_30": {
+    "message": "Il messaggio è già in Posta in arrivo. Sposta manualmente la copia nei Posticipati."
+  },
+  "snooze_31": {
+    "message": "Lo spazio per i posticipi è esaurito."
+  },
+  "snooze_thread_order": {
+    "message": "Ordine delle conversazioni in arrivo"
+  },
+  "snooze_bulk_retry": {
+    "message": "Alcune conversazioni sono ancora in trasferimento. I posticipi salvati verranno riprovati."
+  },
+  "snooze_already_returning": {
+    "message": "Questa conversazione sta già tornando in Posta in arrivo."
+  },
+  "snooze_picker_0": {
+    "message": "Più tardi in settimana"
+  },
+  "snooze_picker_1": {
+    "message": "Questo fine settimana"
+  },
+  "snooze_picker_2": {
+    "message": "Data"
+  },
+  "snooze_picker_3": {
+    "message": "Ora"
+  },
+  "snooze_picker_4": {
+    "message": "Mese precedente"
+  },
+  "snooze_picker_5": {
+    "message": "Mese successivo"
+  },
+  "snooze_picker_6": {
+    "message": "Scegli una data e un’ora valide."
+  },
+  "snooze_time_0": {
+    "message": "Ore"
+  },
+  "snooze_time_1": {
+    "message": "Minuti"
+  },
+  "snooze_time_2": {
+    "message": "Fine"
+  },
+  "snooze_time_3": {
+    "message": "Posticipo della conversazione…"
+  },
+  "snooze_time_4": {
+    "message": "Conversazione posticipata"
+  },
+  "snooze_time_5": {
+    "message": "Ripristino della conversazione in Posta in arrivo…"
+  },
+  "snooze_time_6": {
+    "message": "Conversazione tornata in Posta in arrivo"
   }
 }
