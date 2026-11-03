@@ -268,3 +268,32 @@ gmailShortcuts.addEventListener('change',async()=>{
  catch(_){gmailShortcuts.checked=!gmailShortcuts.checked;reportStatus(gmText('Unable to save. Please try again.'));}
  finally{gmailShortcuts.disabled=false;}
 });
+
+const dockIconSwitch=document.getElementById('dock-icon');
+const dockIconMode=document.getElementById('dock-icon-mode'),dockIconLight=document.getElementById('dock-icon-light'),dockIconDark=document.getElementById('dock-icon-dark');
+let savedDockIcon={enabled:false,preferences:{mode:'auto',light:'light',dark:'dark'}};
+function renderDockIcon(){
+  dockIconSwitch.checked=savedDockIcon.enabled;
+  for(const key of ['mode','light','dark'])for(const radio of document.querySelectorAll(`input[name="dock-icon-${key}"]`))radio.checked=radio.value===savedDockIcon.preferences[key];
+  document.getElementById('dock-icon-customization').hidden=!savedDockIcon.enabled;
+  document.getElementById('dock-icon-themes').hidden=savedDockIcon.preferences.mode!=='auto';
+}
+Promise.all([browser.runtime.getPlatformInfo(),browser.storage.local.get({dockIconEnabled:false,dockIconPreferences:{}})]).then(([platform,settings])=>{
+  if(platform.os!=='mac')return;
+  document.getElementById('appearance').hidden=false;
+  document.getElementById('appearance-nav').hidden=false;
+  const preferences=settings.dockIconPreferences||{},valid=value=>['light','dark'].includes(value);
+  savedDockIcon={enabled:settings.dockIconEnabled===true,preferences:{mode:valid(preferences.mode)?preferences.mode:'auto',light:valid(preferences.light)?preferences.light:'light',dark:valid(preferences.dark)?preferences.dark:'dark'}};
+  renderDockIcon();
+}).catch(()=>reportStatus(gmText('Unable to load settings.')));
+async function saveDockIcon(next){
+  const controls=[dockIconSwitch,dockIconMode,dockIconLight,dockIconDark];controls.forEach(input=>input.disabled=true);
+  try{await browser.inlineLabels.setDockIcon(next.enabled,next.preferences);await browser.storage.local.set({dockIconEnabled:next.enabled,dockIconPreferences:next.preferences});savedDockIcon=next;reportStatus(gmText('Saved.'));}
+  catch(_){await browser.inlineLabels.setDockIcon(savedDockIcon.enabled,savedDockIcon.preferences).catch(()=>{});reportStatus(gmText('Unable to save. Please try again.'));}
+  finally{renderDockIcon();controls.forEach(input=>input.disabled=false);}
+}
+dockIconSwitch.addEventListener('change',()=>saveDockIcon({...savedDockIcon,enabled:dockIconSwitch.checked}));
+for(const key of ['mode','light','dark'])document.getElementById(`dock-icon-${key}`).addEventListener('change',event=>{
+  if(event.target.name!==`dock-icon-${key}`||!event.target.checked)return;
+  saveDockIcon({...savedDockIcon,preferences:{...savedDockIcon.preferences,[key]:event.target.value}});
+});

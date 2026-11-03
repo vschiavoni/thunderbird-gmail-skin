@@ -137,6 +137,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const windows = new Map(),tabWatchers=new Map(),startupWindows=new Map();
     const conversationDocuments = new Map();
     const id = context.extension.id;
+    let dockIcon=null;
     const skinWindows = new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
@@ -307,6 +308,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
     };
     context.callOnClose({ close() {
+      dockIcon?.close();dockIcon=null;
       thunderGSnooze?.close();thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
       labelBackupController?.close();labelBackupController=null;
@@ -367,6 +369,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
           return JSON.stringify({ok:false,error:error.message || gmText("The Gmail import operation failed.")});
         }
       },
+      async setDockIcon(enabled,options={}){if(enabled)dockIcon ||= createNativeDockIcon(context.extension);await dockIcon?.setEnabled(enabled===true,options);},
       async setSearchResultsAsList(enabled){searchResultsAsList=enabled!==false;},
       async setShowColumnHeaders(enabled) {
         showColumnHeaders = enabled === true;

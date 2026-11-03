@@ -31,6 +31,7 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             data += b'\n' + (source / 'label-backup-native.js').read_bytes()
             data += b'\n' + (source / 'nested-labels.js').read_bytes()
             data += b'\n' + (source / 'shortcuts.js').read_bytes()
+            data += b'\n' + (source / 'dock-icon.js').read_bytes()
             data += b'\n' + (source / 'snooze.js').read_bytes()
             data += b'\n' + (source / 'snooze-native.js').read_bytes()
             data += b'\n' + (source / 'snooze-ui.js').read_bytes()

@@ -2,6 +2,7 @@
   {
     "namespace": "inlineLabels",
     "functions": [
+      {"name":"setDockIcon","type":"function","async":true,"parameters":[{"name":"enabled","type":"boolean"},{"name":"options","type":"object","optional":true,"properties":{"mode":{"type":"string","optional":true,"enum":["auto","light","dark"]},"light":{"type":"string","optional":true,"enum":["light","dark"]},"dark":{"type":"string","optional":true,"enum":["light","dark"]}}}]},
       {
         "name": "labelBackup",
         "type": "function",
