@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.0
+
+- Add settings search, Dock icon customization, toolbar branding, and compact sidebar refinements.
+- Open Thunder-G settings from the gear beside Quick Filter.
+- Preview the first unread message in a thread and fetch missing previews on demand.
+
 ## 0.24.0
 
 - Add a Snoozed folder mode that groups account holding folders in a sidebar section, with matching clock icons and remembered visibility.
