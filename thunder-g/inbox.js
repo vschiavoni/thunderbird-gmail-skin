@@ -1,3 +1,15 @@
+function threadPreviewHeader(view,index,header) {
+  try {
+    const thread=view?.getThreadContainingIndex?.(index);
+    if(!thread || thread.numChildren<2)return header;
+    for(let i=0;i<thread.numChildren;i++){
+      const child=thread.getChildHdrAt(i);
+      if(child && child.isRead===false)return child;
+    }
+  }catch(_){/* Native summaries may be unavailable while the view changes. */}
+  return header;
+}
+
 function renderThreadCount(win,row) {
   row.querySelector('.gm-thread-count')?.remove();
   try {
@@ -165,6 +177,17 @@ function localMessagePreview(header) {
   finally { try { stream?.close(); } catch (_) {} }
 }
 
+function fetchUnreadPreview(header,ready) {
+  const folder=header.folder;
+  if(header.isRead!==false || !folder?.fetchMsgPreviewText)return false;
+  try {
+    return folder.fetchMsgPreviewText([header.messageKey],{
+      OnStartRunningUrl(){},
+      OnStopRunningUrl(){ready();},
+    });
+  } catch (_) { return false; }
+}
+
 var sharedPreviewCaches=new WeakMap();
 function createPreviewQueue(win) {
   let shared=sharedPreviewCaches.get(win);
@@ -178,9 +201,9 @@ function createPreviewQueue(win) {
     if(!entry.text && (entry.retryAt<=Date.now() || entry.flags!==header.flags))return null;
     cache.delete(key);cache.set(key,entry);return entry;
   }
-  let timer = null, closed = false;
+  let timer = null, closed = false, fetching = false;
   function schedule() {
-    if (!closed && timer === null && jobs.size) timer = win.setTimeout(drain, 16);
+    if (!closed && timer === null && !fetching && jobs.size) timer = win.setTimeout(drain, 16);
   }
   function drain() {
     timer = null;
@@ -195,12 +218,23 @@ function createPreviewQueue(win) {
         if(cache.size>=300)cache.delete(cache.keys().next().value);
         cache.set(key,{text,stamp:stamp(job.header),flags:job.header.flags,retryAt:Date.now()+30000,expiresAt:Date.now()+300000});
       }
+      if(!text && job.fetchUnread && win.navigator?.onLine!==false && !found?.fetched){
+        cache.get(key).fetched=true;
+        fetching=true;
+        const finish=()=>{
+          fetching=false;
+          if(!closed && job.isCurrent())job.ready();
+          schedule();
+        };
+        if(fetchUnreadPreview(job.header,finish))return;
+        fetching=false;
+      }
       if (!closed && job.isCurrent()) job.ready();
     }
     schedule();
   }
   return {
-    get(header, isCurrent, ready) {
+    get(header, isCurrent, ready, fetchUnread=false) {
       if (closed) return '';
       const native = cachedMessagePreview(header);
       if (native) return native;
@@ -208,10 +242,10 @@ function createPreviewQueue(win) {
         ? header.folder.URI+'#'+header.messageKey : null;
       if (!key) return '';
       const found=lookup(header,key);
-      if(found)return found.text;
+      if(found && (found.text || !fetchUnread || found.fetched))return found.text;
       // Keep the queue bounded when scrolling through many virtual rows.
       if (jobs.size >= 100 && !jobs.has(key)) jobs.delete(jobs.keys().next().value);
-      jobs.set(key,{header,isCurrent,ready}); schedule();
+      jobs.set(key,{header,isCurrent,ready,fetchUnread}); schedule();
       return '';
     },
     close() {
@@ -879,10 +913,25 @@ function installFolderPaneToggle(win) {
   }};
 }
 
-function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null}={}) {
+function installInboxSettingsButton(doc,openSettings) {
+  const filter=doc.getElementById('threadPaneQuickFilterButton');
+  if(!filter || !openSettings)return {close(){}};
+  const button=doc.createElement('button');
+  button.type='button';
+  button.className='button icon-button unified-toolbar-button gm-inbox-settings';
+  gmBindAttribute(button,'aria-label',()=>gmText("Thunder-G settings"));
+  gmBindAttribute(button,'title',()=>gmText("Thunder-G settings"));
+  button.textContent='⚙';
+  button.addEventListener('click',openSettings);
+  filter.after(button);
+  return {close(){button.removeEventListener('click',openSettings);button.remove();}};
+}
+
+function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
+  const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
   const drafts = installSenderDraftLabels(win);
@@ -915,6 +964,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   const style = doc.createElement('style');
   style.textContent = `
     #threadTree[data-gm-hide-thread-arrows] tr:not([data-properties~="dummy"]) .twisty { display: none !important; }
+    .gm-inbox-settings { font-size: 19px; line-height: 1; }
     .gm-folder-pane-toggle {
       position: absolute;
       inset-block-start: 5px;
@@ -1097,11 +1147,17 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
       if (actions) line.insertBefore(snippet, actions);
       else line.append(snippet);
     }
-    const preview = previews.get(header, isCurrent, () => {
+    const previewHeader=threadPreviewHeader(view,index,header);
+    const isPreviewCurrent=()=>{
+      if(!isCurrent())return false;
+      const current=threadPreviewHeader(view,index,header);
+      return current?.messageKey===previewHeader.messageKey && current?.folder?.URI===previewHeader.folder?.URI;
+    };
+    const preview = previews.get(previewHeader, isPreviewCurrent, () => {
       // Update only the snippet: replacing action buttons here would steal
       // keyboard focus while the user is interacting with the row.
-      showPreview(previews.get(header,isCurrent,()=>{}));
-    });
+      showPreview(previews.get(previewHeader,isPreviewCurrent,()=>{}));
+    },previewHeader.isRead===false);
     showPreview(preview);
     const actions = doc.createElement('div');
     actions.className = 'gm-row-actions';
@@ -1186,6 +1242,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     style.remove();
     previews.close();
     reader?.setDraftOpener?.(null);
+    settingsButton.close();
     folderToggle.close();
     stars.close();
     drafts.close();

@@ -655,3 +655,56 @@ test('sidebar toggle overrides native minimum sizes and draws three visible bars
   assert.match(rule,/border-radius: 50% !important/);
   assert.match(source,/box-shadow: 0 -4px currentColor, 0 4px currentColor/);
 });
+
+test('settings gear sits immediately after Quick Filter and opens settings once per click',()=>{
+  const events=new Map(),attrs=new Map();
+  let inserted,opens=0;
+  const button={setAttribute:(key,value)=>attrs.set(key,value),
+    addEventListener:(name,fn)=>events.set(name,fn),
+    removeEventListener:name=>events.delete(name),remove(){this.removed=true}};
+  const filter={after(node){inserted=node}};
+  const doc={getElementById:id=>id==='threadPaneQuickFilterButton'?filter:null,createElement:()=>button};
+  const control=scope.installInboxSettingsButton(doc,()=>opens++);
+  assert.equal(inserted,button);
+  assert.equal(attrs.get('aria-label'),'Thunder-G settings');
+  events.get('click')();
+  assert.equal(opens,1);
+  control.close();
+  assert.equal(button.removed,true);
+  assert.equal(events.size,0);
+});
+
+test('thread previews use the first unread message even on expanded child rows',()=>{
+  const root={isRead:true},first={isRead:false},second={isRead:false};
+  const messages=[root,first,second];
+  let expanded=false;
+  const view={isContainer:()=>true,isContainerOpen:()=>expanded,
+    getThreadContainingIndex:()=>({numChildren:messages.length,getChildHdrAt:i=>messages[i]})};
+  assert.equal(scope.threadPreviewHeader(view,0,root),first);
+  first.isRead=true;
+  assert.equal(scope.threadPreviewHeader(view,0,root),second);
+  expanded=true;
+  assert.equal(scope.threadPreviewHeader(view,0,root),second);
+  assert.equal(scope.threadPreviewHeader(view,1,first),second);
+  expanded=false;second.isRead=true;
+  assert.equal(scope.threadPreviewHeader(view,0,root),root);
+});
+
+test('uncached unread inbox preview uses native fetch and ignores a recycled row',()=>{
+  let listener,preview='',current=true,ready=0;
+  const timers=[];
+  const header={isRead:false,messageKey:7,getStringProperty:()=>preview,
+    folder:{URI:'imap://inbox',fetchMsgPreviewText(keys,callback){
+      assert.equal(keys[0],7);listener=callback;return true;
+    }}};
+  const queue=scope.createPreviewQueue({setTimeout:fn=>timers.push(fn),clearTimeout(){}});
+  assert.equal(queue.get(header,()=>current,()=>ready++,true),'');
+  timers.shift()();
+  assert.ok(listener);
+  current=false;
+  preview='Unread reply body';
+  listener.OnStopRunningUrl();
+  assert.equal(ready,0);
+  assert.equal(queue.get(header,()=>true,()=>{},true),'Unread reply body');
+  queue.close();
+});

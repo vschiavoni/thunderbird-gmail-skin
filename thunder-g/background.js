@@ -1,3 +1,4 @@
+browser.inlineLabels.onOpenSettings?.addListener(()=>browser.runtime.openOptionsPage().catch(console.error));
 // The provider authenticates our extension ID; no sender or result is synthesized.
 browser.inlineLabels.onDkimRequest.addListener(async(request,messageId,domain,baseDomain,details,popupContext)=>{
   let result;

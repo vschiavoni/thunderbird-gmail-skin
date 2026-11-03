@@ -138,6 +138,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const conversationDocuments = new Map();
     const id = context.extension.id;
     let dockIcon=null;
+    let settingsFire;
     const skinWindows = new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
@@ -236,7 +237,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       pagedDocuments.set(doc,pages); pages.setSize(messagesPerPage);
       const zoom = installMailZoom(doc.defaultView,fontSize,action=>reader.zoom(action));
       const dates = installCompactDates(doc.defaultView);
-      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,reader});
+      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
       const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
       doc.defaultView.addEventListener('unload',detach,{once:true});
@@ -382,6 +383,9 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       async setInlineReplyEnabled(enabled){inlineReplyEnabled=enabled===true;},
       async setInlineNewMessageEnabled(enabled){inlineNewMessageEnabled=enabled===true;},
       async setBimiEnabled(enabled){independentBimiEnabled=enabled===true;for(const refresh of independentBimiListeners)refresh();},
+      onOpenSettings: new ExtensionCommon.EventManager({context,name:'inlineLabels.onOpenSettings',register(fire){
+        settingsFire=fire;return()=>{settingsFire=null;};
+      }}).api(),
       onDkimRequest: new ExtensionCommon.EventManager({context,name:'inlineLabels.onDkimRequest',register(fire){dkimFire=fire;return()=>{dkimFire=null;};}}).api(),
       async resolveDkim(request,payload) {
         const pending=dkimRequests.get(request);if(!pending)return;

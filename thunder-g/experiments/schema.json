@@ -208,6 +208,11 @@
     ],
     "events": [
       {
+        "name": "onOpenSettings",
+        "type": "function",
+        "parameters": []
+      },
+      {
         "name": "onDkimRequest",
         "type": "function",
         "parameters": [
