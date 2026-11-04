@@ -781,3 +781,49 @@ test('expired conversation counts refresh and can decrease after messages are de
   time=11;assert.equal(cache.get(anchor),2);await new Promise(setImmediate);
   assert.equal(cache.get(anchor),1);assert.equal(calls,2);cache.close();
 });
+
+test('archiving or adding a reply invalidates only the connected conversation count',async()=>{
+  const scope=context(),a=message(1,'thread-a'),b=message(2,'thread-b');
+  const reply=references(message(3,'reply-a','sent'),'thread-a');let calls=0;
+  const cache=scope.createConversationCountCache(header=>{calls++;return {promise:Promise.resolve({messages:header===a?[a,reply]:[b]})}},()=>{},()=>0);
+  cache.get(a);cache.get(b);await new Promise(setImmediate);assert.equal(calls,2);
+  cache.invalidateMessages([references(message(9,'archive-copy','archive'),'thread-a')]);
+  assert.equal(cache.get(b),1);assert.equal(calls,2,'unrelated thread stays cached');
+  cache.get(a);await new Promise(setImmediate);assert.equal(calls,3);
+  cache.invalidateMessages([references(message(10,'new-reply','inbox'),'thread-a')]);
+  cache.get(a);cache.get(b);await new Promise(setImmediate);assert.equal(calls,4);
+  cache.invalidateFolder({URI:'archive-unrelated'});cache.get(a);cache.get(b);assert.equal(calls,4);
+  cache.invalidateFolder({URI:'sent'});cache.get(a);cache.get(b);await new Promise(setImmediate);assert.equal(calls,5);
+  cache.close();
+});
+test('pending unrelated counts survive targeted invalidation and stale results cannot overwrite replacements',async()=>{
+  const scope=context(),a=message(1,'a'),b=message(2,'b');const jobs=[];let updates=0;
+  const cache=scope.createConversationCountCache(header=>{
+    const job={header,promise:new Promise(resolve=>jobs.push({header,resolve}))};return job;
+  },()=>updates++,()=>0);
+  cache.get(a);cache.get(b);cache.invalidateMessages([a]);cache.get(a);
+  jobs[0].resolve({messages:[a,message(3,'stale')]});jobs[1].resolve({messages:[b]});await new Promise(setImmediate);
+  assert.equal(updates,1);assert.equal(cache.get(b),1);
+  jobs[2].resolve({messages:[a]});await new Promise(setImmediate);assert.equal(cache.get(a),1);cache.close();
+});
+test('mail notifications batch exact changed messages and folders instead of clearing every count',()=>{
+  const scope=context();let listener,timer;const changed=[],sent=[];
+  scope.createSentCandidateCache=()=>({invalidateFolders:folders=>sent.push(folders),close(){}});
+  scope.createConversationCountCache=()=>({invalidateMessages:headers=>changed.push(headers),invalidate(){throw Error('full invalidation')},invalidateFolder(){},close(){}});
+  const win={document:{querySelectorAll:()=>[]},setTimeout:fn=>{timer=fn;return 1},clearTimeout(){},requestAnimationFrame:()=>1,cancelAnimationFrame(){}};
+  const mail={accounts:{},mfn:{addListener:value=>listener=value,removeListener(){}}};
+  const ui=scope.installConversationCounts(win,mail,{nsIMsgFolderNotificationService:{}});
+  const header=message(1,'a'),destination={URI:'archive'};
+  listener.msgsMoveCopyCompleted(true,[header],destination,[]);listener.msgAdded(header);timer();
+  assert.equal(changed.length,1);assert.equal(changed[0].length,1,'duplicate events are coalesced');
+  assert.equal(changed[0][0],header);assert.equal(sent[0].length,2);assert.equal(sent[0][1],destination);
+  ui.close();
+});
+
+test('ordinary refreshes retain settled counts after idle time until a relevant message changes',async()=>{
+  const scope=context(),anchor=message(1,'one');let time=0,calls=0;
+  const cache=scope.createConversationCountCache(()=>{calls++;return {promise:Promise.resolve({messages:[anchor]})}},()=>{},()=>time);
+  cache.get(anchor);await new Promise(setImmediate);
+  time=86400000;for(let i=0;i<100;i++)assert.equal(cache.get(anchor),1);
+  assert.equal(calls,1,'elapsed time and repaint do not rescan a settled conversation');cache.close();
+});

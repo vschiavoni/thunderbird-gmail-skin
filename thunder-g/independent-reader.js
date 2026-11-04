@@ -1068,23 +1068,27 @@ function installIndependentReader(win) {
 
 // Resolve only visible list rows. Bound lookups and cached counts independently
 // of mailbox size; reuse the reader's Sent metadata index and grouping rules.
-function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=500,ttl=60000){
+function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=500,ttl=Infinity){
   const entries=new Map(),queue=[];let running=0,generation=0,closed=false;
-  const key=header=>JSON.stringify([header.folder?.URI,header.messageKey,header.messageId]);
+  const key=header=>header.messageId || JSON.stringify([header.folder?.URI,header.messageKey]);
+  function discard(id,entry){entry.stale=true;entries.delete(id);entry.cancel?.()}
   function pump(){
     while(!closed && running<2 && queue.length){
-      const entry=queue.shift();if(entry.generation!==generation)continue;
+      const entry=queue.shift();if(entry.stale || entry.generation!==generation)continue;
       running++;entry.active=true;
       let job;
       try{job=resolve(entry.header);entry.cancel=()=>job.cancel?.()}
       catch(_){job={promise:Promise.reject(_)}}
       Promise.resolve(job.promise).then(result=>{
-        if(closed || entry.generation!==generation)return;
-        entry.count=independentMessages(result.messages || [],entry.header).length;
+        if(closed || entry.stale || entry.generation!==generation)return;
+        const messages=independentMessages(result.messages || [],entry.header);
+        entry.count=messages.length;
+        entry.ids=new Set(messages.flatMap(independentReferenceIds));
+        entry.folders=new Set(messages.map(message=>message.folder?.URI));
         entry.expires=now()+ttl;
-      },()=>{if(entry.generation===generation)entry.expires=now()+ttl}).finally(()=>{
+      },()=>{if(!entry.stale && entry.generation===generation)entry.expires=now()+60000}).finally(()=>{
         running--;entry.active=false;entry.cancel=null;entry.pending=false;
-        if(!closed && entry.generation===generation)changed();
+        if(!closed && !entry.stale && entry.generation===generation)changed();
         pump();
       });
     }
@@ -1098,15 +1102,25 @@ function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=5
           // Evict settled entries first; never retain an unbounded scroll queue.
           if(entries.size>=limit){
             const victim=[...entries].find(([,item])=>!item.pending);
-            if(victim)entries.delete(victim[0]);else return undefined;
+            if(victim)discard(...victim);else return undefined;
           }
-          entry={header,count:undefined};entries.set(id,entry);
+          entry={header,count:undefined,ids:new Set(independentReferenceIds(header)),folders:new Set([header.folder?.URI])};entries.set(id,entry);
         }
         entry.pending=true;entry.generation=generation;queue.push(entry);pump();
       }
       return entry.count;
     },
-    invalidate(){generation++;queue.length=0;for(const entry of entries.values())entry.cancel?.();entries.clear()},
+    invalidateMessages(headers){
+      if(!headers){this.invalidate();return}
+      const changed=Array.from(headers),ids=new Set(changed.flatMap(independentReferenceIds));
+      const physical=new Set(changed.map(key));
+      for(const [id,entry] of entries)if(physical.has(id) || [...entry.ids].some(value=>ids.has(value)))discard(id,entry);
+    },
+    invalidateFolder(folder){
+      if(!folder?.URI){this.invalidate();return}
+      for(const [id,entry] of entries)if(entry.folders.has(folder.URI))discard(id,entry);
+    },
+    invalidate(){generation++;queue.length=0;for(const [id,entry] of entries)discard(id,entry)},
     close(){closed=true;this.invalidate()},
   };
 }
@@ -1135,17 +1149,33 @@ function installConversationCounts(win,mail=globalThis.MailServices,interfaces=t
       for(const row of win.document.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout'))render(row);
     });
   }
-  function invalidate(){
-    if(closed || invalidation!==null)return;
+  const changedMessages=new Set(),changedFolders=new Set(),deletedFolders=new Set();let unknown=false;
+  function invalidate(headers,folders=[],deletedFolder=null){
+    if(closed)return;
+    if(!headers)unknown=true;else for(const header of headers)changedMessages.add(header);
+    for(const folder of folders)changedFolders.add(folder);
+    if(deletedFolder)deletedFolders.add(deletedFolder);
+    if(invalidation!==null)return;
     invalidation=win.setTimeout(()=>{
       invalidation=null;if(closed)return;
-      sentCache.invalidate();cache.invalidate();schedule();
+      sentCache.invalidateFolders(unknown?null:[...changedFolders]);
+      if(unknown)cache.invalidate();else cache.invalidateMessages([...changedMessages]);
+      for(const folder of deletedFolders)cache.invalidateFolder(folder);
+      changedMessages.clear();changedFolders.clear();deletedFolders.clear();unknown=false;schedule();
     },200);
   }
-  const listener={};let flags=0;
-  for(const name of ['msgAdded','msgsDeleted','msgsMoveCopyCompleted','msgKeyChanged','folderDeleted']){
-    listener[name]=invalidate;flags|=interfaces.nsIMsgFolderNotificationService[name] || 0;
-  }
+  const listener={
+    msgAdded:header=>invalidate(header?[header]:null,[header?.folder]),
+    msgsDeleted:headers=>{const items=headers?Array.from(headers):null;invalidate(items,items?.map(header=>header.folder))},
+    msgsMoveCopyCompleted:(_move,headers,destination,destinationHeaders)=>{
+      const items=headers?Array.from(headers):null;
+      invalidate(items?[...items,...Array.from(destinationHeaders || [])]:null,[...(items?.map(header=>header.folder) || []),destination]);
+    },
+    msgKeyChanged:(_oldKey,header)=>invalidate(header?[header]:null,[header?.folder]),
+    folderDeleted:folder=>invalidate([], [folder],folder),
+  };
+  let flags=0;
+  for(const name of Object.keys(listener))flags|=interfaces.nsIMsgFolderNotificationService[name] || 0;
   mail.mfn?.addListener(listener,flags);
   return {render,close(){
     closed=true;mail.mfn?.removeListener(listener);
