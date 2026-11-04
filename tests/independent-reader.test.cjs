@@ -748,3 +748,36 @@ test('conversation reference lookups reuse the cached index without rescanning c
  const replacement=[{header:message(9,'new','sent',9),ids:['root']}];
  assert.equal(scope.independentRelatedSent([anchor],replacement)[1].messageId,'new','a new snapshot gets a fresh index');
 });
+
+test('list conversation count includes Sent replies and deduplicates copies of the same message',async()=>{
+  const scope=context();const anchor=message(1,'received-1'),incoming=message(2,'received-2');
+  const messages=[anchor,incoming,...[3,4,5,6].map(key=>message(key,'sent-'+key,'sent')),message(99,'sent-3','allmail')];
+  let finish,lookups=0,updates=0;
+  const cache=scope.createConversationCountCache(()=>{lookups++;return {promise:new Promise(resolve=>finish=resolve)}},()=>updates++);
+  assert.equal(cache.get(anchor),undefined);assert.equal(cache.get(anchor),undefined);assert.equal(lookups,1);
+  finish({messages});await new Promise(setImmediate);
+  assert.equal(cache.get(anchor),6);assert.equal(updates,1);assert.equal(lookups,1);
+  cache.close();
+});
+test('count lookups bound concurrency and capacity and ignore stale completions after invalidation or close',async()=>{
+  const scope=context();const jobs=[];let changed=0;
+  const cache=scope.createConversationCountCache(header=>{
+    const job={header,cancelled:false};job.promise=new Promise(resolve=>job.finish=resolve);
+    job.cancel=()=>{job.cancelled=true;job.finish({messages:[header]})};jobs.push(job);return job;
+  },()=>changed++,()=>0,3);
+  for(let key=1;key<=8;key++)cache.get(message(key,String(key)));
+  assert.equal(jobs.length,2,'only two lookups start concurrently');
+  jobs[0].finish({messages:[jobs[0].header]});await new Promise(setImmediate);
+  assert.equal(jobs.length,3,'queue is bounded to cache capacity');
+  cache.invalidate();assert.equal(jobs[1].cancelled,true);assert.equal(jobs[2].cancelled,true);
+  await new Promise(setImmediate);assert.equal(changed,1,'invalidated jobs cannot repaint rows');
+  cache.get(message(9,'new'));cache.close();await new Promise(setImmediate);
+  assert.equal(jobs[3].cancelled,true);assert.equal(changed,1);
+});
+test('expired conversation counts refresh and can decrease after messages are deleted',async()=>{
+  const scope=context(),anchor=message(1,'one');let time=0,calls=0;
+  const cache=scope.createConversationCountCache(()=>({promise:Promise.resolve({messages:++calls===1?[anchor,message(2,'two','sent')]:[anchor]})}),()=>{},()=>time,5,10);
+  cache.get(anchor);await new Promise(setImmediate);assert.equal(cache.get(anchor),2);
+  time=11;assert.equal(cache.get(anchor),2);await new Promise(setImmediate);
+  assert.equal(cache.get(anchor),1);assert.equal(calls,2);cache.close();
+});

@@ -1065,3 +1065,93 @@ function installIndependentReader(win) {
     getMessages(){return resolving?[]:currentHeaders.slice()}
   };
 }
+
+// Resolve only visible list rows. Bound lookups and cached counts independently
+// of mailbox size; reuse the reader's Sent metadata index and grouping rules.
+function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=500,ttl=60000){
+  const entries=new Map(),queue=[];let running=0,generation=0,closed=false;
+  const key=header=>JSON.stringify([header.folder?.URI,header.messageKey,header.messageId]);
+  function pump(){
+    while(!closed && running<2 && queue.length){
+      const entry=queue.shift();if(entry.generation!==generation)continue;
+      running++;entry.active=true;
+      let job;
+      try{job=resolve(entry.header);entry.cancel=()=>job.cancel?.()}
+      catch(_){job={promise:Promise.reject(_)}}
+      Promise.resolve(job.promise).then(result=>{
+        if(closed || entry.generation!==generation)return;
+        entry.count=independentMessages(result.messages || [],entry.header).length;
+        entry.expires=now()+ttl;
+      },()=>{if(entry.generation===generation)entry.expires=now()+ttl}).finally(()=>{
+        running--;entry.active=false;entry.cancel=null;entry.pending=false;
+        if(!closed && entry.generation===generation)changed();
+        pump();
+      });
+    }
+  }
+  return {
+    get(header){
+      if(closed || !header?.folder)return undefined;
+      const id=key(header);let entry=entries.get(id);
+      if(!entry || (!entry.pending && entry.expires<=now())){
+        if(!entry){
+          // Evict settled entries first; never retain an unbounded scroll queue.
+          if(entries.size>=limit){
+            const victim=[...entries].find(([,item])=>!item.pending);
+            if(victim)entries.delete(victim[0]);else return undefined;
+          }
+          entry={header,count:undefined};entries.set(id,entry);
+        }
+        entry.pending=true;entry.generation=generation;queue.push(entry);pump();
+      }
+      return entry.count;
+    },
+    invalidate(){generation++;queue.length=0;for(const entry of entries.values())entry.cancel?.();entries.clear()},
+    close(){closed=true;this.invalidate()},
+  };
+}
+function installConversationCounts(win,mail=globalThis.MailServices,interfaces=typeof Ci==='undefined'?null:Ci){
+  if(!mail?.accounts || !interfaces)return {render:row=>renderThreadCount(win,row),close(){}};
+  let gloda=null,closed=false,frame=null,invalidation=null;
+  try{if(Services.prefs.getBoolPref('mailnews.database.global.indexer.enabled',true))
+    gloda=ChromeUtils.importESModule('resource:///modules/gloda/GlodaPublic.sys.mjs').Gloda}catch(_){}
+  const sentCache=createSentCandidateCache(win);
+  const cache=createConversationCountCache(header=>independentConversation(win,header,gloda,independentSentFolders(),sentCache),schedule);
+  function render(row){
+    let count;
+    try{
+      const view=win.gDBView;
+      if(!(row.dataset.properties || '').split(' ').includes('dummy') &&
+          !(view?.getLevel?.(row.index)>0) &&
+          !(view?.isContainer?.(row.index) && view.isContainerOpen(row.index)))
+        count=cache.get(view?.getMsgHdrAt(row.index));
+    }catch(_){/* Row may have been recycled while the folder changed. */}
+    renderThreadCount(win,row,count);
+  }
+  function schedule(){
+    if(closed || frame!==null)return;
+    frame=win.requestAnimationFrame(()=>{
+      frame=null;if(closed)return;
+      for(const row of win.document.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout'))render(row);
+    });
+  }
+  function invalidate(){
+    if(closed || invalidation!==null)return;
+    invalidation=win.setTimeout(()=>{
+      invalidation=null;if(closed)return;
+      sentCache.invalidate();cache.invalidate();schedule();
+    },200);
+  }
+  const listener={};let flags=0;
+  for(const name of ['msgAdded','msgsDeleted','msgsMoveCopyCompleted','msgKeyChanged','folderDeleted']){
+    listener[name]=invalidate;flags|=interfaces.nsIMsgFolderNotificationService[name] || 0;
+  }
+  mail.mfn?.addListener(listener,flags);
+  return {render,close(){
+    closed=true;mail.mfn?.removeListener(listener);
+    if(frame!==null)win.cancelAnimationFrame(frame);
+    if(invalidation!==null)win.clearTimeout(invalidation);
+    cache.close();sentCache.close();
+    for(const node of win.document.querySelectorAll('.gm-thread-count'))node.remove();
+  }};
+}

@@ -14,14 +14,15 @@ function threadPreviewHeader(view,index,header) {
   return header;
 }
 
-function renderThreadCount(win,row) {
+function renderThreadCount(win,row,total) {
   row.querySelector('.gm-thread-count')?.remove();
   try {
     const view=win.gDBView;
     const sender=row.querySelector('.sendercol-column, .correspondentcol-column');
-    if(sender && view?.isContainer(row.index) && !view.isContainerOpen(row.index) &&
+    if(sender && view && !(view.isContainer?.(row.index) && view.isContainerOpen(row.index)) &&
+        !(view.getLevel?.(row.index)>0) &&
         !(row.dataset.properties || '').split(' ').includes('dummy')){
-      const count=view.getThreadContainingIndex(row.index)?.numChildren;
+      const count=total ?? (view.isContainer?.(row.index)?view.getThreadContainingIndex(row.index)?.numChildren:1);
       if(count>1){
         const badge=win.document.createElement('span');
         badge.className='gm-thread-count';
@@ -971,6 +972,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
   const drafts = installSenderDraftLabels(win);
+  const conversationCounts=installConversationCounts(win);
   reader?.setDraftOpener?.(drafts.openRow,drafts.getRowDraft);
   const compose = installComposeLabel(doc);
   const uniformColumns=installUniformColumns(win);
@@ -1153,7 +1155,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     renderThreadGuide(row);
     stars.render(row);
     drafts.render(row);
-    renderThreadCount(win,row);
+    conversationCounts.render(row);
     row.querySelector('.gm-row-actions')?.remove();
     row.querySelector('.gm-message-snippet')?.remove();
     row.querySelector('.subject-line')?.classList?.remove('gm-has-snippet');
@@ -1282,6 +1284,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     folderToggle.close();
     stars.close();
     drafts.close();
+    conversationCounts.close();
     compose.close();
     responsive.close();
     viewCopy.close();

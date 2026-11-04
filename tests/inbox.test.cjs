@@ -5,6 +5,7 @@ const scope=require('./localization-context.cjs').createContext({});
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8'),scope);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/stars.js'),'utf8'),scope);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),scope);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8'),scope);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/compose.js'),'utf8'),scope);
 test('thread arrows toggle once per activation, including rapid clicks and keyboard-generated clicks',()=>{
   const events={},calls=[];
@@ -735,4 +736,16 @@ test('line trimming reads raw local text before whitespace normalization',()=>{
   }};
   assert.equal(scope.localMessagePreview(header,scope.previewTextSettings({enabled:true,lines:1})),'Message body');
   assert.equal(scope.localMessagePreview(header),'Collapsed cached banner body');
+});
+
+test('resolved cross-folder totals replace folder-local counts, including a single Inbox message',()=>{
+  let badge,container=true,level=0;
+  const sender={append(node){badge=node}};
+  const row={index:0,dataset:{},querySelector:selector=>selector==='.gm-thread-count'?badge:sender};
+  const win={document:{createElement:()=>({remove(){badge=undefined}})},gDBView:{
+    isContainer:()=>container,isContainerOpen:()=>false,getLevel:()=>level,getThreadContainingIndex:()=>({numChildren:2})}};
+  scope.renderThreadCount(win,row,6);assert.equal(badge.textContent,'6');
+  container=false;scope.renderThreadCount(win,row,6);assert.equal(badge.textContent,'6');
+  scope.renderThreadCount(win,row,1);assert.equal(badge,undefined,'logical duplicates do not inflate the count');
+  level=1;scope.renderThreadCount(win,row,6);assert.equal(badge,undefined,'expanded child rows have no conversation badge');
 });
