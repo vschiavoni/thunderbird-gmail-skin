@@ -145,7 +145,7 @@ var SNOOZE_PICKER_CSS=`
 function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs=globalThis.Services?.prefs){
   const doc=win.document,pane=win.folderPane,tree=doc.getElementById('folderTree');
   const menu=doc.getElementById('folderModesContextMenuPopup');
-  if(!pane?._modes||!tree||!menu)return {close(){}};
+  if(win.gViewWrapper?.isSynthetic||!pane?._modes||!tree||!menu)return {close(){}};
   const name='gmSnoozed',pref='extensions.thunderg.snooze.folderMode';
   let closed=false;
   const mode={name,active:false,canBeCompact:false,

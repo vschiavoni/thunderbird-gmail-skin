@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Show search progress and display confirmed local search results progressively without requiring Refresh.
+
+- Add common Gmail-style search operators with local message-list results, boolean groups, labels, dates, sizes and attachment filters.
+
 ## 0.25.0
 
 - Add settings search, Dock icon customization, toolbar branding, and compact sidebar refinements.
