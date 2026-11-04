@@ -154,13 +154,13 @@ test('preview queue yields between messages, skips stale rows, retries unavailab
   const queue=scope.createPreviewQueue(win);
   queue.get(header,()=>true,()=>ready++);
   assert.equal(reads,0,'rendering must not read body streams');
-  next();assert.equal(reads,1);assert.equal(ready,1);
+  next();assert.equal(reads,2);assert.equal(ready,1);
   queue.get(header,()=>true,()=>ready++);assert.equal(timers.size,0,'empty results are throttled');
   now+=30001;body='available after download';
   queue.get(header,()=>true,()=>ready++);next();
   assert.equal(queue.get(header,()=>true,()=>{}),'available after download');
   const stale={...header,messageKey:2};queue.get(stale,()=>false,()=>{throw Error('stale callback')});
-  next();assert.equal(reads,2,'stale virtual rows do not start IO');
+  next();assert.equal(reads,3,'stale virtual rows do not start IO');
   const changed={...header,messageKey:3};body='';queue.get(changed,()=>true,()=>{});next();
   changed.flags=128;body='downloaded';queue.get(changed,()=>true,()=>{});next();
   assert.equal(queue.get(changed,()=>true,()=>{}),'downloaded','offline flag changes allow an immediate retry');
@@ -679,20 +679,22 @@ test('settings gear sits immediately after Quick Filter and opens settings once 
   assert.equal(events.size,0);
 });
 
-test('thread previews use the first unread message even on expanded child rows',()=>{
-  const root={isRead:true},first={isRead:false},second={isRead:false};
-  const messages=[root,first,second];
-  let expanded=false;
-  const view={isContainer:()=>true,isContainerOpen:()=>expanded,
-    getThreadContainingIndex:()=>({numChildren:messages.length,getChildHdrAt:i=>messages[i]})};
-  assert.equal(scope.threadPreviewHeader(view,0,root),first);
-  first.isRead=true;
-  assert.equal(scope.threadPreviewHeader(view,0,root),second);
-  expanded=true;
-  assert.equal(scope.threadPreviewHeader(view,0,root),second);
-  assert.equal(scope.threadPreviewHeader(view,1,first),second);
-  expanded=false;second.isRead=true;
-  assert.equal(scope.threadPreviewHeader(view,0,root),root);
+test('thread previews choose the latest message regardless of read state or thread order',()=>{
+  const root={isRead:true,dateInSeconds:10},latest={isRead:false,dateInSeconds:30},older={isRead:false,dateInSeconds:20};
+  const messages=[root,latest,older];
+  const view={getThreadContainingIndex:()=>({numChildren:messages.length,getChildHdrAt:i=>messages[i]})};
+  assert.equal(scope.threadPreviewHeader(view,0,root),latest);
+  latest.isRead=true;
+  assert.equal(scope.threadPreviewHeader(view,0,root),latest);
+});
+
+test('local extraction retries empty text with a fresh bounded larger stream',()=>{
+  const sizes=[];let closed=0;
+  const header={folder:{getMsgInputStream:()=>({close(){closed++}}),
+    getMsgTextFromStream(_stream,_charset,size){sizes.push(size);return size===262144?'Recovered body':''}}};
+  assert.equal(scope.localMessagePreview(header),'Recovered body');
+  assert.deepEqual(sizes,[16384,262144]);
+  assert.equal(closed,2);
 });
 
 test('uncached unread inbox preview uses native fetch and ignores a recycled row',()=>{

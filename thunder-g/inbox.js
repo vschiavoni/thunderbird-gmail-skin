@@ -2,10 +2,13 @@ function threadPreviewHeader(view,index,header) {
   try {
     const thread=view?.getThreadContainingIndex?.(index);
     if(!thread || thread.numChildren<2)return header;
+    let latest=null,latestDate=-Infinity;
     for(let i=0;i<thread.numChildren;i++){
       const child=thread.getChildHdrAt(i);
-      if(child && child.isRead===false)return child;
+      const date=child?.dateInSeconds ?? child?.date ?? 0;
+      if(child && date>=latestDate){latest=child;latestDate=date;}
     }
+    return latest || header;
   }catch(_){/* Native summaries may be unavailable while the view changes. */}
   return header;
 }
@@ -165,21 +168,26 @@ function cachedMessagePreview(header) {
 function localMessagePreview(header) {
   const cached = cachedMessagePreview(header);
   if (cached) return cached;
-  let stream;
-  try {
-    const folder = header.folder;
-    if (!folder?.getMsgInputStream || !folder.getMsgTextFromStream) return '';
-    // This API reads only the local store, including locally cached IMAP mail.
-    stream = folder.getMsgInputStream(header);
-    const text = folder.getMsgTextFromStream(stream, header.charset || '', 16384, 240, true, true, {});
-    return cachedMessagePreview({getStringProperty:()=>text});
-  } catch (_) { return ''; }
-  finally { try { stream?.close(); } catch (_) {} }
+  const folder = header.folder;
+  if (!folder?.getMsgInputStream || !folder.getMsgTextFromStream) return '';
+  // Long headers or leading MIME parts can put the body beyond the first 16 KiB.
+  // Retry only empty results, with a bounded local read and a fresh stream.
+  for (const bytes of [16384, 262144]) {
+    let stream;
+    try {
+      stream = folder.getMsgInputStream(header);
+      const text = folder.getMsgTextFromStream(stream, header.charset || '', bytes, 240, true, true, {});
+      const preview = cachedMessagePreview({getStringProperty:()=>text});
+      if (preview) return preview;
+    } catch (_) { return ''; }
+    finally { try { stream?.close(); } catch (_) {} }
+  }
+  return '';
 }
 
-function fetchUnreadPreview(header,ready) {
+function fetchMessagePreview(header,ready) {
   const folder=header.folder;
-  if(header.isRead!==false || !folder?.fetchMsgPreviewText)return false;
+  if(!folder?.fetchMsgPreviewText)return false;
   try {
     return folder.fetchMsgPreviewText([header.messageKey],{
       OnStartRunningUrl(){},
@@ -218,15 +226,20 @@ function createPreviewQueue(win) {
         if(cache.size>=300)cache.delete(cache.keys().next().value);
         cache.set(key,{text,stamp:stamp(job.header),flags:job.header.flags,retryAt:Date.now()+30000,expiresAt:Date.now()+300000});
       }
-      if(!text && job.fetchUnread && win.navigator?.onLine!==false && !found?.fetched){
+      if(!text && job.fetchMissing && win.navigator?.onLine!==false && !found?.fetched){
         cache.get(key).fetched=true;
         fetching=true;
         const finish=()=>{
           fetching=false;
+          // Some folders populate only the local store, not the preview property.
+          if(!closed){
+            const entry=cache.get(key);
+            if(entry)entry.text=localMessagePreview(job.header);
+          }
           if(!closed && job.isCurrent())job.ready();
           schedule();
         };
-        if(fetchUnreadPreview(job.header,finish))return;
+        if(fetchMessagePreview(job.header,finish))return;
         fetching=false;
       }
       if (!closed && job.isCurrent()) job.ready();
@@ -234,7 +247,7 @@ function createPreviewQueue(win) {
     schedule();
   }
   return {
-    get(header, isCurrent, ready, fetchUnread=false) {
+    get(header, isCurrent, ready, fetchMissing=false) {
       if (closed) return '';
       const native = cachedMessagePreview(header);
       if (native) return native;
@@ -242,10 +255,10 @@ function createPreviewQueue(win) {
         ? header.folder.URI+'#'+header.messageKey : null;
       if (!key) return '';
       const found=lookup(header,key);
-      if(found && (found.text || !fetchUnread || found.fetched))return found.text;
+      if(found && (found.text || !fetchMissing || found.fetched))return found.text;
       // Keep the queue bounded when scrolling through many virtual rows.
       if (jobs.size >= 100 && !jobs.has(key)) jobs.delete(jobs.keys().next().value);
-      jobs.set(key,{header,isCurrent,ready,fetchUnread}); schedule();
+      jobs.set(key,{header,isCurrent,ready,fetchMissing}); schedule();
       return '';
     },
     close() {
@@ -1159,7 +1172,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
       // Update only the snippet: replacing action buttons here would steal
       // keyboard focus while the user is interacting with the row.
       showPreview(previews.get(previewHeader,isPreviewCurrent,()=>{}));
-    },previewHeader.isRead===false);
+    },true);
     showPreview(preview);
     const actions = doc.createElement('div');
     actions.className = 'gm-row-actions';
