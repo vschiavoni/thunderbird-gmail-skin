@@ -5,6 +5,7 @@ function threadPreviewHeader(view,index,header) {
     let latest=null,latestDate=-Infinity;
     for(let i=0;i<thread.numChildren;i++){
       const child=thread.getChildHdrAt(i);
+      if(child?.isRead===false)return child;
       const date=child?.dateInSeconds ?? child?.date ?? 0;
       if(child && date>=latestDate){latest=child;latestDate=date;}
     }

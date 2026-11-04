@@ -679,13 +679,15 @@ test('settings gear sits immediately after Quick Filter and opens settings once 
   assert.equal(events.size,0);
 });
 
-test('thread previews choose the latest message regardless of read state or thread order',()=>{
-  const root={isRead:true,dateInSeconds:10},latest={isRead:false,dateInSeconds:30},older={isRead:false,dateInSeconds:20};
-  const messages=[root,latest,older];
+test('thread preview prefers first unread and falls back to latest when all are read',()=>{
+  const root={isRead:true,dateInSeconds:10},unread={isRead:false,dateInSeconds:20},latest={isRead:true,dateInSeconds:30};
+  const messages=[root,unread,latest];
   const view={getThreadContainingIndex:()=>({numChildren:messages.length,getChildHdrAt:i=>messages[i]})};
+  assert.equal(scope.threadPreviewHeader(view,0,root),unread);
+  unread.isRead=true;
   assert.equal(scope.threadPreviewHeader(view,0,root),latest);
-  latest.isRead=true;
-  assert.equal(scope.threadPreviewHeader(view,0,root),latest);
+  root.isRead=false;
+  assert.equal(scope.threadPreviewHeader(view,1,unread),root);
 });
 
 test('local extraction retries empty text with a fresh bounded larger stream',()=>{
