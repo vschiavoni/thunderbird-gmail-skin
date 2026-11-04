@@ -139,7 +139,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const id = context.extension.id;
     let dockIcon=null;
     let settingsFire;
-    const skinWindows = new Map();
+    const skinWindows = new Map(),gmailSearchWindows=new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
     let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, coloredStars=null,previewTrimming=null;
@@ -238,11 +238,13 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       const zoom = installMailZoom(doc.defaultView,fontSize,action=>reader.zoom(action));
       const dates = installCompactDates(doc.defaultView);
       const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
+      const searchStatus=installGmailSearchStatus(doc.defaultView);
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
       const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
       doc.defaultView.addEventListener('unload',detach,{once:true});
       documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
         doc.defaultView.removeEventListener('unload',detach);
+        searchStatus.close();
         readers.delete(doc);
         snoozeOrder?.close();
         pages.close(); pagedDocuments.delete(doc); zoom.close();
@@ -264,6 +266,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         nativeComposeAutosaves.set(win,installNativeChangeAutosave(win));return;
       }
       loadSkin(win);
+      if(win.document.documentURI==='chrome://messenger/content/messenger.xhtml' && !gmailSearchWindows.has(win))
+        gmailSearchWindows.set(win,installGmailSearch(win,MailServices));
       if(win.document.documentURI==='chrome://messenger/content/messenger.xhtml' && !startupWindows.has(win)) {
         let activityManager=null;
         try {activityManager=Cc['@mozilla.org/activity-manager;1'].getService(Ci.nsIActivityManager);}catch(_){/* Native dialogs still report connection errors. */}
@@ -337,6 +341,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       for (const controller of conversationDocuments.values()) controller.close();
       conversationDocuments.clear();
       for (const zoom of zoomWindows.values()) zoom.close(); zoomWindows.clear();
+      for(const search of gmailSearchWindows.values())search.close();gmailSearchWindows.clear();
       for (const win of skinWindows.keys()) unloadSkin(win);
       for (const win of todayWindows) removeTodayPaneStyle(win);
       for(const watcher of tabWatchers.values())watcher.close();tabWatchers.clear();
@@ -430,6 +435,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         chromeURLs: ["chrome://messenger/content/messenger.xhtml","chrome://messenger/content/messengercompose/messengercompose.xhtml"],
         onLoadWindow: loadWindow,
         onUnloadWindow(win) {
+          gmailSearchWindows.get(win)?.close();gmailSearchWindows.delete(win);
           startupWindows.get(win)?.close();startupWindows.delete(win);
           nativeComposeAutosaves.get(win)?.close();nativeComposeAutosaves.delete(win);
           tabWatchers.get(win)?.close();tabWatchers.delete(win);

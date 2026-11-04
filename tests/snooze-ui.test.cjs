@@ -48,3 +48,9 @@ test('keyboard-opened snooze menu closes on Escape and outside pointer, releasin
   f.doc.emit('pointerdown',{target:anchor});assert.equal(menu.isConnected,false);
   ui.close();f.doc.emit('keydown',{key:'Escape'});
 });
+
+test('synthetic search tabs do not initialize hidden native folder modes',()=>{
+  const win={gViewWrapper:{isSynthetic:true},document:{getElementById(){return {}}},folderPane:{_modes:{}}};
+  const ui=scope.installSnoozedFolderMode(win,{});
+  assert.deepEqual(Object.keys(win.folderPane._modes),[]);ui.close();
+});

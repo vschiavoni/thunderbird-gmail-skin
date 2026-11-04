@@ -69,3 +69,5 @@ on each client and platform.
 
 > [!NOTE]
 > This independent project is not affiliated with Google and requires no Gmail account. It works with your existing email provider. Cross-client synchronization of Exchange tags is not supported.
+
+Gmail-style operator queries are documented in [Search](docs/search.md).
