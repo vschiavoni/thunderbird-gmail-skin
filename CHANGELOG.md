@@ -2,9 +2,13 @@
 
 ## Unreleased
 
-- Show search progress and display confirmed local search results progressively without requiring Refresh.
+## 0.26.0
 
-- Add common Gmail-style search operators with local message-list results, boolean groups, labels, dates, sizes and attachment filters.
+- Add common Gmail-style advanced search operators with progressive local message-list results and a “Searching…” indicator. Support address, subject, label, folder, status, attachment, date and size conditions, quoted phrases, boolean groups and exclusions.
+- Add optional preview trimming for server-added banners and initial lines.
+- Prefer the first unread message preview, falling back to the latest message when all are read, and recover missing snippets.
+- Count complete conversations across folders, including Sent replies, while deduplicating physical copies.
+- Preserve unrelated conversation-count caches on mailbox changes and ordinary refreshes; coalesce notifications and refresh only affected conversations.
 
 ## 0.25.0
 
