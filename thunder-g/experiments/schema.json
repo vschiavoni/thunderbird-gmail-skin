@@ -135,6 +135,12 @@
         ]
       },
       {
+        "name": "setPreviewTrimming",
+        "type": "function",
+        "async": true,
+        "parameters": [{"name":"value","type":"any"}]
+      },
+      {
         "name": "setColoredStars",
         "type": "function",
         "async": true,

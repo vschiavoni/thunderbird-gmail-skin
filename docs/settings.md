@@ -164,3 +164,9 @@ See the [complete keyboard shortcut reference](keyboard-shortcuts.md) for macOS
 and Windows/Linux tables, navigation, selection sequences, composer commands and
 requirements. Letter shortcuts are ignored while typing. The existing `L` label
 picker and native Thunderbird bindings remain available independently.
+
+### Customize message previews
+
+Disabled by default. Enable this to skip a number of initial body lines and optionally remove a matching leading server banner, such as “E-MAIL EXTERNE ¦ Attention aux liens et pièces jointes”. Lines are skipped first, then the leading text is matched literally, ignoring differences in whitespace.
+
+This applies to snippets in the message list. Line skipping requires locally available body text with line breaks. Changes apply immediately to visible rows. The stored message body is preserved.

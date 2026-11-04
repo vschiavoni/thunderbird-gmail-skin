@@ -715,3 +715,22 @@ test('uncached unread inbox preview uses native fetch and ignores a recycled row
   assert.equal(queue.get(header,()=>true,()=>{},true),'Unread reply body');
   queue.close();
 });
+
+test('preview trimming is opt-in, skips lines, and removes only a leading literal banner',()=>{
+  const original='Server banner\nSecond line\nActual body';
+  assert.equal(scope.trimPreviewText(original,scope.previewTextSettings(null)),original);
+  assert.equal(scope.trimPreviewText(original,scope.previewTextSettings({enabled:true,lines:2})),'Actual body');
+  const settings=scope.previewTextSettings({enabled:true,text:'E-MAIL EXTERNE ¦ Attention aux liens et pièces jointes'});
+  assert.equal(scope.trimPreviewText('E-MAIL EXTERNE ¦ Attention aux liens et pièces jointes Hello',settings),'Hello');
+  assert.equal(scope.trimPreviewText('Body mentions E-MAIL EXTERNE',settings),'Body mentions E-MAIL EXTERNE');
+  assert.equal(scope.trimPreviewText('First\r\nBanner\nBody',scope.previewTextSettings({enabled:true,lines:1,text:'Banner'})),'Body');
+});
+
+test('line trimming reads raw local text before whitespace normalization',()=>{
+  const header={getStringProperty:()=> 'Collapsed cached banner body',folder:{
+    getMsgInputStream:()=>({close(){}}),
+    getMsgTextFromStream:()=> 'Server warning\nMessage body',
+  }};
+  assert.equal(scope.localMessagePreview(header,scope.previewTextSettings({enabled:true,lines:1})),'Message body');
+  assert.equal(scope.localMessagePreview(header),'Collapsed cached banner body');
+});

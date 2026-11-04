@@ -159,14 +159,33 @@ function installSenderDraftLabels(win,mail=globalThis.MailServices,interfaces=ty
 }
 
 /* Native quick filters, cached previews, and row-scoped actions. */
-function cachedMessagePreview(header) {
+function previewTextSettings(value) {
+  return {enabled:value?.enabled===true,
+    lines:Math.max(0,Math.min(100,Math.floor(Number(value?.lines)||0))),
+    text:typeof value?.text==='string'?value.text.trim().slice(0,2000):''};
+}
+function trimPreviewText(text,settings) {
+  text=String(text || '');
+  if(!settings?.enabled)return text;
+  const lines=text.replace(/\r\n?/g,'\n').split('\n');
+  text=lines.slice(settings.lines).join('\n').trimStart();
+  if(settings.text){
+    // Match only a leading literal banner. Whitespace differences introduced
+    // by MIME extraction do not prevent a match.
+    const normalized=text.replace(/\s+/g,' ').trimStart();
+    const prefix=settings.text.replace(/\s+/g,' ');
+    if(normalized.startsWith(prefix))text=normalized.slice(prefix.length).trimStart();
+  }
+  return text;
+}
+function cachedMessagePreview(header,settings) {
   try {
-    return (header.getStringProperty?.('preview') || '')
+    return trimPreviewText(header.getStringProperty?.('preview') || '',settings)
       .replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
   } catch (_) { return ''; }
 }
-function localMessagePreview(header) {
-  const cached = cachedMessagePreview(header);
+function localMessagePreview(header,settings) {
+  const cached = settings?.enabled && settings.lines>0?'':cachedMessagePreview(header,settings);
   if (cached) return cached;
   const folder = header.folder;
   if (!folder?.getMsgInputStream || !folder.getMsgTextFromStream) return '';
@@ -176,8 +195,8 @@ function localMessagePreview(header) {
     let stream;
     try {
       stream = folder.getMsgInputStream(header);
-      const text = folder.getMsgTextFromStream(stream, header.charset || '', bytes, 240, true, true, {});
-      const preview = cachedMessagePreview({getStringProperty:()=>text});
+      const text = folder.getMsgTextFromStream(stream, header.charset || '', bytes, settings?.enabled?16384:240, true, true, {});
+      const preview = cachedMessagePreview({getStringProperty:()=>text},settings);
       if (preview) return preview;
     } catch (_) { return ''; }
     finally { try { stream?.close(); } catch (_) {} }
@@ -221,7 +240,7 @@ function createPreviewQueue(win) {
     jobs.delete(key);
     if (job.isCurrent()) {
       // Another consumer may already have read this message while queued.
-      const found=lookup(job.header,key),text=found?found.text:localMessagePreview(job.header);
+      const found=lookup(job.header,key),text=found?found.text:localMessagePreview(job.header,job.settings);
       if(!found){
         if(cache.size>=300)cache.delete(cache.keys().next().value);
         cache.set(key,{text,stamp:stamp(job.header),flags:job.header.flags,retryAt:Date.now()+30000,expiresAt:Date.now()+300000});
@@ -234,7 +253,7 @@ function createPreviewQueue(win) {
           // Some folders populate only the local store, not the preview property.
           if(!closed){
             const entry=cache.get(key);
-            if(entry)entry.text=localMessagePreview(job.header);
+            if(entry)entry.text=localMessagePreview(job.header,job.settings);
           }
           if(!closed && job.isCurrent())job.ready();
           schedule();
@@ -247,18 +266,18 @@ function createPreviewQueue(win) {
     schedule();
   }
   return {
-    get(header, isCurrent, ready, fetchMissing=false) {
+    get(header, isCurrent, ready, fetchMissing=false,settings=null) {
       if (closed) return '';
-      const native = cachedMessagePreview(header);
+      const native = settings?.enabled && settings.lines>0?'':cachedMessagePreview(header,settings);
       if (native) return native;
       const key = header.folder?.URI && header.messageKey !== undefined
-        ? header.folder.URI+'#'+header.messageKey : null;
+        ? header.folder.URI+'#'+header.messageKey+(settings?.enabled?JSON.stringify(settings):'') : null;
       if (!key) return '';
       const found=lookup(header,key);
       if(found && (found.text || !fetchMissing || found.fetched))return found.text;
       // Keep the queue bounded when scrolling through many virtual rows.
       if (jobs.size >= 100 && !jobs.has(key)) jobs.delete(jobs.keys().next().value);
-      jobs.set(key,{header,isCurrent,ready,fetchMissing}); schedule();
+      jobs.set(key,{header,isCurrent,ready,fetchMissing,settings}); schedule();
       return '';
     },
     close() {
@@ -943,7 +962,7 @@ function installInboxSettingsButton(doc,openSettings) {
   return {close(){button.removeEventListener('click',openSettings);button.remove();}};
 }
 
-function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,reader=null,openSettings=null}={}) {
+function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,previewTrimming=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
@@ -973,6 +992,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     showThreadGuides=enabled===true;
     if(!closed)for(const row of doc.querySelectorAll('#threadTree tr.table-layout'))renderThreadGuide(row);
   }
+  let previewSettings=previewTextSettings(previewTrimming);
   const previews = createPreviewQueue(win);
   const filter = win.quickFilterBar;
   const wasVisible = filter?.filterer?.visible;
@@ -1171,8 +1191,8 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     const preview = previews.get(previewHeader, isPreviewCurrent, () => {
       // Update only the snippet: replacing action buttons here would steal
       // keyboard focus while the user is interacting with the row.
-      showPreview(previews.get(previewHeader,isPreviewCurrent,()=>{}));
-    },true);
+      showPreview(previews.get(previewHeader,isPreviewCurrent,()=>{},false,previewSettings));
+    },true,previewSettings);
     showPreview(preview);
     const actions = doc.createElement('div');
     actions.className = 'gm-row-actions';
@@ -1280,5 +1300,5 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   }
   win.addEventListener('focus',refreshPreviews);
   win.addEventListener('unload',close,{once:true});
-  return {close,setThreadGuides,setColoredStars:stars.configure,setThreadExpandArrows:threadToggles.setEnabled};
+  return {close,setThreadGuides,setPreviewTrimming(value){previewSettings=previewTextSettings(value);refreshPreviews();},setColoredStars:stars.configure,setThreadExpandArrows:threadToggles.setEnabled};
 }

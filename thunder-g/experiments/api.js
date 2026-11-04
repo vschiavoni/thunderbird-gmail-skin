@@ -142,7 +142,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const skinWindows = new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
-    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, coloredStars=null;
+    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, coloredStars=null,previewTrimming=null;
     const readers = new Map();
     const pagedDocuments = new Map(), zoomWindows = new Map();
     const fontSize = ChromeUtils.importESModule("resource:///modules/UIFontSize.sys.mjs").UIFontSize;
@@ -237,11 +237,11 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       pagedDocuments.set(doc,pages); pages.setSize(messagesPerPage);
       const zoom = installMailZoom(doc.defaultView,fontSize,action=>reader.zoom(action));
       const dates = installCompactDates(doc.defaultView);
-      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
+      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
       const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
       doc.defaultView.addEventListener('unload',detach,{once:true});
-      documents.set(doc, { setColoredStars:inbox.setColoredStars, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
+      documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
         doc.defaultView.removeEventListener('unload',detach);
         readers.delete(doc);
         snoozeOrder?.close();
@@ -376,6 +376,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         showColumnHeaders = enabled === true;
         for (const doc of documents.keys()) doc.documentElement.toggleAttribute('data-gm-hide-column-headers', !showColumnHeaders);
       },
+      async setPreviewTrimming(value){previewTrimming=value;for(const controller of documents.values())controller.setPreviewTrimming?.(value);},
       async setColoredStars(value){coloredStars=value;for(const controller of documents.values())controller.setColoredStars?.(value);},
       async setThreadExpandArrows(enabled){threadExpandArrows=enabled===true;for(const controller of documents.values())controller.setThreadExpandArrows?.(threadExpandArrows);},
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},

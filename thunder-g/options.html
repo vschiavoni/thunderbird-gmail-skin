@@ -86,6 +86,16 @@
           </div>
           <div class="setting-row">
             <div class="setting-copy">
+              <label for="preview-trimming">Customize message previews</label>
+              <p>Skip initial lines, then remove this text if it appears at the beginning of the preview. Only message-list previews are affected.</p>
+              <label>Initial lines to skip <input id="preview-skip-lines" type="number" min="0" max="100" value="0"></label>
+              <label>Leading text to skip <textarea id="preview-skip-text" rows="2" maxlength="2000" placeholder="E-MAIL EXTERNE ¦ Attention aux liens et pièces jointes"></textarea></label>
+              <p id="preview-trimming-status" role="status"></p>
+            </div>
+            <input class="switch" id="preview-trimming" type="checkbox" role="switch" disabled>
+          </div>
+          <div class="setting-row">
+            <div class="setting-copy">
               <label for="colored-stars">Colored stars</label>
               <p>Drag markers between lists or reorder them. Quick clicks cycle through the markers in use.</p>
               <div>Presets <button type="button" data-star-preset="1">1 star</button>
@@ -218,6 +228,7 @@
       </main>
     </div>
   </div>
+  <script src="preview-options.js"></script>
   <script src="stars.js"></script>
   <script src="star-options.js"></script>
   <script src="localization.js"></script>
