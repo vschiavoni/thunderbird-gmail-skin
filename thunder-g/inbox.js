@@ -1108,6 +1108,9 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
       color:var(--gm-snippet, #9aa0a6) !important;
       font-weight:400 !important;
     }
+    /* Keep centering on the same height when 28px hover actions appear.
+       Fractional label/text heights otherwise round to different baselines. */
+    #threadTree .subject-line { min-block-size:28px; }
     #threadTree .gm-row-actions {
       display:none; flex:0 0 auto; gap:2px; margin-inline-start:auto;
       pointer-events:auto;

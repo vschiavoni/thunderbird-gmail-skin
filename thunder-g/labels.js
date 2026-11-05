@@ -53,7 +53,9 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     }
     #threadTree .subject-line > img { flex: 0 0 auto; }
     #threadTree .gm-inline-labels {
-      display: inline-flex; flex: 0 1 auto; max-width: 48%; gap: 4px;
+      /* Hover actions must truncate subject/preview, not move their origin
+         by shrinking the preceding labels. Keep the existing width cap. */
+      display: inline-flex; flex: 0 0 auto; max-width: 48%; gap: 4px;
       overflow: hidden; margin-inline: 0 !important; padding: 0 !important; align-items: center;
       font-weight: 400; vertical-align: middle;
     }
