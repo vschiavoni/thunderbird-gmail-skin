@@ -139,15 +139,34 @@ summary { width: fit-content; max-width: 100%; padding: 13px 0; color: var(--acc
 .import-export-group + .import-export-group { border-top: 1px solid var(--border); }
 .import-export-group h3 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.2px; }
 
-.star-marker-list {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-inline-size: 36px;
-  min-block-size: 26px;
-  vertical-align: middle;
+.star-presets, .star-marker-row { display: flex; align-items: center; gap: 8px; }
+.star-presets { flex-wrap: wrap; margin-top: 12px; margin-bottom: 4px; }
+.star-presets > span, .star-list-label { flex: 0 0 82px; }
+.star-list-label { font-size: 13px; font-weight: 600; }
+.star-presets button {
+  appearance: none; border: 0; background: transparent; color: var(--accent);
+  padding: 4px 2px; font: inherit; font-size: 13px; cursor: pointer;
 }
-.star-marker-list button { cursor: grab; }
+.star-presets button:hover { text-decoration: underline; }
+.star-marker-list {
+  display: inline-flex; flex-wrap: wrap; gap: 4px;
+  min-inline-size: 36px; min-block-size: 32px; flex: 1;
+}
+.star-marker-list button {
+  appearance: none; display: inline-grid; place-items: center;
+  flex: 0 0 28px; inline-size: 28px; block-size: 28px; padding: 0;
+  border: 0; border-radius: 4px; background: transparent; cursor: grab;
+}
+.star-marker-list button:hover { background: light-dark(#eef3fb, #303640); }
+.star-marker-list button:active { cursor: grabbing; }
+.star-marker-icon {
+  display: block; inline-size: 18px; block-size: 18px;
+  background: currentColor; mask: var(--gm-star-image) center / contain no-repeat;
+  pointer-events: none;
+}
+:where(.star-presets button, .star-marker-list button):focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
 
 .settings-search { margin-bottom: 20px; }
 .settings-search label { display: block; margin-bottom: 7px; font-weight: 600; }

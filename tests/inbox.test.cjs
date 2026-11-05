@@ -581,7 +581,8 @@ test('colored markers cycle in configured order and clear the native flag on a l
   const flags=[],events={};
   const message={messageKey:1,isFlagged:false,getStringProperty:()=>marker,setStringProperty(_key,value){marker=value}};
   message.folder={URI:'mailbox://test',markMessagesFlagged([header],value){header.isFlagged=value;flags.push(value)}};
-  const button={dataset:{},style:{removeProperty(){},setProperty(){}},removeAttribute(){delete this.dataset.gmStar}};
+  const properties=new Map(),styleWrites=[];
+  const button={dataset:{},style:{removeProperty(key){styleWrites.push(key);properties.delete(key)},setProperty(key,value){styleWrites.push(key);properties.set(key,value)},getPropertyValue(key){return properties.get(key)||''}},removeAttribute(){delete this.dataset.gmStar}};
   const row={index:0,dataset:{},querySelector:()=>button};
   const tree={querySelectorAll:()=>[row],addEventListener(name,fn){events[name]=fn},removeEventListener(){}};
   const win={document:{getElementById:()=>tree},gDBView:{getMsgHdrAt:()=>message}};
@@ -589,10 +590,15 @@ test('colored markers cycle in configured order and clear the native flag on a l
   scope.Date={now:()=>now};
   try{
     const controller=scope.installColoredStars(win,{enabled:true,order:['blue-star','red-star']});
+    styleWrites.length=0;controller.render(row);controller.render(row);
+    assert.deepEqual(styleWrites,[],'unchanged row refreshes must not unload the marker image');
     const click=()=>events.click({button:0,target:{closest:()=>({closest:()=>row})},preventDefault(){},stopImmediatePropagation(){}});
     click();assert.equal(marker,'blue-star');assert.equal(message.isFlagged,true);
     now=100;click();assert.equal(marker,'red-star');assert.deepEqual(flags,[true]);
-    now=1000;click();assert.equal(marker,'');assert.deepEqual(flags,[true,false]);
+    now=1100;click();assert.equal(marker,'blue-star','a deliberate repeat after one second still cycles');
+    let prevented=0;events.dblclick({button:0,target:{closest:()=>button},preventDefault(){prevented++},stopImmediatePropagation(){prevented++}});
+    assert.equal(prevented,2,'native double-click must not reopen the message');
+    now=3000;click();assert.equal(marker,'');assert.deepEqual(flags,[true,false]);
     controller.configure({enabled:true,order:['red-star','blue-star']});
     click();assert.equal(marker,'red-star');
     controller.configure({enabled:false});assert.equal(button.dataset.gmStar,undefined);
@@ -748,4 +754,17 @@ test('resolved cross-folder totals replace folder-local counts, including a sing
   container=false;scope.renderThreadCount(win,row,6);assert.equal(badge.textContent,'6');
   scope.renderThreadCount(win,row,1);assert.equal(badge,undefined,'logical duplicates do not inflate the count');
   level=1;scope.renderThreadCount(win,row,6);assert.equal(badge,undefined,'expanded child rows have no conversation badge');
+});
+
+test('empty and colored stars share vector geometry instead of font-dependent glyph sizes',()=>{
+  const svg=id=>decodeURIComponent(scope.gmStarImage(id).split(',')[1].slice(0,-2));
+  const empty=svg();
+  assert.match(empty,/fill="none"/);
+  const path=empty.match(/d="([^"]+)"/)[1];
+  for(const color of ['yellow','red','orange','blue','purple','green']){
+    const filled=svg(`${color}-star`);
+    assert.equal(filled.match(/d="([^"]+)"/)[1],path);
+    assert.match(filled,/fill="black"/);
+    assert.match(filled,/viewBox="0 0 24 24"/);
+  }
 });

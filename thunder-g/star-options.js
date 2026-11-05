@@ -15,10 +15,13 @@
     const markers=new Map(GM_STAR_MARKERS.map(([id,glyph,color])=>[id,{glyph,color}]));
     for(const id of [...order,...[...markers.keys()].filter(id=>!order.includes(id))]){
       const list=order.includes(id)?active:inactive;
-      const {glyph,color}=markers.get(id);
+      const {color}=markers.get(id);
       const item=document.createElement('button');
       item.type='button';item.draggable=true;item.dataset.marker=id;
-      item.textContent=glyph;item.title=id;item.setAttribute('aria-label',id);item.style.color=color;
+      item.title=id;item.setAttribute('aria-label',id);item.style.color=color;
+      const icon=document.createElement('span');
+      icon.className='star-marker-icon';icon.setAttribute('aria-hidden','true');
+      icon.style.setProperty('--gm-star-image',gmStarImage(id));item.append(icon);
       item.addEventListener('dragstart',event=>{dragged=id;event.dataTransfer.setData('text/plain',id);});
       item.addEventListener('dragend',()=>{dragged=null;});
       item.addEventListener('click',()=>move(id,list===active?inactive:active));
