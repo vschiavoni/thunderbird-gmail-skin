@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.27.0
+
+- Show distinct unread senders in collapsed conversations.
+- Count each conversation once in threaded pagination and keep expanded replies on the same page.
+- Improve row and checkbox hover styling and show the selection highlight on unread rows.
+- Prevent checkbox double-clicks from opening messages and remove the selection counter from the toolbar.
+- Open Thunderbird’s standalone composer when an embedded send requires pre-send spell check.
+
 ## 0.26.0
 
 - Add common Gmail-style advanced search operators with progressive local message-list results and a “Searching…” indicator. Support address, subject, label, folder, status, attachment, date and size conditions, quoted phrases, boolean groups and exclusions.
