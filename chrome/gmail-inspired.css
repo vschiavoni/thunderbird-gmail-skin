@@ -207,14 +207,22 @@
   }
 
   #threadTree tbody > tr.table-layout:hover {
-    background: var(--gm-hover) !important;
-    box-shadow: inset 0 1px var(--gm-border), inset 0 -1px var(--gm-border),
-      0 1px 2px var(--gm-shadow) !important;
+    /* Keep the shadow inside the row so the next row cannot cover it. */
+    box-shadow: inset 0 -3px 3px -3px var(--gm-shadow),
+      inset 0 -1px var(--gm-border) !important;
   }
 
   #threadTree tbody > tr.table-layout.selected {
     background: var(--gm-selected) !important;
     color: var(--gm-ink) !important;
+  }
+
+  #threadTree .gm-unread-thread-senders {
+    font-weight: 700;
+  }
+
+  #threadTree .gm-unread-thread-senders + .gm-native-thread-sender {
+    display: none;
   }
 
   #threadTree .gm-thread-count {
