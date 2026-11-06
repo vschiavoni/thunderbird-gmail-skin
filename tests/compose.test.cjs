@@ -275,12 +275,12 @@ test('invalid floating size preferences fall back safely and oversized drags sav
  f.hook.update(true,{maxWidth:1600,maxHeight:1000});assert.equal(f.panel.style.width,'900px');assert.equal(f.panel.style.height,'700px');f.hook.close();
 });
 
-function sendFixture({result='success',draftFails=false,busy=false}={}) {
+function sendFixture({result='success',draftFails=false,busy=false,spellCheck=false,openSeparateComposer=null}={}) {
  const events=new Map(),states=[],timers=new Map();let sendListener,saved=0,timerId=0;
  const modes={Now:0,Later:1,SaveAsDraft:4,Background:8};
  const compose={compFields:{from:'Me <me@example.org>',to:'You <you@example.org>',subject:'Re: Thread',messageId:''},
   addMsgSendListener(listener){sendListener=listener},removeMsgSendListener(listener){assert.equal(listener,sendListener);sendListener=null}};
- const native={gSendOperationInProgress:busy,gMsgCompose:compose,gAttachmentBucket:{itemChildren:[{attachment:{name:'notes.pdf'}}]},
+ const native={DoSpellCheckBeforeSend:()=>spellCheck,gSendOperationInProgress:busy,gMsgCompose:compose,gAttachmentBucket:{itemChildren:[{attachment:{name:'notes.pdf'}}]},
   GetCurrentEditor:()=>({outputToString:()=>'<literal text> reply'}),
   addEventListener:(name,fn)=>events.set(name,fn),removeEventListener:name=>events.delete(name),
   async GenericSendMessage(mode){
@@ -297,7 +297,7 @@ function sendFixture({result='success',draftFails=false,busy=false}={}) {
   }};
  const original=native.GenericSendMessage;
  const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId},clearTimeout(id){timers.delete(id)}};
- const status=scope.installInlineSendStatus(native,clock,state=>states.push(state),async()=>{saved++;if(draftFails)throw new Error('disk full');return 'draft://42'},modes);
+ const status=scope.installInlineSendStatus(native,clock,state=>states.push(state),async()=>{saved++;if(draftFails)throw new Error('disk full');return 'draft://42'},modes,openSeparateComposer);
  return {native,states,status,original,modes,timers,fail(){sendListener.onStopSending('',1,'Send failed')},tick(){const pending=[...timers.values()];timers.clear();for(const fn of pending)fn()},get saved(){return saved}};
 }
 test('inline send shows an immediate snapshot and reports Sent only after native aftersend',async()=>{
@@ -306,6 +306,28 @@ test('inline send shows an immediate snapshot and reports Sent only after native
  assert.equal(f.states[0].body,'<literal text> reply');assert.equal(f.states[0].attachments[0],'notes.pdf');
  assert.equal(f.states[1].messageId,'<outgoing-id>');assert.equal(f.states[0].id,f.states[1].id);
  assert.equal(f.saved,0);f.status.close();assert.equal(f.native.GenericSendMessage,f.original);
+});
+test('pending replies decode MIME address display names without changing compose fields',async()=>{
+ const f=sendFixture();
+ const fields=f.native.gMsgCompose.compFields;
+ const encoded='=?UTF-8?Q?Th=C3=A9o_Rollier?= <theo@example.org>';
+ const decoded='Théo Rollier <theo@example.org>';
+ fields.to=encoded;
+ fields.cc='Plain Name <plain@example.org>';
+ const previous=scope.MailServices;
+ scope.MailServices={mimeConverter:{decodeMimeHeader(value){
+  assert.equal(value,encoded);
+  return decoded;
+ }}};
+ try {
+  await f.native.GenericSendMessage(f.modes.Now);
+  assert.equal(f.states[0].to,decoded);
+  assert.equal(f.states[0].cc,fields.cc);
+  assert.equal(fields.to,encoded);
+ }finally{
+  scope.MailServices=previous;
+  f.status.close();
+ }
 });
 test('native failure saves the real composer as a draft and exposes draft-save failure honestly',async()=>{
  for(const draftFails of [false,true]){
@@ -592,4 +614,16 @@ test('forward MIME preparation includes body and attachments without copying rec
  params=await load();assert.equal(params.format,2);assert.match(params.composeFields.body,/Sender &lt;sender@example.org&gt;/);assert.match(params.composeFields.body,/src="imap:\/\/local\?part=1.3"/);
  mime.isEncrypted=true;await assert.rejects(load(),/encrypted/);
  mime=null;await assert.rejects(load(),/Could not load/);
+});
+
+test('pre-send spelling check transfers embedded sends without intercepting draft saves',async()=>{
+ let transfers=0;
+ const f=sendFixture({spellCheck:true,openSeparateComposer:async()=>{transfers++}});
+ await f.native.GenericSendMessage(f.modes.SaveAsDraft);
+ assert.equal(transfers,0);
+ await f.native.GenericSendMessage(f.modes.Now);
+ await f.native.GenericSendMessage(f.modes.Background);
+ assert.equal(transfers,2);
+ assert.deepEqual(f.states,[]);
+ f.status.close();
 });

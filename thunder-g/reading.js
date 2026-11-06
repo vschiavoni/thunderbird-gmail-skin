@@ -129,7 +129,6 @@ function installReadingMode(win) {
   const threadPane = doc.getElementById('threadPane');
   const headingTargets = ['threadPaneFolderName', 'threadPaneFolderCountContainer']
     .map(id => doc.getElementById(id)).filter(Boolean);
-  const selectionLabel = doc.createElement('span');
   const originalMessagePaneVisible = layout.messagePaneVisible;
   // A message replaces the list inside the current mail tab.
   layout.messagePaneVisible = false;
@@ -181,8 +180,6 @@ function installReadingMode(win) {
     .gm-reading-back svg { display:block; inline-size:20px; block-size:20px; flex:none; }
     .gm-action-separator { inline-size:1px; block-size:20px; margin-inline:8px;
       background:var(--layout-border-0, #dadce0); flex:0 0 1px; }
-    .gm-selection-count { margin-inline:6px 10px; white-space:nowrap; }
-    .gm-selection-count:empty { display:none; }
     /* Replace the folder heading with actions, rather than adding another row. */
     #threadPane.gm-bulk-selecting > #threadPaneHeaderBar { display:none !important; }
     #threadPaneHeaderBar { min-block-size:44px; box-sizing:border-box; }
@@ -215,8 +212,7 @@ function installReadingMode(win) {
   back.className = 'gm-reading-back';
   back.type = 'button';
   setBackIcon(false);
-  selectionLabel.className = 'gm-selection-count';
-  toolbar.append(back, selectionLabel);
+  toolbar.append(back);
   separator();
   const popups = [];
   function icon(path) {
@@ -662,7 +658,6 @@ function installReadingMode(win) {
     if (!toolbar.hidden) {
       threadPane.prepend(toolbar);
       setBackIcon(true);
-      gmBindValue(selectionLabel, "textContent", () => gmText("$1 selected", count));
       gmBindAttribute(toolbar, 'aria-label', () => gmText("Selected message actions"));
       snoozeButton.disabled = count === 0 || !snoozeUI;
     }
@@ -693,11 +688,24 @@ function installReadingMode(win) {
       if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
       return;
     }
-    if (event.target.closest('.select-column, .selectcol-column, #selectCol') ||
+    const selectionCell = event.target.closest('.select-column, .selectcol-column, #selectCol, .tree-view-row-select');
+    if (selectionCell ||
         event.ctrlKey || event.metaKey || event.shiftKey) {
       if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
       if (active) leave(false);
       bulk = true;
+      // Native selection only toggles on the checkbox image, not its cell,
+      // and ignores rapid clicks. Handle the whole selection cell consistently.
+      if (event.button === 0 && selectionCell) {
+        const row = event.target.closest('tr.table-layout, tr.card-layout');
+        if (row && tree.contains(row) && !row.hasAttribute('data-gm-outside-page')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (event.shiftKey) tree._selectRange(-1, row.index, event.ctrlKey || event.metaKey);
+          else tree._toggleSelected(row.index);
+          tree.ensureCorrectFocus?.();
+        }
+      }
       win.requestAnimationFrame(() => { if (!closed) syncBulk(); });
     }
   }
@@ -745,7 +753,6 @@ function installReadingMode(win) {
     setBackIcon(false);
     if(selectionControl)selectionControlHome?.prepend(selectionControl);
     back.hidden=false;
-    selectionLabel.textContent = '';
     snoozeButton.disabled = !snoozeUI;
     gmBindAttribute(toolbar, 'aria-label', () => gmText("Conversation navigation"));
     toolbar.hidden = false;
@@ -800,6 +807,12 @@ function installReadingMode(win) {
     });
   }
   function doubleClick(event) {
+    // Selection controls must never trigger Thunderbird's bulk message opener.
+    if (event.target.closest('.select-column, .selectcol-column, #selectCol, .tree-view-row-select')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     if (!isReadingClick(event) || !(event.target.closest('tr.table-layout') || event.target.closest('tr.card-layout'))) return;
     // The first click already opened the in-tab reader; avoid a second tab.
     event.preventDefault();

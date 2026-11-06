@@ -48,6 +48,54 @@ function sidebarLabelVisibleKeys(nodes,modes,unread,selectedKey=null) {
   for(const node of nodes)visit(node);
   return visible;
 }
+async function countUnreadLabelConversations(folders, keys, pause, isCurrent) {
+  const parents=new Map(), tagged=[], unreadIds=[];
+  function root(id) {
+    while(parents.has(id)){
+      const parent=parents.get(id);
+      if(parents.has(parent))parents.set(id,parents.get(parent));
+      id=parent;
+    }
+    return id;
+  }
+  let visited=0;
+  for(const folder of folders){
+    try {
+      if(folder.isServer ||
+          folder.isSpecialFolder(Ci.nsMsgFolderFlags.Virtual | Ci.nsMsgFolderFlags.Trash |
+            Ci.nsMsgFolderFlags.Junk,false))continue;
+      for(const header of folder.messages){
+        if(++visited%250===0){
+          await pause();
+          if(!isCurrent())return null;
+        }
+        const keywords=(header.getStringProperty('keywords') || '').split(/\s+/);
+        if(header.label)keywords.push('$label'+header.label);
+        const labels=keywords.filter(key=>keys.has(key));
+        if(!labels.length && header.isRead!==false)continue;
+        const ids=independentReferenceIds(header).filter(Boolean);
+        const id=ids[0] || Symbol();
+        for(const related of ids){
+          const from=root(related),to=root(id);
+          if(from!==to)parents.set(from,to);
+        }
+        if(labels.length)tagged.push({id,labels});
+        if(header.isRead===false)unreadIds.push(id);
+      }
+    }catch(_){/* Some folders have no available local summary. */}
+  }
+  const unreadRoots=new Set(unreadIds.map(root));
+  const conversations=new Map();
+  for(const {id,labels} of tagged){
+    if(!unreadRoots.has(root(id)))continue;
+    for(const key of labels){
+      if(!conversations.has(key))conversations.set(key,new Set());
+      conversations.get(key).add(root(id));
+    }
+  }
+  return new Map([...conversations].map(([key,ids])=>[key,ids.size]));
+}
+
 function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.prefs) {
   const doc=win.document,tree=doc.getElementById('folderTree');
   if(!tree)return {close(){}};
@@ -55,6 +103,30 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
   const menu=installSidebarLabelMenu(win,mailServices.tags,prefs);
   const saved=new Map(),rowStates=new Map(),vocabulary=new Map(),createButtons=new Map(),uriKeys=new Map(),unread=new Map();
   let closed=false,timer=null,definitionsDirty=true,rowsDirty=true,hierarchy=[],definitions=[],currentList=null,expanded=false,more=null,moreStyle=null;
+  let countRevision=0,countTimer=null,counts=null;
+  function showCounts(){
+    if(!counts)return;
+    for(const [key,row] of saved){
+      const count=counts.get(key) || 0;
+      row.unreadCount=count;
+      unread.set(key,count);
+    }
+  }
+  function scheduleCounts(){
+    if(closed || !mailServices.accounts)return;
+    const revision=++countRevision;
+    if(countTimer!==null)win.clearTimeout(countTimer);
+    countTimer=win.setTimeout(async()=>{
+      countTimer=null;
+      if(!saved.size)return;
+      const isCurrent=()=>!closed && revision===countRevision;
+      try {
+        const result=await countUnreadLabelConversations(mailServices.accounts.allFolders,
+          new Set(saved.keys()),()=>new Promise(resolve=>win.setTimeout(resolve,0)),isCurrent);
+        if(result && isCurrent()){counts=result;showCounts();applyVisibility();}
+      }catch(_){/* Account setup can briefly make folder summaries unavailable. */}
+    },200);
+  }
   function rename(node,text,tooltip=false) {
     if(!node)return;
     const attributes=['data-l10n-id','data-l10n-args','title','aria-label','tooltiptext'];
@@ -70,6 +142,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
       // Keep native tree keyboard navigation from treating this as a folder.
       more.addEventListener('keydown',event=>event.stopPropagation());
       moreStyle=doc.createElement('style');moreStyle.textContent=`
+        #folderTree [data-gm-nested-label] .total-count{display:none!important}
         #folderTree .gm-sidebar-hidden{display:none!important}
         .gm-sidebar-more[hidden],[data-mode=tags].collapsed > .gm-sidebar-more{display:none!important}
         .gm-sidebar-more{display:flex;align-items:center;gap:16px;width:100%;padding:6px 18px;border:0;border-radius:20px;background:transparent;color:inherit;text-align:start;font:inherit;cursor:pointer}
@@ -121,6 +194,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
     if(currentList!==list){currentList=list;rowsDirty=true;}
     if(definitionsDirty){definitions=mailServices.tags.getAllTags();hierarchy=nestedLabelTree(definitions);definitionsDirty=false;rowsDirty=true;}
     if(rowsDirty){
+      const previousKeys=new Set(saved.keys());
       const keys=new Set(definitions.map(tag=>tag.key));
       saved.clear();
       for(const row of list.querySelectorAll('[data-tag-key]'))saved.set(row.dataset.tagKey,row);
@@ -138,8 +212,9 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
       });}
       try{place(hierarchy,list);rowsDirty=false;}finally{observer.observe(tree,{childList:true,subtree:true});}
       menu.prune?.();
+      if(previousKeys.size!==saved.size || [...saved.keys()].some(key=>!previousKeys.has(key)))scheduleCounts();
     }
-    ensureMore(mode);applyVisibility();
+    ensureMore(mode);showCounts();applyVisibility();
     for(const [node] of vocabulary)if(node.isConnected===false)vocabulary.delete(node);
     for(const [button,handler] of createButtons)if(button.isConnected===false){button.removeEventListener('click',handler,true);createButtons.delete(button);}
   }
@@ -158,21 +233,29 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
   const prefObserver={observe(_subject,_topic,name){if(name?.startsWith('mailnews.tags.'))definitionsDirty=true;schedule();}};
   prefs.addObserver('mailnews.tags.',prefObserver);prefs.addObserver(visibilityPref,prefObserver);
   const folderListener={onFolderIntPropertyChanged(folder,property,oldValue,newValue){
-    if(property!=='TotalUnreadMessages' || oldValue===newValue)return;
+    if(oldValue===newValue || !['TotalUnreadMessages','TotalMessages'].includes(property))return;
+    scheduleCounts();
+    if(property!=='TotalUnreadMessages')return;
     const key=uriKeys.get(folder.URI);if(!key)return;
     unread.set(key,Math.max(0,newValue));schedule();
   }};
   const folderFlag=typeof Ci==='undefined'?null:Ci.nsIFolderListener?.intPropertyChanged;
   if(folderFlag!=null)mailServices.mailSession?.AddFolderListener(folderListener,folderFlag);
+  const keywordListener={msgPropertyChanged(_header,property){
+    if(property==='keywords' || property==='label')scheduleCounts();
+  }};
+  const propertyFlag=typeof Ci==='undefined'?null:Ci.nsIMsgFolderNotificationService?.msgPropertyChanged;
+  if(propertyFlag!=null)mailServices.mfn?.addListener(keywordListener,propertyFlag);
   tree.addEventListener?.('select',schedule);schedule();
   return {refresh(){definitionsDirty=true;rowsDirty=true;schedule();},close(){
-    closed=true;observer.disconnect();menu.close();prefs.removeObserver('mailnews.tags.',prefObserver);prefs.removeObserver(visibilityPref,prefObserver);
+    closed=true;if(countTimer!==null)win.clearTimeout(countTimer);observer.disconnect();menu.close();prefs.removeObserver('mailnews.tags.',prefObserver);prefs.removeObserver(visibilityPref,prefObserver);
     if(folderFlag!=null)mailServices.mailSession?.RemoveFolderListener(folderListener);
+    if(propertyFlag!=null)mailServices.mfn?.removeListener(keywordListener);
     tree.removeEventListener?.('select',schedule);if(timer!==null)win.clearTimeout(timer);
     more?.remove();moreStyle?.remove();
     for(const [row,state] of rowStates){row.classList.remove('gm-sidebar-hidden');row.classList.toggle('unselectable',state.unselectable);if(state.aria===null)row.removeAttribute('aria-hidden');else row.setAttribute('aria-hidden',state.aria);}
     const list=win.folderPane?._modes?.tags?.containerList;
-    if(list?.isConnected)for(const tag of mailServices.tags.getAllTags()){const row=saved.get(tag.key);if(!row)continue;list.append(row);row.name=tag.tag;row.fullName=tag.tag;delete row.dataset.gmNestedLabel;}
+    if(list?.isConnected)for(const tag of mailServices.tags.getAllTags()){const row=saved.get(tag.key);if(!row)continue;list.append(row);row.name=tag.tag;row.fullName=tag.tag;delete row.dataset.gmNestedLabel;if(counts && row.folder)row.unreadCount=row.folder.getNumUnread(row.classList.contains('collapsed'));}
     for(const [node,previous] of vocabulary){if(!previous.tooltip)node.textContent=previous.text;for(const [name,value] of previous.attributes){if(value===null)node.removeAttribute(name);else node.setAttribute(name,value);}}
     for(const [button,handler] of createButtons)button.removeEventListener('click',handler,true);
     createButtons.clear();vocabulary.clear();saved.clear();rowStates.clear();uriKeys.clear();unread.clear();hierarchy=[];definitions=[];

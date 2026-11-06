@@ -276,7 +276,7 @@ function inlineSendFailure(status,message) {
   }
   return gmText("Thunderbird did not provide a failure reason.");
 }
-function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineReplyDraft(native,clock),modes=Ci.nsIMsgCompDeliverMode) {
+function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineReplyDraft(native,clock),modes=Ci.nsIMsgCompDeliverMode,openSeparateComposer=null) {
   const original=native.GenericSendMessage,compose=native.gMsgCompose;
   if(typeof original!=='function')return {close(){}};
   let closed=false,job=null,sequence=0,idleTimer=null,idleCancel=null;
@@ -297,11 +297,17 @@ function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineRe
     if(closed || !job || !job.done || job.delivered)return;
     job.recovered=true;job.draftURI=compose.compFields.draftId;emit('draft-saved');
   }
+  function displayAddress(value) {
+    if(!value || !value.includes('=?'))return value || '';
+    try {
+      return globalThis.MailServices?.mimeConverter?.decodeMimeHeader(value,null,false,true) || value;
+    }catch(_){return value;}
+  }
   function snapshot() {
     const fields=compose.compFields;
     let body='';try{body=native.GetCurrentEditor().outputToString('text/plain',0)}catch(_){}
-    ++sequence;return {id:{},from:fields.from || native.gCurrentIdentity?.email || '',to:fields.to || '',
-      subject:fields.subject || '',date:Date.now(),cc:fields.cc || '',body,messageId:fields.messageId || '',attachments:Array.from(native.gAttachmentBucket?.itemChildren || [],item=>item.attachment?.name || '').filter(Boolean)};
+    ++sequence;return {id:{},from:displayAddress(fields.from || native.gCurrentIdentity?.email),to:displayAddress(fields.to),
+      subject:fields.subject || '',date:Date.now(),cc:displayAddress(fields.cc),body,messageId:fields.messageId || '',attachments:Array.from(native.gAttachmentBucket?.itemChildren || [],item=>item.attachment?.name || '').filter(Boolean)};
   }
   function emit(state){if(!closed && job)onState({...job,state})}
   function starting(event) {
@@ -328,6 +334,12 @@ function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineRe
     onTransportSecurityError(id,status){if(job)job.error=inlineSendFailure(status,gmText("Connection security error. Check Thunderbird’s security prompt."))}};
   async function send(mode,...args) {
     const sending=[modes.Now,modes.Background].includes(mode),before=sequence;
+    // The native spell-check dialog requires a standalone compose window.
+    // Transfer the draft and let the user send from that window.
+    if(sending && openSeparateComposer && native.DoSpellCheckBeforeSend?.()){
+      await openSeparateComposer();
+      return;
+    }
     const restoreProgress=sending?suppressInlineSendProgress():()=>{};
     try{return await original.call(this,mode,...args)}
     catch(error){if(job)job.error=inlineSendFailure(error?.result,error?.message);throw error}
@@ -1059,7 +1071,7 @@ function createInlineCompose(win) {
               try{const addresses=MailServices.headerParser.parseDecodedHeader(replyTo);replyRow.toggleAttribute('data-gm-redundant',addresses.length>0 && addresses.every(item=>item.email?.toLowerCase()===identity.toLowerCase()));}catch(_){}
             }
             composeShortcuts=typeof installGmailComposeShortcuts==='function'?installGmailComposeShortcuts(native):null;
-            ready=true;save.disabled=false;windowButton.disabled=false;changeAutosave=installChangeDrivenAutosave(native,win);draftStatus=installComposeDraftStatus(native,savedStatus,win,Ci.nsIMsgCompDeliverMode,state=>{if(state==='saved')sendStatus?.draftSaved()});sendStatus=installInlineSendStatus(native,win,onSendState);if(loadingTimer!==null)win.clearTimeout(loadingTimer);loadingTimer=null;native.SetMsgBodyFrameFocus?.();placement.onReady?.();if(command==='cmd_editDraft')revealInlineDraft(win,panel,()=>browser===frame && presentation==='inline' && (!placement.isCurrent || placement.isCurrent()));return;}
+            ready=true;save.disabled=false;windowButton.disabled=false;changeAutosave=installChangeDrivenAutosave(native,win);draftStatus=installComposeDraftStatus(native,savedStatus,win,Ci.nsIMsgCompDeliverMode,state=>{if(state==='saved')sendStatus?.draftSaved()});sendStatus=installInlineSendStatus(native,win,onSendState,undefined,undefined,separateWindow);if(loadingTimer!==null)win.clearTimeout(loadingTimer);loadingTimer=null;native.SetMsgBodyFrameFocus?.();placement.onReady?.();if(command==='cmd_editDraft')revealInlineDraft(win,panel,()=>browser===frame && presentation==='inline' && (!placement.isCurrent || placement.isCurrent()));return;}
           if(Date.now()-started>20000){
             gmBindValue(title, "textContent", () => gmText("Editor could not finish starting. Close and use a classic reply."));restoreChrome?.();restoreChrome=null;return;
           }

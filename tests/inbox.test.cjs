@@ -756,6 +756,26 @@ test('resolved cross-folder totals replace folder-local counts, including a sing
   level=1;scope.renderThreadCount(win,row,6);assert.equal(badge,undefined,'expanded child rows have no conversation badge');
 });
 
+test('unread thread sender names skip read messages and deduplicate by address',()=>{
+  const messages=[
+    {isRead:true,author:'read'},
+    {isRead:false,author:'first'},
+    {isRead:false,author:'duplicate'},
+    {isRead:false,author:'second'},
+  ];
+  const addresses={
+    read:{name:'Read Sender',email:'read@example.org'},
+    first:{name:'Virginia Fasel',email:'fasel@example.org'},
+    duplicate:{name:'V. Fasel',email:'FASEL@example.org'},
+    second:{name:'Dimitrakakis, Christos',email:'d@example.org'},
+  };
+  const thread={get numChildren(){return messages.length},getChildHdrAt:index=>messages[index]};
+  const parser={parseDecodedHeader:value=>[addresses[value]]};
+  assert.deepEqual(Array.from(scope.unreadThreadSenderNames(thread,parser)),['Fasel','Dimitrakakis']);
+  messages[3].isRead=true;
+  assert.equal(scope.unreadThreadSenderNames(thread,parser).length,0);
+});
+
 test('empty and colored stars share vector geometry instead of font-dependent glyph sizes',()=>{
   const svg=id=>decodeURIComponent(scope.gmStarImage(id).split(',')[1].slice(0,-2));
   const empty=svg();

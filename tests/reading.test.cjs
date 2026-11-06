@@ -193,7 +193,7 @@ test('checkbox selection shows bulk toolbar and archives native selection withou
   for(const fn of tree.events.click)fn(event);
   while(frames.length)frames.shift()();
   const toolbar=threadPane.children[0];
-  assert.equal(toolbar.hidden,false);assert.equal(toolbar.children[1].textContent,'2 selected');
+  assert.equal(toolbar.hidden,false);assert.equal(toolbar.children.some(child=>child.className==='gm-selection-count'),false);
   for (const title of ['Print conversation','Previous message','Next message'])
     assert.equal(nodes.find(n=>n.title===title).hidden,true,`${title} is hidden in bulk mode`);
   assert.equal(layout.messagePaneVisible,false);

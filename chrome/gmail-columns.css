@@ -106,3 +106,15 @@
   inline-size:28px !important; min-inline-size:28px !important; max-inline-size:28px !important;
   padding-inline:0 !important;
 }
+
+/* Keep the hover circle behind the native checkbox and inside its gutter. */
+#threadTree .tree-view-row-select:hover {
+  background-image: radial-gradient(
+    circle closest-side at center,
+    light-dark(#3c404326, #ffffff29) calc(100% - 1px),
+    transparent 100%
+  ) !important;
+  background-size: 26px 26px !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}

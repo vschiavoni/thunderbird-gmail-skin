@@ -14,6 +14,47 @@ function threadPreviewHeader(view,index,header) {
   return header;
 }
 
+function unreadThreadSenderNames(thread,parser) {
+  const senders=new Map();
+  for(let i=0;i<thread.numChildren;i++){
+    const message=thread.getChildHdrAt(i);
+    if(message?.isRead!==false)continue;
+    const address=parser.parseDecodedHeader(message.mime2DecodedAuthor || message.author || '')[0];
+    const email=address?.email?.toLowerCase();
+    if(!email || senders.has(email))continue;
+    const name=address.name?.trim();
+    // Display names are unstructured. Prefer an explicit surname-first form.
+    const familyName=name?.includes(',')?name.split(',')[0].trim():name?.split(/\s+/).at(-1);
+    senders.set(email,familyName || address.email);
+  }
+  return senders.size>1?[...senders.values()]:[];
+}
+
+function renderUnreadThreadSenders(win,row,parser=globalThis.MailServices?.headerParser) {
+  row.querySelector('.gm-unread-thread-senders')?.remove();
+  const view=win.gDBView;
+  if(!parser || !row.matches('.children.collapsed[data-properties~="hasUnread"]:not([data-properties~="dummy"])'))return;
+  const cell=row.querySelector('.sendercol-column, .correspondentcol-column');
+  if(!cell || cell.querySelector('.gm-draft-sender-content'))return;
+  try {
+    const thread=view?.getThreadContainingIndex?.(row.index);
+    if(!thread)return;
+    const names=unreadThreadSenderNames(thread,parser);
+    if(!names.length)return;
+    const summary=win.document.createElement('span');
+    summary.className='gm-unread-thread-senders';
+    summary.textContent=summary.title=names.join(', ');
+    const native=win.document.createElement('span');
+    native.className='gm-native-thread-sender';
+    // Keep the native text available when this row is reused.
+    if(!cell.querySelector('.gm-native-thread-sender')){
+      native.append(...cell.childNodes);
+      cell.append(native);
+    }
+    cell.prepend(summary);
+  }catch(_){/* The native thread may be unavailable during a folder change. */}
+}
+
 function renderThreadCount(win,row,total) {
   row.querySelector('.gm-thread-count')?.remove();
   try {
@@ -1110,6 +1151,9 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
       color:var(--gm-snippet, #9aa0a6) !important;
       font-weight:400 !important;
     }
+    /* Keep centering on the same height when 28px hover actions appear.
+       Fractional label/text heights otherwise round to different baselines. */
+    #threadTree .subject-line { min-block-size:28px; }
     #threadTree .gm-row-actions {
       display:none; flex:0 0 auto; gap:2px; margin-inline-start:auto;
       pointer-events:auto;
@@ -1156,7 +1200,11 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   function render(row) {
     renderThreadGuide(row);
     stars.render(row);
+    row.querySelector('.gm-unread-thread-senders')?.remove();
+    const nativeSender=row.querySelector('.gm-native-thread-sender');
+    if(nativeSender)nativeSender.replaceWith(...nativeSender.childNodes);
     drafts.render(row);
+    renderUnreadThreadSenders(win,row);
     conversationCounts.render(row);
     row.querySelector('.gm-row-actions')?.remove();
     row.querySelector('.gm-message-snippet')?.remove();
