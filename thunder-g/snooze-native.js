@@ -27,27 +27,48 @@ function createNativeSnooze() {
     }
     throw new Error('The Snoozed folder could not be created.');
   }
+  const copies=new Map();
   function copy(header,destination,move){
     if(closed)return Promise.reject(new Error('Snooze closed'));
+    const key=JSON.stringify([accountId(header.folder.server),messageId(header),header.date,header.folder.URI,destination.URI,move]);
+    let operation=copies.get(key);
+    if(!operation){
+      operation=new Promise((resolve,reject)=>{
+        MailServices.copy.copyMessages(header.folder,[header],destination,move,{
+          QueryInterface:ChromeUtils.generateQI(['nsIMsgCopyServiceListener']),
+          onStartCopy(){},onProgress(){},setMessageKey(){},getMessageId(){return '';},
+          onStopCopy(status){if(Components.isSuccessCode(status))resolve();else reject(new Error('Snooze move failed ('+status+').'));},
+        },null,false);
+      });
+      copies.set(key,operation);operation.then(()=>copies.delete(key),()=>copies.delete(key));
+    }
+    return waitCopy(operation);
+  }
+  function waitCopy(operation){
     return new Promise((resolve,reject)=>{
-    MailServices.copy.copyMessages(header.folder,[header],destination,move,{
-      QueryInterface:ChromeUtils.generateQI(['nsIMsgCopyServiceListener']),
-      onStartCopy(){},onProgress(){},setMessageKey(){},getMessageId(){return '';},
-      onStopCopy(status){if(Components.isSuccessCode(status))resolve();else reject(new Error('Snooze move failed ('+status+').'));},
-    },null,false);
-  });}
+      const timer=setTimeout(()=>reject(new Error('Snooze move is still pending. Saved snoozes will be retried.')),60000);
+      operation.then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
+    });
+  }
+  async function pendingCopies(message){
+    for(const [key,operation] of copies){
+      const [account,id,date]=JSON.parse(key);
+      if(account===message.account&&id===message.id&&date===message.date)await waitCopy(operation);
+    }
+  }
   async function refresh(folder){
-    if(folder.server.type!=='imap')return;
-    await new Promise((resolve,reject)=>{
+    if(folder.server.type!=='imap')return true;
+    const fresh=await new Promise((resolve,reject)=>{
       // A folder that is already updating may not start a new URL or invoke
       // this listener. Continue with cached headers and bounded arrival checks.
-      const timer=setTimeout(resolve,2000);
-      folder.updateFolderWithListener(null,{
+      const timer=setTimeout(()=>resolve(false),2000);
+      try{folder.QueryInterface(Ci.nsIMsgImapMailFolder).updateFolderWithListener(null,{
         QueryInterface:ChromeUtils.generateQI(['nsIUrlListener']),OnStartRunningUrl(){},
-        OnStopRunningUrl(_url,status){clearTimeout(timer);Components.isSuccessCode(status)?resolve():reject(new Error('The snoozed folder is unavailable.'));},
-      });
+        OnStopRunningUrl(_url,status){clearTimeout(timer);Components.isSuccessCode(status)?resolve(true):reject(new Error('The snoozed folder is unavailable.'));},
+      });}catch(error){clearTimeout(timer);reject(error);}
     });
     if(closed)throw new Error('Snooze closed');
+    return fresh;
   }
   async function arrived(folder,message){
     for(let attempt=0;attempt<300;attempt++){
@@ -96,6 +117,7 @@ function createNativeSnooze() {
       return {id:Services.uuid.generateUUID().toString(),subject:headers[0]?.mime2DecodedSubject||'',messages,due};
     },
     async hide(job,message){
+      await pendingCopies(message);
       const destination=message.storage===pendingFolder?await storage(serverFor(message)):folderFor(message,message.storage);
       message.storage=destination.URI;
       await refresh(destination);
@@ -109,23 +131,29 @@ function createNativeSnooze() {
       await arrived(destination,message);
     },
     async restore(job,message){
+      await pendingCopies(message);
       if(message.restored)return;
       const server=serverFor(message),inbox=server.rootFolder.getFolderWithFlags(folderFlags.Inbox);
       if(!inbox)throw new Error('This account has no Inbox.');
       if(message.storage===pendingFolder&&!server.rootFolder.containsChildNamed(folderName)){
         const existing=unique(inbox,message);if(existing){existing.setStringProperty('thunderGSnoozeReturned',String(Math.floor(Date.now()/1000)));return;}
       }
-      const storage=folderFor(message,message.storage);await refresh(storage);await refresh(inbox);
-      const header=unique(storage,message),existing=unique(inbox,message);
+      const storage=folderFor(message,message.storage),fresh=[await refresh(storage),await refresh(inbox)];
+      const header=unique(storage,message),existing=matches(inbox,message)[0]||null;
       if(!header){
         if(existing){existing.setStringProperty('thunderGSnoozeReturned',String(message.returned||Math.floor(Date.now()/1000)));return;}
         // A user moving/deleting a snoozed message cancels that reminder rather
         // than resurrecting another copy from Sent or another folder.
+        if(fresh?.every(Boolean)){message.cancelled=true;return;}
         throw new Error('The snoozed message is unavailable.');
       }
       if(existing){
-        // Never delete a user-visible duplicate automatically.
-        throw new Error('This message is already in Inbox. Move the Snoozed copy manually.');
+        // Complete the requested native move even when Inbox already has a
+        // logical copy (e.g. a Gmail message with both labels). Do not delete
+        // either copy manually: Thunderbird/server owns move semantics.
+        await copy(header,inbox,true);
+        existing.setStringProperty('thunderGSnoozeReturned',String(message.returned||Math.floor(Date.now()/1000)));
+        return;
       }
       message.returned ||= Math.floor(Date.now()/1000);
       await copy(header,inbox,true);

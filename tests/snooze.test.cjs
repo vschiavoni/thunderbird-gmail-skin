@@ -44,3 +44,30 @@ test('a failed journal write never reports acceptance',async()=>{
   let accepted=false;const service=scope.createSnoozeService({load:()=>[],save(){throw Error('disk full')},prepare:async()=>({id:'job',messages:[{id:'a'}]}),report(){}},{now:()=>1,schedule:()=>1,unschedule(){}});
   await assert.rejects(service.snooze(['a'],100,()=>accepted=true),/disk full/);assert.equal(accepted,false);
 });
+
+test('retrying a failed Unsnooze preserves cancellation and sends no due notification',async()=>{
+  const f=fixture();await f.service.snooze(['a'],2000);f.failRestore=true;
+  await assert.rejects(f.service.cancel('joba'),/offline/);
+  assert.equal(f.stored[0].wakeReason,'cancel');
+  f.failRestore=false;await f.service.check();assert.equal(f.stored.length,0);
+  assert.equal(f.notified.length,0);
+});
+
+test('cancelled queued requests never prepare or move another conversation',async()=>{
+  let release,started,prepared=[],stored=[];
+  const began=new Promise(resolve=>started=resolve);
+  const adapter={load:()=>[],save:jobs=>stored=structuredClone(jobs),prepare:async headers=>{prepared.push(headers[0]);return {id:headers[0],messages:[{id:headers[0]}]}},hide:async()=>{started();await new Promise(resolve=>release=resolve)},report(){}};
+  const service=scope.createSnoozeService(adapter,{now:()=>1,schedule:()=>1,unschedule(){}});
+  const first=service.snooze(['first'],100);await began;
+  let requested=true;const second=service.snooze(['cancelled'],100,null,()=>requested);
+  requested=false;release();await first;
+  await assert.rejects(second,error=>error.code==='SNOOZE_CANCELLED');
+  assert.deepEqual(prepared,['first']);assert.equal(stored.length,1);service.close();
+});
+test('failed durable Unsnooze write rolls back the in-memory waking state',async()=>{
+  let fail=false;
+  const service=scope.createSnoozeService({load:()=>[],save(){if(fail)throw Error('disk full')},prepare:async()=>({id:'a',messages:[{id:'a'}]}),hide:async()=>{},restore:async()=>{throw Error('must not restore')},report(){}},{now:()=>1,schedule:()=>1,unschedule(){}});
+  await service.snooze(['a'],100);fail=true;
+  await assert.rejects(service.cancelMany(['a']),/disk full/);
+  assert.equal(service.list()[0].state,'sleeping');assert.equal(service.list()[0].wakeReason,undefined);service.close();
+});
