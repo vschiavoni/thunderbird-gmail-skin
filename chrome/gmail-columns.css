@@ -155,3 +155,10 @@
   background-origin: content-box !important;
   background-repeat: no-repeat !important;
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  #threadTree tbody {
+    translate: 0 var(--gm-edge-bounce, 0px);
+    transition: translate 180ms ease-out;
+  }
+}

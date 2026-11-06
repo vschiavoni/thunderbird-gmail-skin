@@ -153,6 +153,7 @@ function installNativePagination(win, reader) {
       setStyle(tail,'top',tableEnd+'px');
       setStyle(tail,'height',Math.max(0,range.rowStart*height+tree.clientHeight-tableEnd)+'px');
       const min=range.rowStart*height,max=Math.max(min,range.rowEnd*height+header-tree.clientHeight);
+      tree._gmPageScrollLimits={min,max};
       const top=alignStart?min:Math.min(Math.max(tree.scrollTop,min),max);
       const rect=tree.getBoundingClientRect();
       const viewport=Math.max(0,tree.clientHeight-header);
@@ -168,6 +169,7 @@ function installNativePagination(win, reader) {
       if(alignStart || Math.abs(tree.scrollTop-top)>.5) tree.scrollTo({top,behavior:'instant'});
     }else{
       pageScroll.hidden=true;
+      delete tree._gmPageScrollLimits;
     }
     for(const row of tree.querySelectorAll('tr.table-layout, tr.card-layout')) {
       row.toggleAttribute('data-gm-outside-page',row.index<range.rowStart || row.index>=range.rowEnd);
@@ -240,6 +242,7 @@ function installNativePagination(win, reader) {
     observer.disconnect();resize.disconnect();
     if(frame!==null) win.cancelAnimationFrame(frame);frame=null;
     for(const row of tree.querySelectorAll('[data-gm-outside-page]')) row.removeAttribute('data-gm-outside-page');
+    delete tree._gmPageScrollLimits;
     pageScroll.hidden=true;tail.hidden=true;tail.style.height='0px';tree.removeAttribute('data-gm-paginated');
   }
   return {

@@ -557,12 +557,12 @@ function installInboxIdleActions(win,reader=null) {
   for(const name of ['select','viewchange','rowcountchange','gm-page-changed'])alignmentTree?.addEventListener?.(name,syncSelection);
   syncSelection();
   alignmentTree?.addEventListener?.('viewchange',alignCheckbox);
-  alignmentTree?.addEventListener?.('scroll',alignCheckbox);
+  alignmentTree?.addEventListener?.('rowcountchange',alignCheckbox);
   alignCheckbox();
   return {close(){closed=true;win.removeEventListener?.('gm-label-navigation',syncLabelBack);reader?.setSelectionControl?.(null);alignmentObserver?.disconnect();
     for(const name of ['select','viewchange','rowcountchange','gm-page-changed'])alignmentTree?.removeEventListener?.(name,syncSelection);
     alignmentTree?.removeEventListener?.('viewchange',alignCheckbox);
-    alignmentTree?.removeEventListener?.('scroll',alignCheckbox);
+    alignmentTree?.removeEventListener?.('rowcountchange',alignCheckbox);
     if(selectionFrame!==null)win.cancelAnimationFrame(selectionFrame);popup.hidePopup();popup.remove();bar.remove();style.remove();}};
 }
 
@@ -1007,10 +1007,49 @@ function installInboxSettingsButton(doc,openSettings) {
   return {close(){button.removeEventListener('click',openSettings);button.remove();}};
 }
 
+function installInboxEdgeBounce(win, tree) {
+  const reducedMotion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
+  let timer=null;
+  let distance=0;
+  function reset() {
+    if(timer!==null)win.clearTimeout(timer);
+    timer=null;
+    distance=0;
+    tree.style.removeProperty('--gm-edge-bounce');
+  }
+  function onWheel(event) {
+    if(reducedMotion?.matches || event.ctrlKey || event.metaKey ||
+        event.defaultPrevented || Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
+    const page=tree._gmPageScrollLimits;
+    const min=page?.min ?? 0;
+    const max=page?.max ?? tree.scrollHeight-tree.clientHeight;
+    const atEdge=max>min && (event.deltaY<0 ? tree.scrollTop<=min+1 : tree.scrollTop>=max-1);
+    if(!atEdge){
+      if(timer!==null)reset();
+      return;
+    }
+    const scale=event.deltaMode===0?1:16;
+    distance=Math.max(-16,Math.min(16,distance-event.deltaY*scale*.16));
+    tree.style.setProperty('--gm-edge-bounce',distance+'px');
+    if(timer!==null)win.clearTimeout(timer);
+    timer=win.setTimeout(reset,75);
+  }
+  tree.addEventListener('wheel',onWheel,{passive:true});
+  tree.addEventListener('viewchange',reset);
+  tree.addEventListener('gm-page-changed',reset);
+  return {close(){
+    if(timer!==null)reset();
+    tree.removeEventListener('wheel',onWheel);
+    tree.removeEventListener('viewchange',reset);
+    tree.removeEventListener('gm-page-changed',reset);
+  }};
+}
+
 function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,previewTrimming=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
+  const edgeBounce=installInboxEdgeBounce(win,tree);
   const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
@@ -1332,6 +1371,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     style.remove();
     previews.close();
     reader?.setDraftOpener?.(null);
+    edgeBounce.close();
     settingsButton.close();
     folderToggle.close();
     stars.close();
