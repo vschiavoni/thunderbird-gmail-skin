@@ -693,11 +693,24 @@ function installReadingMode(win) {
       if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
       return;
     }
-    if (event.target.closest('.select-column, .selectcol-column, #selectCol') ||
+    const selectionCell = event.target.closest('.select-column, .selectcol-column, #selectCol, .tree-view-row-select');
+    if (selectionCell ||
         event.ctrlKey || event.metaKey || event.shiftKey) {
       if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
       if (active) leave(false);
       bulk = true;
+      // Native selection only toggles on the checkbox image, not its cell,
+      // and ignores rapid clicks. Handle the whole selection cell consistently.
+      if (event.button === 0 && selectionCell) {
+        const row = event.target.closest('tr.table-layout, tr.card-layout');
+        if (row && tree.contains(row) && !row.hasAttribute('data-gm-outside-page')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (event.shiftKey) tree._selectRange(-1, row.index, event.ctrlKey || event.metaKey);
+          else tree._toggleSelected(row.index);
+          tree.ensureCorrectFocus?.();
+        }
+      }
       win.requestAnimationFrame(() => { if (!closed) syncBulk(); });
     }
   }
@@ -800,6 +813,12 @@ function installReadingMode(win) {
     });
   }
   function doubleClick(event) {
+    // Selection controls must never trigger Thunderbird's bulk message opener.
+    if (event.target.closest('.select-column, .selectcol-column, #selectCol, .tree-view-row-select')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     if (!isReadingClick(event) || !(event.target.closest('tr.table-layout') || event.target.closest('tr.card-layout'))) return;
     // The first click already opened the in-tab reader; avoid a second tab.
     event.preventDefault();
