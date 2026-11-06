@@ -107,6 +107,42 @@
   padding-inline:0 !important;
 }
 
+/* Reserve room for the active marker and hover dots before each checkbox. */
+:root { --gm-selection-gutter: 16px; }
+#threadTree :is(#selectCol, .selectcol-column, td.tree-view-row-select) {
+  width: calc(28px + var(--gm-selection-gutter)) !important;
+  min-width: calc(28px + var(--gm-selection-gutter)) !important;
+  max-width: calc(28px + var(--gm-selection-gutter)) !important;
+  inline-size: calc(28px + var(--gm-selection-gutter)) !important;
+  min-inline-size: calc(28px + var(--gm-selection-gutter)) !important;
+  max-inline-size: calc(28px + var(--gm-selection-gutter)) !important;
+  padding-inline-start: var(--gm-selection-gutter) !important;
+}
+#threadTree tr.table-layout > td.tree-view-row-select {
+  position: relative;
+}
+#threadTree tr.table-layout.current > td.tree-view-row-select::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  background: light-dark(#4285f4, #8ab4f8);
+  pointer-events: none;
+}
+#threadTree tr.table-layout:hover > td.tree-view-row-select::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 5px;
+  inline-size: 10px;
+  block-size: 15px;
+  transform: translateY(-50%);
+  background: radial-gradient(circle, currentColor 1.25px, transparent 1.75px) 0 0 / 5px 5px;
+  opacity: .45;
+  pointer-events: none;
+}
+
 /* Keep the hover circle behind the native checkbox and inside its gutter. */
 #threadTree .tree-view-row-select:hover {
   background-image: radial-gradient(
@@ -116,5 +152,6 @@
   ) !important;
   background-size: 26px 26px !important;
   background-position: center !important;
+  background-origin: content-box !important;
   background-repeat: no-repeat !important;
 }

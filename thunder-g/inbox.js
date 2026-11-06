@@ -504,6 +504,8 @@ function installInboxIdleActions(win,reader=null) {
     .gm-inbox-idle-actions{display:flex;align-items:center;gap:8px;min-height:36px;flex:0 0 auto;overflow:visible;}
     .gm-inbox-select-group{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;block-size:36px;flex:0 0 auto;margin:0;padding:0 6px;border-radius:6px;gap:2px;}
     .gm-inbox-select-group{background:transparent!important;}
+    .gm-inbox-select-group{padding-inline-start:calc(6px + var(--gm-selection-gutter, 0px));}
+    #threadPane > .gm-reading-toolbar:has(> .gm-inbox-select-group){padding-inline-start:0!important;}
     .gm-inbox-select-group input{appearance:none!important;box-sizing:border-box;border:2px solid currentColor!important;background:transparent!important;inline-size:16px!important;block-size:16px!important;min-inline-size:16px!important;flex:0 0 16px;padding:0!important;margin:0!important;accent-color:#1a73e8;cursor:pointer;border-radius:2px!important;}
     /* All three states keep the same square shape, independent of OS accent. */
     .gm-inbox-select-group input:checked{appearance:none!important;background:transparent url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22m3%208%203%203%207-7%22%20fill%3D%22none%22%20stroke%3D%22%23444746%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E") center/14px 14px no-repeat!important;}
