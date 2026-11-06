@@ -26,7 +26,7 @@ test('zoom delegates Ctrl/Cmd plus/minus/reset to native controls and leaves tex
   listener({ctrlKey:true,key:'+',target,preventDefault(){},stopImmediatePropagation(){stopped++}});
   assert.equal(zoomed,1);assert.equal(stopped,1);zoom.close();assert.equal(removed,listener);
 });
-for (const collapsed of [false,true,'short-last']) test(`native pagination retains native rows and reaches every message (collapsed threads: ${collapsed})`,()=>{
+for (const collapsed of [false,true,'short-last','threaded']) test(`native pagination retains native rows and reaches every message (collapsed threads: ${collapsed})`,()=>{
   function node() {
     const attrs=new Set(),events={};
     let text='',textWrites=0;
@@ -38,6 +38,7 @@ for (const collapsed of [false,true,'short-last']) test(`native pagination retai
       append(...items){this.children.push(...items)},before(item){this.bar=item},remove(){this.removed=true}};
   }
   const total=collapsed==='short-last'?219:collapsed?218:53;
+  const threaded=collapsed==='threaded',hasThread=collapsed===true || threaded;
   const rows=Array.from({length:total},(_,index)=>Object.assign(node(),{index}));
   const tree=node();tree.getBoundingClientRect=()=>({top:0,left:260,right:1000});tree.parentNode={};tree.clientHeight=200;tree.scrollTop=0;tree._rowElementClass={ROW_HEIGHT:20};
   if(collapsed==='short-last') {
@@ -54,9 +55,10 @@ for (const collapsed of [false,true,'short-last']) test(`native pagination retai
   tree.currentIndex=-1;tree.selectedIndices=[];
   tree.querySelectorAll=selector=>selector==='[data-gm-outside-page]'?rows.filter(r=>r.hasAttribute('data-gm-outside-page')):rows;
   let expansions=0;
-  const nativeView={rowCount:collapsed===true?195:total,numMsgsInView:total,getFlagsAt:()=>0,
+  const nativeView={rowCount:hasThread?195:total,numMsgsInView:total,viewFlags:threaded?1:0,getFlagsAt:()=>0,
+    getLevel:index=>threaded && nativeView.rowCount===total && index>0 && index<24?1:0,
     doCommand(){expansions++;throw Error('pagination must never expand all threads')},
-    isContainer:index=>collapsed===true && index===0,
+    isContainer:index=>hasThread && index===0,
     isContainerOpen:()=>nativeView.rowCount===total,
     getThreadContainingIndex:()=>({numChildren:24}),
     toggleOpenState(index){assert.equal(index,0);this.rowCount=this.rowCount===total?195:total}};tree.view=nativeView;
@@ -95,6 +97,23 @@ for (const collapsed of [false,true,'short-last']) test(`native pagination retai
     assert.equal(tree.scrollTop,200*20,'density changes keep the final page aligned');
     assert.equal(tree.children[0].style.height,'100px');
     pages.setSize(0);assert.equal(tree.hasAttribute('data-gm-paginated'),false,'continuous native scrolling is restored');assert.equal(tree.children[0].hidden,true);pages.close();return;
+  }
+  if(threaded) {
+    pages.setSize(100);
+    assert.equal(tree.bar.children[0].textContent,'1–100 of 195');
+    assert.equal(rows[99].hasAttribute('data-gm-outside-page'),false);
+    assert.equal(rows[100].hasAttribute('data-gm-outside-page'),true);
+    tree.events.keydown({ctrlKey:true,key:'a',target:{closest:()=>null},preventDefault(){},stopImmediatePropagation(){}});
+    assert.equal(nativeView.rowCount,218);
+    assert.equal(selections.at(-1).length,123,'100 conversations include all 24 messages in the first thread');
+    while(frames.length)frames.shift()();
+    assert.equal(tree.bar.children[0].textContent,'1–100 of 195','expanding for selection preserves conversation totals');
+    tree.bar.children[2].events.click();
+    assert.equal(tree.bar.children[0].textContent,'101–195 of 195');
+    assert.equal(rows[122].hasAttribute('data-gm-outside-page'),true);
+    assert.equal(rows[123].hasAttribute('data-gm-outside-page'),false);
+    assert.equal(tree.scrollTop,123*20);
+    pages.close();return;
   }
   if(collapsed) {
     pages.setSize(100);
@@ -163,8 +182,8 @@ for (const collapsed of [false,true,'short-last']) test(`native pagination retai
   pages.close();assert.equal(tree.bar.removed,true);
 });
 
-test('collapsed threads spanning pages remain reachable with stable message totals',()=>{
- const view={rowCount:2,getFlagsAt:()=>0,isContainer:i=>i===0,isContainerOpen:()=>false,getThreadContainingIndex:()=>({numChildren:150})};
+test('collapsed sort groups spanning pages remain reachable with stable message totals',()=>{
+ const view={viewFlags:0x40,rowCount:2,getFlagsAt:()=>0,isContainer:i=>i===0,isContainerOpen:()=>false,getThreadContainingIndex:()=>({numChildren:150})};
  const rows=scope.nativePageRows(view);
  assert.equal(rows.total,151);
  const first=scope.nativeMessagePage(rows,100,0),last=scope.nativeMessagePage(rows,100,1);
@@ -203,4 +222,27 @@ test('native content zoom always passes an explicit message browser, including s
   assert.equal(scope.zoomNativeMessage({ZoomManager:manager},null,'increaseSize'),false);
   assert.equal(scope.zoomNativeMessage({},pane,'increaseSize'),false);
   assert.equal(calls.length,6,'loading or missing browsers cannot zoom a default UI browser');
+});
+
+
+test('threaded pages count a 100-message conversation once and never split expanded descendants',()=>{
+ const makeView=open=>({viewFlags:1,rowCount:open?103:4,getFlagsAt:()=>0,
+  getLevel:i=>open && i>=2 && i<=100?(i===50?2:1):0,
+  isContainer:i=>i===1,isContainerOpen:()=>open,getThreadContainingIndex:()=>({numChildren:100})});
+ for(const open of [false,true]){
+  const rows=scope.nativePageRows(makeView(open));assert.equal(rows.total,4);
+  const first=scope.nativeMessagePage(rows,2,0),last=scope.nativeMessagePage(rows,2,1);
+  assert.equal(first.rowStart,0);assert.equal(first.rowEnd,open?101:2);
+  assert.equal(last.rowStart,first.rowEnd);assert.equal(last.rowEnd,open?103:4);
+  assert.equal(first.pages,2);assert.equal(last.start,2);assert.equal(last.end,4);
+ }
+});
+test('flat and grouped views count messages while threaded totals stay independent of thread size',()=>{
+ const view={viewFlags:1,rowCount:3,getFlagsAt:()=>0,getLevel:()=>0,
+  isContainer:()=>true,isContainerOpen:()=>false,getThreadContainingIndex:()=>({numChildren:100})};
+ assert.equal(scope.nativePageRows(view).total,3);
+ view.viewFlags=0;view.isContainer=()=>false;
+ assert.equal(scope.nativePageRows(view).total,3);
+ view.viewFlags=0x41;view.isContainer=i=>i===0;view.getFlagsAt=i=>i===0?0x20000000:0;
+ assert.equal(scope.nativePageRows(view).total,101,'a collapsed sort group counts its messages, not one conversation');
 });

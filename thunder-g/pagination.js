@@ -4,12 +4,21 @@ function nativePageBounds(total, size, page) {
   page=Math.min(Math.max(0,page),pages-1);
   return {page,pages,start:page*size,end:Math.min(total,(page+1)*size)};
 }
-// Each visible row covers one message, or the whole hidden subtree of a
-// collapsed thread. Page membership counts messages, scroll geometry counts rows.
+// Threaded pages count conversations, keeping every expanded descendant on the
+// same page as its root. Flat/grouped views count messages; geometry counts rows.
 function nativePageRows(view) {
   const spans=[];let total=0;
+  const threaded=!!(view?.viewFlags&1) && !(view.viewFlags&0x40);
+  let threadSpan=null;
   for(let index=0;index<(view?.rowCount || 0);index++) {
     const dummy=!!(view.getFlagsAt(index)&0x20000000);
+    if(threaded && !dummy) {
+      if(!threadSpan || view.getLevel(index)===0) {
+        threadSpan={start:total,end:total+1};total++;
+      }
+      spans.push({...threadSpan});
+      continue;
+    }
     let count=dummy?0:1;
     if(view.isContainer?.(index) && !view.isContainerOpen(index)) {
       try {
@@ -114,8 +123,8 @@ function installNativePagination(win, reader) {
   `;doc.head.append(style);
   function rows(){
     const view=win.gDBView;
-    if(!rowMap || rowMap.view!==view || rowMap.count!==(view?.rowCount || 0) || rowMap.messages!==view?.numMsgsInView)
-      rowMap={...nativePageRows(view),view,count:view?.rowCount || 0,messages:view?.numMsgsInView};
+    if(!rowMap || rowMap.view!==view || rowMap.count!==(view?.rowCount || 0) || rowMap.messages!==view?.numMsgsInView || rowMap.flags!==view?.viewFlags)
+      rowMap={...nativePageRows(view),view,count:view?.rowCount || 0,messages:view?.numMsgsInView,flags:view?.viewFlags};
     return rowMap;
   }
   function bounds(){return nativeMessagePage(rows(),size,page)}
@@ -204,7 +213,8 @@ function installNativePagination(win, reader) {
     event.preventDefault();event.stopImmediatePropagation();
     let range=bounds();
     // Selecting a page is an explicit bulk action. Reveal only collapsed rows
-    // touching it so native selection cannot include hidden children on another page.
+    // touching it. Threaded page bounds retain all descendants of those threads;
+    // grouped message views still enforce their individual message boundaries.
     for(let i=range.rowEnd-1;i>=range.rowStart;i--) {
       if(win.gDBView.isContainer?.(i) && !win.gDBView.isContainerOpen(i))win.gDBView.toggleOpenState(i);
     }

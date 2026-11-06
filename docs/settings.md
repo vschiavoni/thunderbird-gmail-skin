@@ -56,7 +56,9 @@ and reduced-motion preference.
 - **Show column headers** *(off by default)* — Restore clickable headers, column resizing and the column picker. Applies immediately without changing the sort order or saved widths.
 
 - **Messages per page** — Show 25, 50 or 100 messages at a time. **All messages**
-  (default) keeps one continuous list. Totals include messages in collapsed threads.
+  (default) keeps one continuous list. In threaded view each conversation counts
+  as one item, whether collapsed or expanded; all its replies stay on the same
+  page. Flat and grouped-by-sort views count individual messages.
 - **Hide Today Pane** *(off by default)* — Hide the calendar pane and its toggle
   to make room for mail. Turning this off restores Thunderbird’s visibility setting.
 - **Show thread connection lines** *(on by default)* — Draw a subtle line between
