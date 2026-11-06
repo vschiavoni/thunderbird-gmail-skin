@@ -1,7 +1,7 @@
 /* Durable, serialized snooze jobs. The adapter only handles native folders and
  * headers; the journal never contains message bodies or account credentials. */
 function createSnoozeService(adapter, {now=()=>Date.now(),schedule=setTimeout,unschedule=clearTimeout}={}) {
-  let jobs=adapter.load(),queue=Promise.resolve(),timer=null,closed=false;
+  let jobs=adapter.load(),queue=Promise.resolve(),timer=null,closed=false,checking=null;
   if(!Array.isArray(jobs)||jobs.length>1000||jobs.some(job=>
     !job||typeof job.id!=='string'||!Number.isFinite(job.due)||!Number.isFinite(job.created)||
     !['preparing','sleeping','waking'].includes(job.state)||!Array.isArray(job.messages)||!job.messages.length||job.messages.length>5000||
@@ -13,10 +13,21 @@ function createSnoozeService(adapter, {now=()=>Date.now(),schedule=setTimeout,un
     if(timer!==null)unschedule(timer);
     if(closed||!jobs.length){timer=null;return;}
     const due=Math.min(...jobs.map(job=>job.due));
-    timer=schedule(()=>{timer=null;run(()=>recover());},due<=now()?30000:Math.min(30000,Math.max(1000,due-now())));
+    timer=schedule(()=>{timer=null;check().catch(()=>{});},due<=now()?30000:Math.min(30000,Math.max(1000,due-now())));
   }
-  function run(task){const result=queue.then(()=>{if(closed)throw new Error('Snooze closed');return task();});queue=result.catch(error=>{if(error.code!=='SNOOZE_CANCELLED')adapter.report(error);}).finally(arm);return result;}
+  function run(task){const queued=Date.now();const result=queue.then(()=>{adapter.timing?.('queue-wait',queued);if(closed)throw new Error('Snooze closed');return task();});queue=result.catch(error=>{if(error.code!=='SNOOZE_CANCELLED')adapter.report(error);}).finally(arm);return result;}
+  function check(){
+    if(!checking){
+      checking=run(recover);
+      checking.then(()=>{checking=null;},()=>{checking=null;});
+    }
+    return checking;
+  }
   function accepted(callback){try{callback?.();}catch(error){adapter.report(error);}}
+  async function moveMessages(job,kind){
+    if(adapter[kind+'Many']){await adapter[kind+'Many'](job,()=>{if(!closed)save();});return;}
+    for(const message of job.messages){if(closed)return;await adapter[kind](job,message);message[kind==='hide'?'hidden':'restored']=true;save();}
+  }
   function ensureRequested(shouldProceed){
     if(shouldProceed&&!shouldProceed()){const error=new Error('Snooze cancelled');error.code='SNOOZE_CANCELLED';throw error;}
   }
@@ -27,23 +38,24 @@ function createSnoozeService(adapter, {now=()=>Date.now(),schedule=setTimeout,un
   }
   async function finish(job,reason,onAccepted){
     beginWaking([job],reason);accepted(onAccepted);
-    for(const message of job.messages){if(closed)return;await adapter.restore(job,message);message.restored=true;save();}
+    await moveMessages(job,'restore');
     if(closed)return;
     jobs=jobs.filter(item=>item!==job);save();
     if(job.wakeReason!=='cancel'&&job.messages.some(message=>!message.cancelled))adapter.notify(job,job.wakeReason);
   }
   async function recover(){
-    for(const job of [...jobs]){
+    adapter.beginCheck?.();
+    try{for(const job of [...jobs]){
       if(closed)return;
       try{
         if(job.state==='preparing'){
-          for(const message of job.messages){if(closed)return;await adapter.hide(job,message);message.hidden=true;save();}
+          await moveMessages(job,'hide');
           if(closed)return;
           job.state='sleeping';delete job.error;save();
         }
         if(job.state==='waking'||job.due<=now()||await adapter.hasReply(job))await finish(job,'due');
       }catch(error){job.error=error.message;save();adapter.report(error);}
-    }
+    }}finally{adapter.endCheck?.();}
   }
   return {
     list(){return jobs.map(job=>({...job,messages:job.messages.map(message=>({...message}))}));},
@@ -67,9 +79,17 @@ function createSnoozeService(adapter, {now=()=>Date.now(),schedule=setTimeout,un
       jobs.push(...planned);try{save();}catch(error){jobs.splice(previousLength);throw error;}
       accepted(onAccepted);
       let failed=false;
-      for(const job of planned){
+      if(adapter.hideJobs){
+        const failures=await adapter.hideJobs(planned,save);
+        if(closed)return;
+        for(const job of planned){
+          if(failures.has(job)){const error=failures.get(job);job.error=error.message;adapter.report(error);failed=true;}
+          else {job.state='sleeping';delete job.error;}
+        }
+        save();
+      }else for(const job of planned){
         try{
-          for(const message of job.messages){if(closed)return;await adapter.hide(job,message);message.hidden=true;save();}
+          await moveMessages(job,'hide');
           if(closed)return;
           job.state='sleeping';delete job.error;save();
         }catch(error){job.error=error.message;save();adapter.report(error);failed=true;}
@@ -83,17 +103,25 @@ function createSnoozeService(adapter, {now=()=>Date.now(),schedule=setTimeout,un
       const selected=jobs.filter(job=>ids.includes(job.id));
       if(!selected.length){accepted(onAccepted);return;}
       beginWaking(selected,'cancel');accepted(onAccepted);
-      for(const job of selected)await finish(job,'cancel');
+      if(adapter.restoreJobs){
+        const failures=await adapter.restoreJobs(selected,save);
+        if(closed)return;
+        jobs=jobs.filter(job=>!selected.includes(job)||failures.has(job));
+        for(const [job,error] of failures){job.error=error.message;adapter.report(error);}save();
+        if(failures.size)throw failures.values().next().value;
+      }else for(const job of selected)await finish(job,'cancel');
     });},
     cancel(id,onAccepted,shouldProceed){return run(async()=>{ensureRequested(shouldProceed);const job=jobs.find(job=>job.id===id);if(job)await finish(job,'cancel',onAccepted);else accepted(onAccepted);});},
     forget(predicate){return run(async()=>{
+      let changed=false;
       for(const job of jobs)if(job.state==='sleeping'){
         const retained=[];for(const message of job.messages)if(!await predicate(message))retained.push(message);
+        if(retained.length!==job.messages.length)changed=true;
         job.messages=retained;
       }
-      jobs=jobs.filter(job=>job.messages.length);save();
+      if(changed){jobs=jobs.filter(job=>job.messages.length);save();}
     });},
-    check(){return run(recover);},
+    check,
     close(){closed=true;if(timer!==null)unschedule(timer);observers.clear();adapter.close?.();},
   };
 }

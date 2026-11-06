@@ -45,6 +45,14 @@ test('a failed journal write never reports acceptance',async()=>{
   await assert.rejects(service.snooze(['a'],100,()=>accepted=true),/disk full/);assert.equal(accepted,false);
 });
 
+test('bursts of Inbox notifications share one queued recovery scan',async()=>{
+  const f=fixture();await f.service.snooze(['a'],99999);
+  const first=f.service.check();
+  for(let i=0;i<120;i++)assert.equal(f.service.check(),first);
+  await first;
+  const next=f.service.check();assert.notEqual(next,first);await next;
+});
+
 test('retrying a failed Unsnooze preserves cancellation and sends no due notification',async()=>{
   const f=fixture();await f.service.snooze(['a'],2000);f.failRestore=true;
   await assert.rejects(f.service.cancel('joba'),/offline/);
