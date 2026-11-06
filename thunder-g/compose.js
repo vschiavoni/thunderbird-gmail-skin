@@ -297,11 +297,17 @@ function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineRe
     if(closed || !job || !job.done || job.delivered)return;
     job.recovered=true;job.draftURI=compose.compFields.draftId;emit('draft-saved');
   }
+  function displayAddress(value) {
+    if(!value || !value.includes('=?'))return value || '';
+    try {
+      return globalThis.MailServices?.mimeConverter?.decodeMimeHeader(value,null,false,true) || value;
+    }catch(_){return value;}
+  }
   function snapshot() {
     const fields=compose.compFields;
     let body='';try{body=native.GetCurrentEditor().outputToString('text/plain',0)}catch(_){}
-    ++sequence;return {id:{},from:fields.from || native.gCurrentIdentity?.email || '',to:fields.to || '',
-      subject:fields.subject || '',date:Date.now(),cc:fields.cc || '',body,messageId:fields.messageId || '',attachments:Array.from(native.gAttachmentBucket?.itemChildren || [],item=>item.attachment?.name || '').filter(Boolean)};
+    ++sequence;return {id:{},from:displayAddress(fields.from || native.gCurrentIdentity?.email),to:displayAddress(fields.to),
+      subject:fields.subject || '',date:Date.now(),cc:displayAddress(fields.cc),body,messageId:fields.messageId || '',attachments:Array.from(native.gAttachmentBucket?.itemChildren || [],item=>item.attachment?.name || '').filter(Boolean)};
   }
   function emit(state){if(!closed && job)onState({...job,state})}
   function starting(event) {

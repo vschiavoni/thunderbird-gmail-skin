@@ -307,6 +307,28 @@ test('inline send shows an immediate snapshot and reports Sent only after native
  assert.equal(f.states[1].messageId,'<outgoing-id>');assert.equal(f.states[0].id,f.states[1].id);
  assert.equal(f.saved,0);f.status.close();assert.equal(f.native.GenericSendMessage,f.original);
 });
+test('pending replies decode MIME address display names without changing compose fields',async()=>{
+ const f=sendFixture();
+ const fields=f.native.gMsgCompose.compFields;
+ const encoded='=?UTF-8?Q?Th=C3=A9o_Rollier?= <theo@example.org>';
+ const decoded='Théo Rollier <theo@example.org>';
+ fields.to=encoded;
+ fields.cc='Plain Name <plain@example.org>';
+ const previous=scope.MailServices;
+ scope.MailServices={mimeConverter:{decodeMimeHeader(value){
+  assert.equal(value,encoded);
+  return decoded;
+ }}};
+ try {
+  await f.native.GenericSendMessage(f.modes.Now);
+  assert.equal(f.states[0].to,decoded);
+  assert.equal(f.states[0].cc,fields.cc);
+  assert.equal(fields.to,encoded);
+ }finally{
+  scope.MailServices=previous;
+  f.status.close();
+ }
+});
 test('native failure saves the real composer as a draft and exposes draft-save failure honestly',async()=>{
  for(const draftFails of [false,true]){
   const f=sendFixture({result:'failure',draftFails});await f.native.GenericSendMessage(f.modes.Now);
