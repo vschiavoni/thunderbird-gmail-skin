@@ -78,19 +78,83 @@ function conversationPhysicalMessages(messages,copyFolders=null) {
   }
   return [...physical.values()];
 }
-function applyConversationLabel(messages, key, add) {
-  const folders = new Map();
-  for (const message of conversationPhysicalMessages(messages)) {
-    const uri = message.folder.URI;
-    if (!folders.has(uri)) folders.set(uri, {folder:message.folder, messages:[]});
-    folders.get(uri).messages.push(message);
+const conversationLabelNotices = new WeakMap();
+function showConversationLabelNotice(win, name, add, undo) {
+  conversationLabelNotices.get(win)?.();
+  const doc = win.document;
+  const notice = doc.createElement('div');
+  notice.style.cssText = 'position:fixed;inset-block-end:24px;inset-inline-start:24px;z-index:10000;display:flex;align-items:center;gap:20px;max-inline-size:calc(100vw - 48px);padding:12px 16px;border-radius:4px;background:#202124;color:#fff;box-shadow:0 4px 16px #0004;';
+  const message = doc.createElement('span');
+  message.setAttribute('role','status');
+  message.textContent = add ? gmText("Conversation added to $1", name) : gmText("Conversation removed from $1", name);
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.textContent = gmText("Undo");
+  button.style.cssText = 'appearance:none;border:0;background:none;color:#a8c7fa;cursor:pointer;font:inherit;';
+  const dismiss = doc.createElement('button');
+  dismiss.type = 'button';
+  dismiss.textContent = '×';
+  dismiss.setAttribute('aria-label',gmText("Dismiss"));
+  dismiss.style.cssText = 'appearance:none;border:0;background:none;color:inherit;cursor:pointer;font:inherit;';
+  function close() {
+    win.clearTimeout(timer);
+    notice.remove();
+    conversationLabelNotices.delete(win);
   }
-  // Same native folder operations used by Thunderbird's tag command; no selection
-  // manipulation, message copying, or account/provider-specific tag storage.
-  for (const {folder,messages} of folders.values()) {
-    if (add) folder.addKeywordsToMessages(messages, key);
-    else folder.removeKeywordsFromMessages(messages, key);
+  button.addEventListener('click',()=>{
+    try {
+      undo();
+      close();
+    } catch(error) {
+      message.textContent = gmText("Could not undo the label change.");
+      button.disabled = true;
+      console.error(error);
+    }
+  });
+  dismiss.addEventListener('click',close);
+  notice.append(message,button,dismiss);
+  doc.documentElement.append(notice);
+  const timer = win.setTimeout(close,10000);
+  conversationLabelNotices.set(win,close);
+}
+
+function applyConversationLabel(messages, key, add, win=null, refresh=null, nativeWrite=null) {
+  const physical = nativeWrite ? messages : conversationPhysicalMessages(messages);
+  function write(headers, adding) {
+    const folders = new Map();
+    for (const header of headers) {
+      if (!folders.has(header.folder.URI)) folders.set(header.folder.URI, {folder:header.folder, messages:[]});
+      folders.get(header.folder.URI).messages.push(header);
+    }
+    for (const {folder,messages} of folders.values()) {
+      if (adding) folder.addKeywordsToMessages(messages, key);
+      else folder.removeKeywordsFromMessages(messages, key);
+    }
   }
+  if (!win) {
+    write(physical,add);
+    return;
+  }
+  const changed = [], legacy = [];
+  for (const header of physical) {
+    const hasKeyword = (header.getStringProperty?.('keywords') || '').split(/\s+/).includes(key);
+    const oldLabel = header.label;
+    const hasLegacy = oldLabel && key === `$label${oldLabel}`;
+    if (add ? !hasKeyword && !hasLegacy : hasKeyword) changed.push(header);
+    if (!add && hasLegacy) legacy.push([header,oldLabel]);
+  }
+  if (nativeWrite) nativeWrite();
+  else {
+    write(changed,add);
+    for (const [header] of legacy) header.label=0;
+  }
+  if (!changed.length && !legacy.length) return;
+  const name = MailServices.tags.getAllTags().find(tag=>tag.key===key)?.tag || key;
+  showConversationLabelNotice(win,name,add,()=>{
+    write(changed,!add);
+    for (const [header,label] of legacy) header.label=label;
+    refresh?.();
+  });
 }
 
 function adjacentMessageIndex(view, index, direction) {
@@ -354,10 +418,11 @@ function installReadingMode(win) {
   }
   function applyPickerLabel(key, add) {
     if (pickerConversation) {
-      applyConversationLabel(pickerMessages, key, add);
+      applyConversationLabel(pickerMessages, key, add, win, () => independent?.refresh?.());
       independent?.refresh?.();
     }
-    else win.commandController._toggleMessageTag(key, add);
+    else applyConversationLabel(pickerMessages, key, add, win, null,
+      () => win.commandController._toggleMessageTag(key, add));
   }
   function sameSelection() {
     const selected = win.gDBView?.getSelectedMsgHdrs() || [];

@@ -562,8 +562,7 @@ function installIndependentReader(win) {
         event.preventDefault();event.stopPropagation();
         if(closed || chip.isConnected===false || !currentHeaders.length)return;
         try {
-          applyConversationLabel(currentHeaders,tag.key,false);
-          for(const header of currentHeaders)if(header.label && tag.key===`$label${header.label}`)header.label=0;
+          applyConversationLabel(currentHeaders,tag.key,false,win,refreshTags);
           refreshTags();
         }catch(_){status.hidden=false;status.textContent='Could not remove the label from every message. Try again.';refreshTags();}
       });

@@ -280,7 +280,7 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     {key:'child',tag:'Project One/Child'},{key:'leaf',tag:'Project One/Child/Leaf'}]}};
   const nativeCommands=[];
   const win={document:doc,top:{document:doc},gDBView:{rowCount:2,getFlagsAt:()=>0,getMsgHdrAt:i=>messages[i],getSelectedMsgHdrs:()=>selected},commandController:{_toggleMessageTag:(...args)=>calls.push(args),doCommand:name=>nativeCommands.push(name)},
-    addEventListener(){},removeEventListener(){}};
+    setTimeout(){return 1},clearTimeout(){},addEventListener(){},removeEventListener(){}};
   let conversationMessages=[...messages,{messageKey:1,folder:{URI:'Sent'},getStringProperty:()=>''}],refreshes=0;
   if(independentMode) {
     scope.installIndependentReader=()=>({open:()=>Promise.resolve(),getMessages:()=>conversationMessages,refresh(){refreshes++},hide(){},close(){}});
@@ -298,12 +298,15 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     assert.equal(nodes.find(n=>n.className==='gm-label-scope').hidden,true,'scope remains in the accessible panel name');
     assert.equal(nodes.find(n=>n.name==='panel').getAttribute('aria-label'),'Label as — entire conversation, 3 messages, includes sent replies');
     const checkbox=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');checkbox.checked=true;checkbox.events.change[0]();
-    assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['add','inbox',[1,2],'one'],['add','Sent',[1],'one']]);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['add','inbox',[2],'one'],['add','Sent',[1],'one']]);
+    assert.ok(nodes.some(n=>n.textContent==='Conversation added to Project One'));
+    nodes.find(n=>n.textContent==='Undo').events.click[0]();
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(2))),[['remove','inbox',[2],'one'],['remove','Sent',[1],'one']]);
     checkbox.checked=false;checkbox.events.change[0]();
-    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(2))),[['remove','inbox',[1,2],'one'],['remove','Sent',[1],'one']]);
-    assert.equal(refreshes,2,'message chips and title labels refresh after a conversation-wide write');
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(4))),[['remove','inbox',[1],'one']]);
+    assert.equal(refreshes,3,'message chips and title labels refresh after a conversation-wide write');
     conversationMessages=conversationMessages.slice(0,1);checkbox.checked=true;checkbox.events.change[0]();
-    assert.equal(calls.length,4,'changing conversation membership invalidates the open picker');
+    assert.equal(calls.length,5,'changing conversation membership invalidates the open picker');
     conversationMessages=[];pressL();
     assert.ok(nodes.some(n=>n.getAttribute?.('aria-label')?.includes('loading')),'loading must never imply a partial message count');
     assert.equal(nodes.find(n=>n.type==='search').disabled,true,'loading cannot fall back to labeling just the selected row');
@@ -324,6 +327,11 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   const first=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');assert.equal(first.indeterminate,true);
   first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['one',true]]);
   first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['one',false]);
+  const undone=[];
+  messages[0].folder.addKeywordsToMessages=(headers,key)=>undone.push([Array.from(headers,h=>h.messageKey),key]);
+  assert.ok(nodes.some(n=>n.textContent==='Conversation removed from Project One'));
+  nodes.filter(n=>n.textContent==='Undo').at(-1).events.click[0]();
+  assert.deepEqual(undone,[[[1],'one']]);
   search.value='Other';search.events.input[0]();
   const list=nodes.find(n=>n.className==='gm-label-list');assert.equal(list.childElementCount,1);
   const other=list.children[0].children.find(n=>n.type==='checkbox');selected=[messages[0]];
