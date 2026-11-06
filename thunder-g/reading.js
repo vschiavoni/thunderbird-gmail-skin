@@ -129,7 +129,6 @@ function installReadingMode(win) {
   const threadPane = doc.getElementById('threadPane');
   const headingTargets = ['threadPaneFolderName', 'threadPaneFolderCountContainer']
     .map(id => doc.getElementById(id)).filter(Boolean);
-  const selectionLabel = doc.createElement('span');
   const originalMessagePaneVisible = layout.messagePaneVisible;
   // A message replaces the list inside the current mail tab.
   layout.messagePaneVisible = false;
@@ -181,8 +180,6 @@ function installReadingMode(win) {
     .gm-reading-back svg { display:block; inline-size:20px; block-size:20px; flex:none; }
     .gm-action-separator { inline-size:1px; block-size:20px; margin-inline:8px;
       background:var(--layout-border-0, #dadce0); flex:0 0 1px; }
-    .gm-selection-count { margin-inline:6px 10px; white-space:nowrap; }
-    .gm-selection-count:empty { display:none; }
     /* Replace the folder heading with actions, rather than adding another row. */
     #threadPane.gm-bulk-selecting > #threadPaneHeaderBar { display:none !important; }
     #threadPaneHeaderBar { min-block-size:44px; box-sizing:border-box; }
@@ -215,8 +212,7 @@ function installReadingMode(win) {
   back.className = 'gm-reading-back';
   back.type = 'button';
   setBackIcon(false);
-  selectionLabel.className = 'gm-selection-count';
-  toolbar.append(back, selectionLabel);
+  toolbar.append(back);
   separator();
   const popups = [];
   function icon(path) {
@@ -662,7 +658,6 @@ function installReadingMode(win) {
     if (!toolbar.hidden) {
       threadPane.prepend(toolbar);
       setBackIcon(true);
-      gmBindValue(selectionLabel, "textContent", () => gmText("$1 selected", count));
       gmBindAttribute(toolbar, 'aria-label', () => gmText("Selected message actions"));
       snoozeButton.disabled = count === 0 || !snoozeUI;
     }
@@ -758,7 +753,6 @@ function installReadingMode(win) {
     setBackIcon(false);
     if(selectionControl)selectionControlHome?.prepend(selectionControl);
     back.hidden=false;
-    selectionLabel.textContent = '';
     snoozeButton.disabled = !snoozeUI;
     gmBindAttribute(toolbar, 'aria-label', () => gmText("Conversation navigation"));
     toolbar.hidden = false;
