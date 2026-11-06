@@ -97,14 +97,14 @@
           <div class="setting-row">
             <div class="setting-copy">
               <label for="colored-stars">Colored stars</label>
-              <p>Drag markers between lists or reorder them. Quick clicks cycle through the markers in use.</p>
-              <div>Presets <button type="button" data-star-preset="1">1 star</button>
+              <p id="stars-help"><strong>Drag the stars between the lists.</strong> Reorder the stars in use to choose their cycle order. Click a marker to move it between lists; use the arrow keys to reorder it. Quick successive clicks on a message cycle through your stars.</p>
+              <div class="star-presets"><span>Presets:</span> <button type="button" data-star-preset="1">1 star</button>
                 <button type="button" data-star-preset="4">4 stars</button>
                 <button type="button" data-star-preset="12">All stars</button></div>
-              <div>In use <span class="star-marker-list" id="stars-active"></span></div>
-              <div>Not in use <span class="star-marker-list" id="stars-inactive"></span></div>
+              <div class="star-marker-row"><span class="star-list-label">In use:</span> <span class="star-marker-list" id="stars-active" role="group" aria-label="Stars in use"></span></div>
+              <div class="star-marker-row"><span class="star-list-label">Not in use:</span> <span class="star-marker-list" id="stars-inactive" role="group" aria-label="Stars not in use"></span></div>
             </div>
-            <input class="switch" id="colored-stars" type="checkbox" role="switch" disabled>
+            <input class="switch" id="colored-stars" type="checkbox" role="switch" aria-describedby="stars-help" disabled>
           </div>
           <div class="setting-row">
             <div class="setting-copy"><label for="thread-expand-arrows">Show thread expand arrows</label></div>

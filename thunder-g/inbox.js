@@ -1112,13 +1112,15 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     #threadTree button[data-gm-star] { background-image: none !important; }
     #threadTree button[data-gm-star] img { visibility: hidden; }
     #threadTree button[data-gm-star]::after {
-      content: attr(data-gm-star);
-      color: var(--gm-star-color,var(--gm-muted));
-      font: 18px/1 sans-serif;
+      content: '';
+      background-color: var(--gm-star-color,var(--gm-muted));
+      mask: var(--gm-star-image) center / contain no-repeat;
       position: absolute;
       inset: 0;
-      display: grid;
-      place-items: center;
+      margin: auto;
+      inline-size: 18px;
+      block-size: 18px;
+      pointer-events: none;
     }
     #threadTree button[data-gm-star] { position: relative; }
     #quick-filter-bar .quickFilterButtons {
