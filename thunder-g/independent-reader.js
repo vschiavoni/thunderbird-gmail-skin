@@ -1048,6 +1048,38 @@ function installIndependentReader(win) {
       if(!closed && token===ticket)selectedCard?.scrollIntoView({block:'nearest',inline:'nearest'});
     });
   }
+  function enrichConversation(headers,anchor,token,focusMessage) {
+    const existing=new Map(currentHeaders.map(header=>[independentMessageKey(header),header]));
+    if(!currentHeaders.every(header=>headers.some(next=>independentMessageKey(next)===independentMessageKey(header)))){
+      render(headers,anchor,token,focusMessage);
+      return;
+    }
+    // Keep the headers captured by existing viewers and their event handlers.
+    currentHeaders=headers.map(header=>existing.get(independentMessageKey(header)) || header);
+    const previous=messageCards.get(actionHeader);
+    previous?.removeAttribute('data-latest');
+    const previousToggle=previous?.children[0]?.children[0];
+    previousToggle?.removeAttribute('aria-disabled');
+    if(previousToggle)previousToggle.title='';
+    actionHeader=currentHeaders.at(-1) || anchor;
+    const selected=(focusMessage && currentHeaders.find(header=>
+      independentMessageKey(header)===independentMessageKey(anchor))) || actionHeader;
+    for(let index=currentHeaders.length-1;index>=0;index--){
+      const header=currentHeaders[index];
+      let card=messageCards.get(header);
+      if(!card)card=buildCard(header,header===selected || header===actionHeader || header.isRead===false,
+        token,messageCards.get(currentHeaders[index+1]));
+      if(header===actionHeader){
+        card.setAttribute('data-latest','');
+        const toggle=card.children[0]?.children[0];
+        toggle?.setAttribute('aria-disabled','true');
+        if(card.getAttribute('data-expanded')===null)toggle?.click();
+      }
+    }
+    updateActions();
+    refreshTags();
+    reconcilePendingReplies();
+  }
   function setMessageTag(header,key,add) {
     if(closed || !currentHeaders.includes(header))return;
     activateMessage(header);
@@ -1096,7 +1128,7 @@ function installIndependentReader(win) {
       // running. Keep that confirmed message when the older query finishes.
       result.messages=independentMessages([...result.messages,...currentHeaders],header).filter(message=>!draft || message.folder?.URI!==draft.folder?.URI);
       const same=currentHeaders.length===result.messages.length && currentHeaders.every((message,index)=>independentMessageKey(message)===independentMessageKey(result.messages[index]));
-      if(!same)render(result.messages,header,token,focusMessage);else updateActions();
+      if(!same)enrichConversation(result.messages,header,token,focusMessage);else updateActions();
       status.textContent=gmCount('$1 message','$1 messages',result.messages.length);
       status.hidden=result.messages.length===1;
       gmBindValue(status, "title", () => result.indexed?'':gmText("Conversation assembled from this folder and locally available sent messages"));

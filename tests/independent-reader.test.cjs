@@ -862,3 +862,28 @@ test('removing Inbox archives only Inbox copies and honors disabled archiving',(
   const removed=new Set([scope.independentMessageKey(inbox)]);
   assert.equal(scope.independentInboxFolder([inbox,sent],{Inbox:4096},removed),null);
 });
+
+test('index enrichment preserves the first card and loaded viewer instead of restarting them',async()=>{
+  const f=readerFixture();
+  let lookup,conversation;
+  f.scope.Services.prefs.getBoolPref=()=>true;
+  f.scope.ChromeUtils.importESModule=()=>({UIFontSize:{},Gloda:{
+    getMessageCollectionForHeader(_header,listener){lookup=listener;return {}},
+  }});
+  const opening=f.reader.open(f.anchor);
+  f.loaded();
+  const originalCard=f.cards.children[0],originalBrowser=f.browsers[0];
+  const reply=f.prepare(message(2,'reply','sent'));
+  lookup.onQueryCompleted({items:[{conversation:{
+    getMessagesCollection(listener){conversation=listener;return {}},
+  }}]});
+  conversation.onQueryCompleted({items:[{folderMessage:f.anchor},{folderMessage:reply}]});
+  await opening;
+  assert.equal(f.cards.children[0],originalCard);
+  assert.equal(f.browsers[0],originalBrowser);
+  assert.notEqual(originalBrowser.removed,true);
+  assert.equal(f.browsers.length,2,'only the newly discovered reply creates a viewer');
+  assert.equal(f.loads.filter(uri=>uri==='mailbox://inbox/1').length,1);
+  assert.equal(f.reader.getMessages().length,2);
+  f.reader.close();
+});
