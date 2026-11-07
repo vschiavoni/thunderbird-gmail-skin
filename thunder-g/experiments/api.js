@@ -142,7 +142,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const skinWindows = new Map(),gmailSearchWindows=new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
-    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, coloredStars=null,previewTrimming=null;
+    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, coloredStars=null,previewTrimming=null;
     const readers = new Map();
     const pagedDocuments = new Map(), zoomWindows = new Map();
     const fontSize = ChromeUtils.importESModule("resource:///modules/UIFontSize.sys.mjs").UIFontSize;
@@ -236,12 +236,12 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       pagedDocuments.set(doc,pages); pages.setSize(messagesPerPage);
       const zoom = installMailZoom(doc.defaultView,fontSize,action=>reader.zoom(action));
       const dates = installCompactDates(doc.defaultView);
-      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
+      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,personalIndicators,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
       const searchStatus=installGmailSearchStatus(doc.defaultView);
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
       const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
       doc.defaultView.addEventListener('unload',detach,{once:true});
-      documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
+      documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setPersonalIndicators:inbox.setPersonalIndicators, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
         doc.defaultView.removeEventListener('unload',detach);
         searchStatus.close();
         readers.delete(doc);
@@ -382,6 +382,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       },
       async setPreviewTrimming(value){previewTrimming=value;for(const controller of documents.values())controller.setPreviewTrimming?.(value);},
       async setColoredStars(value){coloredStars=value;for(const controller of documents.values())controller.setColoredStars?.(value);},
+      async setPersonalIndicators(enabled){personalIndicators=enabled===true;for(const controller of documents.values())controller.setPersonalIndicators(personalIndicators);},
       async setThreadExpandArrows(enabled){threadExpandArrows=enabled===true;for(const controller of documents.values())controller.setThreadExpandArrows?.(threadExpandArrows);},
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},
       async setGmailShortcuts(enabled){gmailShortcutsEnabled=enabled===true;},

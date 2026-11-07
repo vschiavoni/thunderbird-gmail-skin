@@ -162,3 +162,26 @@
     transition: translate 180ms ease-out;
   }
 }
+
+#threadTree[data-gm-personal-indicators] :is(#flaggedCol, .flaggedcol-column) {
+  width: 46px !important;
+  min-width: 46px !important;
+  max-width: 46px !important;
+  inline-size: 46px !important;
+  min-inline-size: 46px !important;
+  max-inline-size: 46px !important;
+  padding-inline-end: 18px !important;
+}
+#threadTree[data-gm-personal-indicators] .flaggedcol-column {
+  position: relative;
+}
+#threadTree .gm-personal-indicator {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block: 0;
+  inline-size: 18px;
+  display: grid;
+  place-items: center;
+  color: light-dark(#185abc, #a8c7fa);
+  font: 600 18px/1 sans-serif;
+}

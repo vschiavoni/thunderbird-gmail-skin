@@ -147,6 +147,12 @@
         "parameters": [{"name":"value","type":"any"}]
       },
       {
+        "name": "setPersonalIndicators",
+        "type": "function",
+        "async": true,
+        "parameters": [{"name": "enabled", "type": "boolean"}]
+      },
+      {
         "name": "setThreadExpandArrows",
         "type": "function",
         "async": true,

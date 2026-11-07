@@ -1045,10 +1045,45 @@ function installInboxEdgeBounce(win, tree) {
   }};
 }
 
-function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,coloredStars=null,previewTrimming=null,reader=null,openSettings=null}={}) {
+function personalRecipientLevel(header, identities, parser) {
+  if (!header || !identities.size || header.getStringProperty?.('list-id')) return 0;
+  const to = parser.parseDecodedHeader(header.mime2DecodedRecipients || header.recipients || '');
+  const cc = parser.parseDecodedHeader(header.ccList || '');
+  const recipients = new Set([...to, ...cc].map(address => address.email?.toLowerCase()).filter(Boolean));
+  if (![...recipients].some(email => identities.has(email))) return 0;
+  return recipients.size === 1 ? 2 : 1;
+}
+
+function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,personalIndicators=false,coloredStars=null,previewTrimming=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
   if (!tree) return {close(){}};
+  let indicatorIdentities = new Set();
+  function renderPersonalIndicator(row) {
+    row.querySelector('.gm-personal-indicator')?.remove();
+    if (!personalIndicators || !indicatorIdentities.size) return;
+    const cell = row.querySelector('.flaggedcol-column');
+    if (!cell || (row.dataset.properties || '').split(' ').includes('dummy')) return;
+    try {
+      const header = win.gDBView?.getMsgHdrAt(row.index);
+      const level = personalRecipientLevel(header, indicatorIdentities, MailServices.headerParser);
+      if (!level) return;
+      const indicator = doc.createElement('span');
+      indicator.className = 'gm-personal-indicator';
+      indicator.textContent = level === 2 ? '»' : '›';
+      indicator.title = level === 2 ? gmText("Sent only to me") : gmText("Sent to me and others");
+      cell.append(indicator);
+    } catch (_) { /* A recycled row can temporarily lose its header. */ }
+  }
+  function setPersonalIndicators(enabled) {
+    personalIndicators = enabled === true;
+    indicatorIdentities = new Set(personalIndicators
+      ? Array.from(globalThis.MailServices?.accounts?.allIdentities || [], identity => identity.email?.toLowerCase()).filter(Boolean)
+      : []);
+    tree.toggleAttribute?.('data-gm-personal-indicators', personalIndicators);
+    for (const row of tree.querySelectorAll('tr.table-layout')) renderPersonalIndicator(row);
+  }
+  setPersonalIndicators(personalIndicators);
   const edgeBounce=installInboxEdgeBounce(win,tree);
   const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
@@ -1239,6 +1274,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   `;
   doc.head.append(style);
   function render(row) {
+    renderPersonalIndicator(row);
     renderThreadGuide(row);
     stars.render(row);
     row.querySelector('.gm-unread-thread-senders')?.remove();
@@ -1371,6 +1407,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     style.remove();
     previews.close();
     reader?.setDraftOpener?.(null);
+    setPersonalIndicators(false);
     edgeBounce.close();
     settingsButton.close();
     folderToggle.close();
@@ -1396,5 +1433,5 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   }
   win.addEventListener('focus',refreshPreviews);
   win.addEventListener('unload',close,{once:true});
-  return {close,setThreadGuides,setPreviewTrimming(value){previewSettings=previewTextSettings(value);refreshPreviews();},setColoredStars:stars.configure,setThreadExpandArrows:threadToggles.setEnabled};
+  return {close,setPersonalIndicators,setThreadGuides,setPreviewTrimming(value){previewSettings=previewTextSettings(value);refreshPreviews();},setColoredStars:stars.configure,setThreadExpandArrows:threadToggles.setEnabled};
 }

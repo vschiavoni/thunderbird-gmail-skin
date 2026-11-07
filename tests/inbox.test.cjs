@@ -788,3 +788,16 @@ test('empty and colored stars share vector geometry instead of font-dependent gl
     assert.match(filled,/viewBox="0 0 24 24"/);
   }
 });
+
+test('personal indicators distinguish sole recipients, shared recipients, and mailing lists',()=>{
+  const identities=new Set(['me@example.org']);
+  const parser={parseDecodedHeader:value=>value.split(',').filter(Boolean).map(email=>({email:email.trim()}))};
+  const level=(recipients,ccList='',listId='')=>scope.personalRecipientLevel({
+    recipients,ccList,getStringProperty:key=>key==='list-id'?listId:'',
+  },identities,parser);
+  assert.equal(level('ME@example.org'),2);
+  assert.equal(level('me@example.org','other@example.org'),1);
+  assert.equal(level('other@example.org','me@example.org'),1);
+  assert.equal(level('other@example.org'),0);
+  assert.equal(level('me@example.org','','list.example.org'),0);
+});

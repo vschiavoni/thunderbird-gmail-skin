@@ -138,6 +138,26 @@ threadGuides.addEventListener('change', async () => {
   } finally { threadGuides.disabled = false; }
 });
 
+const personalIndicators = document.getElementById('personal-indicators');
+if (personalIndicators) {
+  personalIndicators.disabled = true;
+  browser.storage.local.get({personalIndicators:false}).then(settings => {
+    personalIndicators.checked = settings.personalIndicators === true;
+    personalIndicators.disabled = false;
+  }).catch(console.error);
+  personalIndicators.addEventListener('change', async () => {
+    personalIndicators.disabled = true;
+    try {
+      await browser.storage.local.set({personalIndicators:personalIndicators.checked});
+    } catch (error) {
+      personalIndicators.checked = !personalIndicators.checked;
+      console.error(error);
+    } finally {
+      personalIndicators.disabled = false;
+    }
+  });
+}
+
 const threadExpandArrows = document.getElementById('thread-expand-arrows');
 if(threadExpandArrows){
   threadExpandArrows.disabled=true;
