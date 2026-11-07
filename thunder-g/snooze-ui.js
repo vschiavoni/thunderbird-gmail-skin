@@ -143,24 +143,70 @@ var SNOOZE_PICKER_CSS=`
 @media(max-width:560px){.gm-snooze-calendar-content{grid-template-columns:1fr;gap:16px}.gm-snooze-calendar{justify-self:center}.gm-snooze-fields{gap:16px}}
 `;
 
+function createUnifiedSnoozedFolder(mail,helper,smartMailbox,flags){
+  let folder=null,scope=null,updating=false;
+  return function ensure(){
+    if(updating)return folder;
+    updating=true;
+    try{
+      const folders=[];
+      for(const server of mail.accounts.allServers){
+        const root=server.rootFolder;
+        if(!server.hidden&&root.containsChildNamed('Thunder-G Snoozed'))folders.push(root.getChildNamed('Thunder-G Snoozed'));
+      }
+      const uris=folders.map(folder=>folder.URI).sort().join('|');
+      if(!folder){
+        const root=smartMailbox.rootFolder;
+        if(root.containsChildNamed('Snoozed')){
+          folder=root.getChildNamed('Snoozed');
+          if(!(folder.flags&flags.Virtual))throw new Error('The unified Snoozed folder name is already in use.');
+        }else{
+          folder=helper.createNewVirtualFolder('Snoozed',root,folders,'ALL',false).virtualFolder;
+          scope=uris;
+        }
+      }
+      if(scope!==uris){
+        const wrapped=helper.wrapVirtualFolder(folder);
+        if(wrapped.searchFolderURIs.split('|').filter(Boolean).sort().join('|')!==uris){wrapped.searchFolders=folders;wrapped.onlineSearch=false;mail.accounts.saveVirtualFolders();}
+        // This database may already belong to an active cross-folder view.
+        // Forcing it closed here invalidates rows during rapid navigation.
+        scope=uris;
+      }
+      return folder;
+    }finally{updating=false;}
+  };
+}
+
 function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs=globalThis.Services?.prefs){
   const doc=win.document,pane=win.folderPane,tree=doc.getElementById('folderTree');
   const menu=doc.getElementById('folderModesContextMenuPopup');
   if(win.gViewWrapper?.isSynthetic||!pane?._modes||!tree||!menu)return {close(){}};
   const name='gmSnoozed',pref='extensions.thunderg.snooze.folderMode';
-  let closed=false;
+  let closed=false,updating=false,unified=null,unifiedRow=null;
+  let hiddenURIs=new Set();
+  function hideStorageRows(){
+    if(closed)return;
+    for(const row of tree.querySelectorAll?.('li')||[])row.toggleAttribute('data-gm-snooze-storage',mode.active&&hiddenURIs.has(row.uri)&&row.modeName!==name);
+  }
+  function placeUnifiedRow(){
+    if(closed)return;
+    const smart=pane._modes.smart,integrated=!!(mode.active&&smart?.active&&smart.containerList);
+    mode.container?.toggleAttribute('data-gm-snooze-integrated',integrated);
+    if(!mode.active||!unified){unifiedRow?.remove();unifiedRow=null;return;}
+    const target=integrated?smart.containerList:mode.containerList,destinationMode=integrated?'smart':name;
+    if(!unifiedRow||unifiedRow.parentNode!==target||unifiedRow.modeName!==destinationMode||unifiedRow.uri!==unified.URI){
+      unifiedRow?.remove();unifiedRow=pane._createFolderRow(destinationMode,unified,'folder');
+      unifiedRow.name=gmText('Snoozed');unifiedRow.classList?.add('gm-unified-snoozed-row');target.append(unifiedRow);
+    }
+    if(integrated){const inboxURI=smart._folderTypes?.find(type=>type.type==='inbox')?.folderURI;const children=[...target.children],index=children.findIndex(row=>row.uri===inboxURI);const next=index>=0?children[index+1]:null;if(next&&next!==unifiedRow)target.insertBefore(unifiedRow,next);}
+    if(mode.containerHeader)mode.containerHeader.hidden=true;
+  }
   const mode={name,active:false,canBeCompact:false,
     init(){
       const heading=this.containerHeader.querySelector('.mode-name');
       heading.removeAttribute('data-l10n-id');heading.removeAttribute('data-l10n-args');
-      heading.textContent=gmText('Snoozed');
-      this.containerList.replaceChildren();
-      for(const server of mail.accounts.allServers){
-        const root=server.rootFolder;if(!root.containsChildNamed('Thunder-G Snoozed'))continue;
-        const folder=root.getChildNamed('Thunder-G Snoozed');
-        const row=pane._createFolderRow(name,folder,'server');
-        this.containerList.append(row);
-      }
+      heading.textContent=gmText('Snoozed');this.containerHeader.hidden=true;
+      unified=service.unifiedFolder();
     },
     addFolder(){refresh();},removeFolder(){refresh();},changeAccountOrder(){refresh();},
   };
@@ -169,27 +215,38 @@ function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs
   for(const [key,value] of Object.entries({class:'folder-pane-mode',value:name,type:'checkbox',closemenu:'none',label:gmText('Snoozed')}))item.setAttribute(key,value);
   menu.insertBefore(item,doc.getElementById('separatorAfterFolderModes'));
   const style=doc.createElement('style');style.textContent=`
-    #folderTree [data-mode="gmSnoozed"]{--gm-snoozed-icon-color:var(--layout-color,CanvasText);--gm-snoozed-clock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm1-13h-2v6l5 3 1-1.7-4-2.3V7z'/%3E%3C/svg%3E")}
+    #folderTree [data-gm-snooze-storage],#folderTree > [data-mode="gmSnoozed"][data-gm-snooze-integrated],#folderTree [data-mode="gmSnoozed"] > .mode-container{display:none!important}
+    #folderTree [data-mode="gmSnoozed"],#folderTree .gm-unified-snoozed-row{--gm-snoozed-icon-color:var(--layout-color,CanvasText);--gm-snoozed-clock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm1-13h-2v6l5 3 1-1.7-4-2.3V7z'/%3E%3C/svg%3E")}
     #folderTree [data-mode="gmSnoozed"] .mode-name::before{content:"";display:inline-block;width:16px;height:16px;margin-inline-end:8px;vertical-align:-3px;background:var(--gm-snoozed-icon-color);mask:var(--gm-snoozed-clock) center/contain no-repeat}
-    #folderTree [data-mode="gmSnoozed"] .icon{content:none!important;fill:var(--gm-snoozed-icon-color)!important;stroke:var(--gm-snoozed-icon-color)!important;--icon-color:var(--gm-snoozed-icon-color)!important;color:var(--gm-snoozed-icon-color)!important;background:var(--gm-snoozed-icon-color)!important;mask:var(--gm-snoozed-clock) center/contain no-repeat!important}
+    #folderTree [data-mode="gmSnoozed"] .icon,#folderTree .gm-unified-snoozed-row .icon{content:none!important;fill:var(--gm-snoozed-icon-color)!important;stroke:var(--gm-snoozed-icon-color)!important;--icon-color:var(--gm-snoozed-icon-color)!important;color:var(--gm-snoozed-icon-color)!important;background:var(--gm-snoozed-icon-color)!important;mask:var(--gm-snoozed-clock) center/contain no-repeat!important}
   `;doc.head.append(style);
   function refresh(){
-    if(closed||!mode.active)return;
-    const wanted=[...mail.accounts.allServers].flatMap(server=>server.rootFolder.containsChildNamed('Thunder-G Snoozed')?[server.rootFolder.getChildNamed('Thunder-G Snoozed').URI]:[]);
-    const existing=[...mode.containerList.children].map(row=>row.uri);
-    if(JSON.stringify(wanted)!==JSON.stringify(existing))mode.init();
+    if(closed||updating)return;
+    updating=true;
+    try{
+      hiddenURIs=new Set([...mail.accounts.allServers].flatMap(server=>!server.hidden&&server.rootFolder.containsChildNamed('Thunder-G Snoozed')?[server.rootFolder.getChildNamed('Thunder-G Snoozed').URI]:[]));
+      if(mode.active){
+        unified=service.unifiedFolder();
+        placeUnifiedRow();
+      }
+      if(!mode.active)placeUnifiedRow();
+      hideStorageRows();
+      if(mode.active&&unified&&hiddenURIs.has(win.gFolder?.URI))win.displayFolder?.(unified.URI);
+    }catch(error){console.error('Thunder-G unified Snoozed:',error);}
+    finally{updating=false;}
   }
   function command(event){
     pane.toggleFolderMode(event);
     prefs?.setBoolPref(pref,pane.activeModes.includes(name));
-    pane.updateContextCheckedFolderMode();
+    pane.updateContextCheckedFolderMode();refresh();
   }
   item.addEventListener('command',command);
   const unsubscribe=service.subscribe(refresh);
+  const observer=win.MutationObserver?new win.MutationObserver(()=>{placeUnifiedRow();hideStorageRows();}):null;observer?.observe(tree,{childList:true,subtree:true});
   if(prefs?.getBoolPref(pref,true)!==false)pane.activeModes=[...pane.activeModes,name];
-  pane.updateContextCheckedFolderMode();
+  pane.updateContextCheckedFolderMode();refresh();
   return {close(){
-    closed=true;unsubscribe();item.removeEventListener('command',command);item.remove();style.remove();
+    closed=true;observer?.disconnect();unifiedRow?.remove();unifiedRow=null;for(const row of tree.querySelectorAll?.('[data-gm-snooze-storage]')||[])row.removeAttribute('data-gm-snooze-storage');unsubscribe();item.removeEventListener('command',command);item.remove();style.remove();
     if(mode.active)pane.activeModes=pane.activeModes.filter(value=>value!==name);
     delete pane._modes[name];
   }};

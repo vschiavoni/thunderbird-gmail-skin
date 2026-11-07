@@ -295,6 +295,15 @@ function createNativeSnooze({onTiming=null}={}) {
     adapter[kind+'Many']=async(job,checkpoint)=>{const failures=await moveJobs(kind,[job],checkpoint);if(failures.has(job))throw failures.get(job);};
   }
   const service=createSnoozeService(adapter);
+  let unifiedProvider=null;
+  service.unifiedFolder=()=>{
+    if(!unifiedProvider){
+      const {VirtualFolderHelper}=ChromeUtils.importESModule('resource:///modules/VirtualFolderWrapper.sys.mjs');
+      const {SmartMailboxUtils}=ChromeUtils.importESModule('resource:///modules/SmartMailboxUtils.sys.mjs');
+      unifiedProvider=createUnifiedSnoozedFolder(MailServices,VirtualFolderHelper,SmartMailboxUtils.getSmartMailbox(),folderFlags);
+    }
+    return unifiedProvider();
+  };
   let reminderIndex=null;
   service.subscribe(()=>{reminderIndex=null;});
   service.forHeaders=headers=>{
