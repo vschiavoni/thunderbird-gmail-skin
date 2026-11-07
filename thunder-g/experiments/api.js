@@ -142,7 +142,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const skinWindows = new Map(),gmailSearchWindows=new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
-    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, coloredStars=null,previewTrimming=null;
+    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, coloredStars=null,previewTrimming=null;
     const readers = new Map();
     const pagedDocuments = new Map(), zoomWindows = new Map();
     const fontSize = ChromeUtils.importESModule("resource:///modules/UIFontSize.sys.mjs").UIFontSize;
@@ -229,6 +229,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       doc.documentElement.toggleAttribute("data-gm-hide-column-headers", !showColumnHeaders);
       const labels = installInlineLabels(doc.defaultView, MailServices, Services.prefs);
       const nestedLabels = installNestedLabelSidebar(doc.defaultView);
+      doc.documentElement.toggleAttribute("data-gm-label-icons",gmailLabelIcons);
       const reader = installReadingMode(doc.defaultView);
       const snoozeOrder=thunderGSnoozeOrder?.attach(doc.defaultView);
       readers.set(doc,reader); reader.setIndependent(independentReader);
@@ -247,6 +248,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         readers.delete(doc);
         snoozeOrder?.close();
         pages.close(); pagedDocuments.delete(doc); zoom.close();
+        doc.documentElement.removeAttribute("data-gm-label-icons");
         nestedLabels.close(); conversationBrowser.close(); inbox.close(); dates.close(); reader.close(); labels.close();
       }});
     };
@@ -382,6 +384,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       },
       async setPreviewTrimming(value){previewTrimming=value;for(const controller of documents.values())controller.setPreviewTrimming?.(value);},
       async setColoredStars(value){coloredStars=value;for(const controller of documents.values())controller.setColoredStars?.(value);},
+      async setGmailLabelIcons(enabled){gmailLabelIcons=enabled===true;for(const doc of documents.keys())doc.documentElement.toggleAttribute("data-gm-label-icons",gmailLabelIcons);},
       async setPersonalIndicators(enabled){personalIndicators=enabled===true;for(const controller of documents.values())controller.setPersonalIndicators(personalIndicators);},
       async setThreadExpandArrows(enabled){threadExpandArrows=enabled===true;for(const controller of documents.values())controller.setThreadExpandArrows?.(threadExpandArrows);},
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},

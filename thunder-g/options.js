@@ -138,6 +138,26 @@ threadGuides.addEventListener('change', async () => {
   } finally { threadGuides.disabled = false; }
 });
 
+const gmailLabelIcons = document.getElementById('gmail-label-icons');
+if (gmailLabelIcons) {
+  gmailLabelIcons.disabled = true;
+  browser.storage.local.get({gmailLabelIcons:false}).then(settings => {
+    gmailLabelIcons.checked = settings.gmailLabelIcons === true;
+    gmailLabelIcons.disabled = false;
+  }).catch(console.error);
+  gmailLabelIcons.addEventListener('change', async () => {
+    gmailLabelIcons.disabled = true;
+    try {
+      await browser.storage.local.set({gmailLabelIcons:gmailLabelIcons.checked});
+    } catch (error) {
+      gmailLabelIcons.checked = !gmailLabelIcons.checked;
+      console.error(error);
+    } finally {
+      gmailLabelIcons.disabled = false;
+    }
+  });
+}
+
 const personalIndicators = document.getElementById('personal-indicators');
 if (personalIndicators) {
   personalIndicators.disabled = true;

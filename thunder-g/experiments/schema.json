@@ -147,6 +147,12 @@
         "parameters": [{"name":"value","type":"any"}]
       },
       {
+        "name": "setGmailLabelIcons",
+        "type": "function",
+        "async": true,
+        "parameters": [{"name": "enabled", "type": "boolean"}]
+      },
+      {
         "name": "setPersonalIndicators",
         "type": "function",
         "async": true,

@@ -258,3 +258,16 @@ test('language overrides propagate from storage to Thunderbird UI independently 
  changed({interfaceLanguage:{newValue:'en'}},'local');assert.equal(calls.at(-1),'en');
  changed({interfaceLanguage:{newValue:'auto'}},'local');assert.equal(calls.at(-1),'en');
 });
+
+test('Gmail label icons default off and follow live local preference changes',async()=>{
+ for(const initial of [undefined,true]){
+  let changed;const calls=[];
+  const scope=require('./localization-context.cjs').createContext({console,browser:{storage:{local:{async get(defaults){return {...defaults,...(initial===undefined?{}:{gmailLabelIcons:initial})}}},onChanged:{addListener(fn){changed=fn}}},
+  inlineLabels:{onDkimRequest:{addListener(){}},async setGmailLabelIcons(value){calls.push(value)},async setHideTodayPane(){},async setComposeAutosave(){},async setMessagesPerPage(){},async setCompactConversations(){},async setIndependentReader(){},async start(){}}}});
+  await vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/background.js'),'utf8'),scope);
+  assert.deepEqual(calls,[initial===true]);
+  changed({gmailLabelIcons:{newValue:false}},'local');changed({gmailLabelIcons:{newValue:true}},'local');
+  assert.deepEqual(calls,[initial===true,false,true]);
+  changed({gmailLabelIcons:{newValue:false}},'sync');assert.equal(calls.length,3);
+ }
+});
