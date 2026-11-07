@@ -351,6 +351,8 @@ function installIndependentReader(win) {
     :host([hidden]) { display:none !important; }
     .conversation { --message-inset:56px; padding:14px 16px 20px; color-scheme:light dark; }
     h1 { margin:0 0 16px var(--message-inset); font-size:1.6em; line-height:1.4; font-weight:400; overflow-wrap:anywhere; user-select:text; cursor:text; }
+    .snooze-notice{margin:-14px -16px 20px;padding:18px 16px 18px 72px;background:var(--layout-background-1,#f5f5f5);color:var(--layout-color-1,#5f6368);font-size:.95em;}
+    .snooze-notice[hidden]{display:none}
     .scope,.status { font-size:.85em; opacity:.75; margin:0 0 8px var(--message-inset); }
     .title-tags { display:inline-flex; flex-wrap:wrap; gap:4px; margin-inline-start:10px; vertical-align:middle; font-size:.6em; font-weight:400; }
     .cards { display:flex; flex-direction:column; }
@@ -444,9 +446,17 @@ function installIndependentReader(win) {
   const title=doc.createElement('h1'),scope=doc.createElement('p'),status=doc.createElement('p'),cards=doc.createElement('div');
   scope.className='scope';scope.hidden=true;
   status.className='status';status.setAttribute('role','status');cards.className='cards';
-  conversation.append(title,scope,status,cards);root.append(style,conversation);
+  const snoozeNotice=doc.createElement('div');snoozeNotice.className='snooze-notice';snoozeNotice.hidden=true;snoozeNotice.setAttribute('role','status');
+  conversation.append(snoozeNotice,title,scope,status,cards);root.append(style,conversation);
   const titleTags=doc.createElement('span');titleTags.className='title-tags';gmBindAttribute(titleTags, 'aria-label', () => gmText("Labels in this conversation"));
   const cleanups=new Set(),tagRenderers=new Set(),securityRenderers=new Set(),frames=new Map(),messageDocs=new Map(),messageCards=new Map();let currentHeaders=[],actionHeader=null,activeHeader=null,activeCard=null,historyExpanded=false;
+  const snoozeService=typeof thunderGSnooze!=='undefined'?thunderGSnooze:null;
+  function refreshSnooze(){
+    const reminder=typeof snoozeDisplayReminder==='function'?snoozeDisplayReminder(snoozeService,currentHeaders):null;
+    snoozeNotice.hidden=!reminder;
+    snoozeNotice.textContent=reminder?snoozeReminderText(reminder,gmLocale()):'';
+  }
+  const stopSnooze=snoozeService?.subscribe(refreshSnooze);
   const zoomResizers=new Map();
   let messageZoom=null;
   function zoomConversation(action) {
@@ -544,6 +554,7 @@ function installIndependentReader(win) {
   conversation.append(actions);
   function updateActions(){for(const button of buttons)button.disabled=resolving || !frames.has(independentMessageKey(actionHeader || {}))}
   function refreshTags(){
+    refreshSnooze();
     for(const render of securityRenderers)render();
     for(const render of tagRenderers)render();
     titleTags.replaceChildren();
@@ -943,7 +954,7 @@ function installIndependentReader(win) {
   }
   function render(headers,anchor,token,focusMessage=false){
     const pending=[...pendingReplies];
-    clearCards();currentHeaders=headers;
+    clearCards();currentHeaders=headers;refreshSnooze();
     actionHeader=headers.at(-1) || anchor;
     const selected=(focusMessage && headers.find(header=>independentMessageKey(header)===independentMessageKey(anchor))) || actionHeader;
     let selectedCard;
@@ -1038,7 +1049,7 @@ function installIndependentReader(win) {
       }
     },
     hide(){if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();++ticket;query?.cancel();query=null;resolving=false;host.hidden=true;layout.classList.remove('gm-independent-open');clearCards()},
-    close(){this.hide();closed=true;contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
+    close(){this.hide();closed=true;stopSnooze?.();contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
     refresh:refreshTags,
     navigateMessage(direction){
       if(resolving || !currentHeaders.length)return;

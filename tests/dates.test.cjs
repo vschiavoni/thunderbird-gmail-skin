@@ -43,3 +43,40 @@ test('recycled dates and Fluent tooltip update; closing restores native renderer
   assert.match(cell.textContent,/2020/);assert.match(cell.title,/2020/);
   controller.close();assert.equal(prototype.fillRow,original);assert.equal(cell.textContent,'native older');assert.equal(attrs.get('title'),'native older');
 });
+
+test('scheduled return replaces the visible date and clears on unsnooze or row recycling',async()=>{
+  const local=require('./localization-context.cjs').createContext({console});
+  let job={due:new Date(2026,10,10,9,10).getTime(),state:'sleeping'},changed;
+  local.thunderGSnooze={forHeaders:()=>job?[job]:[],subscribe(fn){changed=fn;return ()=>{changed=null}}};
+  vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),local);
+  vm.runInContext(fs.readFileSync('thunder-g/dates.js','utf8'),local);
+  const attrs=new Map(),cell={textContent:'original',get title(){return attrs.get('title')},set title(v){attrs.set('title',v)},getAttribute:n=>attrs.get(n)??null,setAttribute:(n,v)=>attrs.set(n,v),removeAttribute:n=>attrs.delete(n)};
+  const prototype={fillRow(){cell.textContent='native'}};
+  const row=Object.assign(Object.create(prototype),{index:0,dataset:{},querySelector:()=>cell});
+  const doc={querySelectorAll:()=>[row]};
+  const win={document:doc,navigator:{languages:['en']},gDBView:{getMsgHdrAt:()=>({dateInSeconds:1700000000})},customElements:{whenDefined:()=>Promise.resolve(),get:()=>({prototype})},setTimeout:()=>1,clearTimeout(){},addEventListener(){},removeEventListener(){}};
+  const controller=local.installCompactDates(win);await Promise.resolve();
+  assert.equal(attrs.get('data-gm-snoozed'),'sleeping');assert.match(cell.textContent,/10/);
+  assert.match(cell.title,/Snoozed until/);
+  job={...job,due:new Date(2026,10,12,9,10).getTime()};changed();assert.match(cell.textContent,/12/);
+  row.fillRow();controller.close();assert.equal(attrs.has('data-gm-snoozed'),false);assert.equal(changed,null);
+  const next=local.installCompactDates(win);await Promise.resolve();job=null;changed();
+  assert.equal(attrs.has('data-gm-snoozed'),false);assert.match(cell.textContent,/2023/);next.close();
+});
+
+test('rapid view changes clear incomplete dates instead of retaining 1970 or another row deadline',async()=>{
+  const local=require('./localization-context.cjs').createContext({console});
+  vm.runInContext(fs.readFileSync('thunder-g/dates.js','utf8'),local);
+  const attrs=new Map([['title','native 1970']]),cell={textContent:'Jan 1, 1970',get title(){return attrs.get('title')},set title(v){attrs.set('title',v)},getAttribute:n=>attrs.get(n)??null,setAttribute:(n,v)=>attrs.set(n,v),removeAttribute:n=>attrs.delete(n)};
+  let header={dateInSeconds:0,date:0};
+  const prototype={fillRow(){cell.textContent='Jan 1, 1970'}};
+  const row=Object.assign(Object.create(prototype),{index:0,dataset:{},querySelector:()=>cell});
+  const view={rowCount:1,getMsgHdrAt:()=>header};row.view=view;
+  const win={document:{querySelectorAll:()=>[row]},navigator:{languages:['en']},gDBView:view,customElements:{whenDefined:()=>Promise.resolve(),get:()=>({prototype})},setTimeout:()=>1,clearTimeout(){},addEventListener(){},removeEventListener(){}};
+  const controller=local.installCompactDates(win);await Promise.resolve();
+  assert.equal(cell.textContent,'');assert.equal(attrs.has('title'),false);
+  header={dateInSeconds:1700000000};row.fillRow();assert.match(cell.textContent,/2023/);
+  win.gDBView={rowCount:1,getMsgHdrAt:()=>({dateInSeconds:1800000000})};row.fillRow();assert.equal(cell.textContent,'','old-view rows cannot render dates from the new folder');
+  row.view=win.gDBView;row.fillRow();assert.notEqual(cell.textContent,'');
+  header=null;win.gDBView=view;row.view=view;row.fillRow();assert.equal(cell.textContent,'');controller.close();
+});

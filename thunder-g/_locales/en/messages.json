@@ -2212,6 +2212,12 @@
   "settings_no_results": {
     "message": "No matching settings. Try another search."
   },
+  "snooze_until_notice": {
+    "message": "Snoozed until $1"
+  },
+  "snooze_pending_notice": {
+    "message": "Snooze pending until $1"
+  },
   "snooze_removed": {
     "message": "Snooze removed"
   }

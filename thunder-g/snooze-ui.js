@@ -376,6 +376,19 @@ function installSnoozeUI(win,service,{onMoveAccepted=()=>{}}={}) {
 }
 
 
+function snoozeDisplayReminder(service,headers){
+  const jobs=service?.forHeaders?.(headers)||[];
+  return jobs.filter(job=>job.state!=='waking').sort((a,b)=>a.due-b.due)[0]||null;
+}
+function snoozeReminderText(job,locale,now=new Date()){
+  const due=new Date(job.due),tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
+  const sameDay=date=>due.getFullYear()===date.getFullYear()&&due.getMonth()===date.getMonth()&&due.getDate()===date.getDate();
+  const day=sameDay(now)?gmText('Today'):sameDay(tomorrow)?gmText('Tomorrow'):new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:due.getFullYear()===now.getFullYear()?undefined:'numeric'}).format(due);
+  const time=new Intl.DateTimeFormat(locale,{hour:'2-digit',minute:'2-digit'}).format(due);
+  return gmText(job.state==='preparing'?'Snooze pending until $1':'Snoozed until $1',day+', '+time);
+}
+
+
 function captureSnoozeSelection(win){
   const view=win.gDBView,tree=win.document.getElementById('threadTree');
   return {view,indices:Array.from(tree?.selectedIndices||[]),keys:Array.from(view?.getSelectedMsgHdrs?.()||[],header=>JSON.stringify([header.folder?.URI,header.messageKey]))};

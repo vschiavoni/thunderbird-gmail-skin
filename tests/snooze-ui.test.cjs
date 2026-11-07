@@ -132,6 +132,12 @@ test('an ordinary message does not offer Unsnooze',()=>{
   const ui=scope.installSnoozeUI(f.win,service);ui.choose([{}]);assert.equal(f.doc.querySelector('.gm-snooze-unsnooze'),null);ui.close();
 });
 
+test('reminder banner reports the scheduled day and distinguishes pending moves',()=>{
+  const now=new Date(2026,10,9,12),due=new Date(2026,10,10,9,10).getTime();
+  assert.equal(scope.snoozeReminderText({due,state:'sleeping'},'en-GB',now),'Snoozed until Tomorrow, 09:10');
+  assert.equal(scope.snoozeReminderText({due,state:'preparing'},'en-GB',now),'Snooze pending until Tomorrow, 09:10');
+  assert.equal(scope.snoozeDisplayReminder({forHeaders:()=>[{due,state:'waking'}]},[{}]),null);
+});
 test('background failure feedback expires instead of leaving a permanent black bar',async()=>{
   const f=operationFixture();f.dialog.querySelector('.gm-snooze-save').click();f.accept();
   f.reject(Error('Saved snoozes will be retried.'));await new Promise(setImmediate);
