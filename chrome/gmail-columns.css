@@ -162,3 +162,13 @@
     transition: translate 180ms ease-out;
   }
 }
+
+/* Use the real row selection rather than a stale native ancestor state. */
+#threadTree .tree-view-row-select-checkbox[data-gm-selection-checked] {
+  -moz-context-properties: fill, fill-opacity, stroke, stroke-opacity !important;
+  stroke-opacity: 0 !important;
+  fill-opacity: 0 !important;
+}
+#threadTree .tree-view-row-select-checkbox[data-gm-selection-checked="true"] {
+  fill-opacity: 1 !important;
+}

@@ -92,7 +92,8 @@ var SNOOZE_PICKER_CSS=`
 .gm-snooze-menu .gm-snooze-option:hover,.gm-snooze-menu .gm-snooze-option:focus-visible{background:#f1f3f4;outline:none}
 .gm-snooze-option-time{color:#5f6368;font-size:13px}
 .gm-snooze-menu .gm-snooze-custom{border-top:1px solid #dadce0;margin-top:8px;height:48px;justify-content:flex-start;gap:16px}
-.gm-snooze-custom svg{width:20px;height:20px;fill:#5f6368;flex-shrink:0}
+.gm-snooze-unsnooze{height:48px!important;justify-content:flex-start!important;gap:16px!important}
+.gm-snooze-custom svg,.gm-snooze-unsnooze svg{width:20px;height:20px;fill:#5f6368;flex-shrink:0}
 .gm-snooze-calendar-dialog{width:560px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:visible;margin:auto;padding:24px;border-radius:28px;box-shadow:none}
 .gm-snooze-calendar-dialog::backdrop{background:rgba(32,33,36,.38)}
 .gm-snooze-calendar-dialog h2{font:400 24px/32px Arial,sans-serif;margin:0 0 32px}
@@ -194,16 +195,16 @@ function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs
   }};
 }
 
-function installSnoozeUI(win,service) {
+function installSnoozeUI(win,service,{onMoveAccepted=()=>{}}={}) {
   const doc=win.document;
-  let dialog=null,toast=null,toastTimer=null;
+  let dialog=null,toast=null,toastTimer=null,closed=false,operation=0;
   function dismissMenu(event){
     if(!dialog?.classList.contains('gm-snooze-menu'))return;
     if(event.type==='keydown'){
       if(event.key!=='Escape')return;
       event.preventDefault();event.stopImmediatePropagation();
       const anchor=dialog._snoozeAnchor;closeDialog();anchor?.focus();
-    }else if(!dialog.contains(event.target))closeDialog();
+    }else if(!dialog.contains(event.target)&&!dialog._snoozeAnchor?.contains(event.target))closeDialog();
   }
   doc.addEventListener('keydown',dismissMenu,true);doc.addEventListener('pointerdown',dismissMenu,true);
   const style=doc.createElement('style');style.textContent=SNOOZE_PICKER_CSS;doc.documentElement.append(style);
@@ -217,14 +218,15 @@ function installSnoozeUI(win,service) {
     if(current.localName==='dialog'&&current.open)current.close();
     else if(current.matches(':popover-open'))current.hidePopover();
     current.remove();
+    if(current._snoozeAnchor?.isConnected)current._snoozeAnchor.focus();
   }
-  function showStatus(message,{error=false,pending=false}={}){
+  function showStatus(message,{error=false,pending=false}={},onDismiss=()=>{}){
     if(toastTimer!==null)win.clearTimeout(toastTimer);
     toast?.remove();toast=doc.createElement('div');toast.className='gm-snooze-status';toast.setAttribute('role',error?'alert':'status');
     const text=doc.createElement('span');text.textContent=gmText(message);toast.append(text);
-    const dismiss=doc.createElement('button');dismiss.type='button';dismiss.textContent=gmText('Dismiss');dismiss.onclick=()=>{toast?.remove();toast=null;};toast.append(dismiss);
+    const dismiss=doc.createElement('button');dismiss.type='button';dismiss.textContent=gmText('Dismiss');dismiss.onclick=()=>{onDismiss();toast?.remove();toast=null;if(toastTimer!==null)win.clearTimeout(toastTimer);toastTimer=null;};toast.append(dismiss);
     doc.documentElement.append(toast);
-    if(!pending&&!error)toastTimer=win.setTimeout(()=>{toast?.remove();toast=null;toastTimer=null;},4000);
+    toastTimer=win.setTimeout(()=>{toast?.remove();toast=null;toastTimer=null;},error?10000:pending?6000:4000);
   }
   function shell(title){
     closeDialog();dialog=doc.createElement('dialog');dialog.className='gm-snooze-dialog';dialog.setAttribute('role','dialog');
@@ -234,28 +236,45 @@ function installSnoozeUI(win,service) {
     const current=dialog;dialog.addEventListener('close',()=>{if(dialog===current)closeDialog();});doc.documentElement.append(dialog);dialog.showModal();return dialog;
   }
   function addButton(parent,label,callback){const element=doc.createElement('button');element.textContent=label;element.style.cssText='padding:8px 12px;margin:4px';element.onclick=callback;parent.append(element);return element;}
-  async function execute(parent,callback,{pending='Snoozing conversation…',success='Conversation snoozed'}={}){
-    const buttons=[...parent.querySelectorAll('button,input')].map(element=>({element,disabled:element.disabled}));buttons.forEach(({element})=>element.disabled=true);
+  async function execute(parent,callback,{pending='Snoozing conversation…',success='Conversation snoozed',moves=true}={}){
+    const ticket=++operation;
+    let dismissed=false;
+    const status=(message,options)=>{if(!closed&&!dismissed&&ticket===operation)showStatus(message,options,()=>{dismissed=true;});};
+    const buttons=[...parent.querySelectorAll('button,input')].map(element=>({element,disabled:element.disabled}));buttons.forEach(({element})=>{if(!element.classList.contains('gm-snooze-cancel')&&element.textContent!==gmText('Close'))element.disabled=true;});
     let accepted=false;
     const ready=()=>{
-      if(accepted)return;accepted=true;
+      if(accepted||closed)return;accepted=true;
+      if(moves){try{onMoveAccepted(parent._snoozeSelection);}catch(error){console.error('Thunder-G snooze selection:',error);}}
       if(dialog===parent)closeDialog();
-      showStatus(pending,{pending:true});
+      status(pending,{pending:true});
     };
-    try{await callback(ready);ready();showStatus(success);}
+    try{await callback(ready,()=>accepted||(!closed&&dialog===parent&&parent.isConnected));if(closed)return;ready();status(success);}
     catch(error){
-      if(accepted||dialog!==parent){showStatus(error.message,{error:true});return;}
+      if(closed)return;
+      if(error.code==='SNOOZE_CANCELLED')return;
+      // Shutdown is a lifecycle event, not a validation error. In particular,
+      // do not leave a modal open with the internal 'Snooze closed' message.
+      if(error.code==='SNOOZE_CLOSED'||error.message==='Snooze closed'){if(dialog===parent)closeDialog();if(ticket===operation){toast?.remove();toast=null;if(toastTimer!==null)win.clearTimeout(toastTimer);toastTimer=null;}return;}
+      if(accepted||dialog!==parent){status(error.message,{error:true});return;}
       buttons.forEach(({element,disabled})=>element.disabled=disabled);let note=parent.querySelector('[role="alert"]');if(!note){note=doc.createElement('p');note.setAttribute('role','alert');parent.append(note);}note.hidden=false;note.textContent=gmText(error.message);
     }
   }
   function choose(headers,job=null,anchor=null){
+    if(closed)return;
+    if(dialog?.classList.contains('gm-snooze-menu')&&anchor&&dialog._snoozeAnchor===anchor){closeDialog();return;}
     const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);tomorrow.setHours(8,0,0,0);
-    const apply=(panel,date)=>execute(panel,ready=>job?service.reschedule(job.id,date.getTime(),ready):service.snooze(headers,date.getTime(),ready));
+    const reminders=job?[job]:(service.forHeaders?.(headers)||[]);
+    job=reminders[0]||null;
+    const freshHeaders=job&&headers.length?headers.filter(header=>!service.forHeaders?.([header])?.length):headers;
+    const apply=(panel,date)=>execute(panel,async(ready,shouldProceed)=>{
+      for(const reminder of reminders)await service.reschedule(reminder.id,date.getTime(),freshHeaders.length?undefined:ready,shouldProceed);
+      if(freshHeaders.length)await service.snooze(freshHeaders,date.getTime(),ready,shouldProceed);
+    },{moves:freshHeaders.length>0});
     const fallback=doc.querySelector('.gm-reading-action[title="'+gmText('Snooze until…')+'"]');
     const bounds=(anchor||fallback)?.getBoundingClientRect();
     closeDialog();
     const menu=doc.createElement('div');dialog=menu;menu.className='gm-snooze-menu';menu.setAttribute('popover','auto');menu.setAttribute('role','menu');
-    menu.setAttribute('aria-label',gmText('Snooze until…'));menu._snoozeAnchor=anchor||fallback;
+    menu.setAttribute('aria-label',gmText('Snooze until…'));menu._snoozeAnchor=anchor||fallback;menu._snoozeSelection=captureSnoozeSelection(win);
     const heading=doc.createElement('div');heading.className='gm-snooze-menu-heading';heading.textContent=gmText('Snooze until…');menu.append(heading);
     const add=(label,date)=>{
       const row=doc.createElement('button');row.type='button';row.className='gm-snooze-option';row.setAttribute('role','menuitem');
@@ -273,6 +292,14 @@ function installSnoozeUI(win,service) {
     const icon=doc.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');
     const path=doc.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zm-7-9H7v5h5v-5z');icon.append(path);
     const label=doc.createElement('span');label.textContent=gmText('Pick date & time');custom.append(icon,label);custom.onclick=()=>calendar(headers,job,tomorrow,apply);menu.append(custom);
+    if(reminders.length){
+      const unsnooze=doc.createElement('button');unsnooze.type='button';unsnooze.className='gm-snooze-option gm-snooze-unsnooze';unsnooze.setAttribute('role','menuitem');
+      const icon=doc.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');
+      const path=doc.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm3.6-12.2L12 11.4 8.4 7.8 7 9.2l3.6 3.6L7 16.4l1.4 1.4 3.6-3.6 3.6 3.6 1.4-1.4-3.6-3.6L17 9.2z');icon.append(path);
+      const label=doc.createElement('span');label.textContent=gmText('Unsnooze');unsnooze.append(icon,label);
+      unsnooze.onclick=()=>execute(menu,async(ready,shouldProceed)=>{if(service.cancelMany)await service.cancelMany(reminders.map(job=>job.id),ready,shouldProceed);else for(const reminder of reminders)await service.cancel(reminder.id,ready,shouldProceed);},{pending:'Returning conversation to Inbox…',success:'Snooze removed'});
+      menu.append(unsnooze);
+    }
     menu.addEventListener('keydown',event=>{
       const options=[...menu.querySelectorAll('button')];let index=options.indexOf(doc.activeElement);
       if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();options[(index+(event.key==='ArrowDown'?1:options.length-1)+options.length)%options.length].focus();}
@@ -286,8 +313,9 @@ function installSnoozeUI(win,service) {
     menu.querySelector('button')?.focus();
   }
   function calendar(headers,job,tomorrow,apply){
+    const anchor=dialog?._snoozeAnchor,selection=dialog?._snoozeSelection;
     closeDialog();
-    const panel=doc.createElement('dialog');dialog=panel;panel.className='gm-snooze-calendar-dialog';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',gmText('Pick date & time'));
+    const panel=doc.createElement('dialog');dialog=panel;panel._snoozeAnchor=anchor;panel._snoozeSelection=selection;panel.className='gm-snooze-calendar-dialog';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',gmText('Pick date & time'));
     const heading=doc.createElement('h2');heading.textContent=gmText('Pick date & time');panel.append(heading);
     const content=doc.createElement('div');content.className='gm-snooze-calendar-content';
     const calendar=doc.createElement('div'),fields=doc.createElement('div');calendar.className='gm-snooze-calendar';fields.className='gm-snooze-fields';content.append(calendar,fields);panel.append(content);
@@ -329,10 +357,10 @@ function installSnoozeUI(win,service) {
     const save=doc.createElement('button');save.type='button';save.className='gm-snooze-save';save.textContent=gmText('Save');
     save.onclick=()=>{const date=snoozeParseDate(dateInput.value,locale),time=timePicker.getTime();if(!date||!time){invalid('Choose a valid date and time.');return;}date.setHours(time.hours,time.minutes,0,0);if(date.getHours()!==time.hours||date.getMinutes()!==time.minutes){invalid('Choose a valid date and time.');return;}if(date.getTime()<=Date.now()){invalid('Choose a future date and time.');return;}apply(panel,date);};
     panel.addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.target===dateInput||event.target===timePicker.element.querySelector('input'))){event.preventDefault();save.click();}});
-    footer.append(cancel,save);panel.append(footer);panel.addEventListener('close',()=>{if(dialog===panel)closeDialog();});draw();doc.documentElement.append(panel);panel.showModal();dateInput.focus();dateInput.select();
+    footer.append(cancel,save);panel.append(footer);panel.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();if(dialog===panel)closeDialog();});panel.addEventListener('close',()=>{if(dialog===panel)closeDialog();});draw();doc.documentElement.append(panel);panel.showModal();dateInput.focus();dateInput.select();
   }
   function manage(){
-    const panel=shell(gmText('Snoozed'));
+    const panel=shell(gmText('Snoozed'));panel._snoozeSelection=captureSnoozeSelection(win);
     const jobs=service.list();
     if(!jobs.length){const empty=doc.createElement('p');empty.textContent=gmText('No snoozed conversations.');panel.append(empty);}
     for(const job of jobs){
@@ -340,9 +368,20 @@ function installSnoozeUI(win,service) {
       title.textContent=(job.subject||gmText('(no subject)'))+' — '+new Date(job.due).toLocaleString();row.append(title);
       if(job.error){const error=doc.createElement('p');error.setAttribute('role','alert');error.textContent=gmText(job.error);row.append(error);}
       addButton(row,gmText('Change time'),()=>choose([],job));
-      addButton(row,gmText('Unsnooze'),()=>execute(panel,ready=>service.cancel(job.id,ready),{pending:'Returning conversation to Inbox…',success:'Conversation returned to Inbox'}));panel.append(row);
+      addButton(row,gmText('Unsnooze'),()=>execute(panel,(ready,shouldProceed)=>service.cancel(job.id,ready,shouldProceed),{pending:'Returning conversation to Inbox…',success:'Snooze removed'}));panel.append(row);
     }
   }
   button.onclick=manage;
-  return {choose,close(){doc.removeEventListener('keydown',dismissMenu,true);doc.removeEventListener('pointerdown',dismissMenu,true);folderMode.close();unsubscribe();closeDialog();button.remove();style.remove();toast?.remove();if(toastTimer!==null)win.clearTimeout(toastTimer);}};
+  return {choose,close(){closed=true;doc.removeEventListener('keydown',dismissMenu,true);doc.removeEventListener('pointerdown',dismissMenu,true);folderMode.close();unsubscribe();closeDialog();button.remove();style.remove();toast?.remove();if(toastTimer!==null)win.clearTimeout(toastTimer);}};
+}
+
+
+function captureSnoozeSelection(win){
+  const view=win.gDBView,tree=win.document.getElementById('threadTree');
+  return {view,indices:Array.from(tree?.selectedIndices||[]),keys:Array.from(view?.getSelectedMsgHdrs?.()||[],header=>JSON.stringify([header.folder?.URI,header.messageKey]))};
+}
+function snoozeSelectionUnchanged(win,context){
+  if(!context||win.gDBView!==context.view)return false;
+  const current=captureSnoozeSelection(win);
+  return JSON.stringify(current.indices)===JSON.stringify(context.indices)&&JSON.stringify(current.keys)===JSON.stringify(context.keys);
 }

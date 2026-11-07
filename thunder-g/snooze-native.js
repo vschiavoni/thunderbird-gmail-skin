@@ -295,6 +295,21 @@ function createNativeSnooze({onTiming=null}={}) {
     adapter[kind+'Many']=async(job,checkpoint)=>{const failures=await moveJobs(kind,[job],checkpoint);if(failures.has(job))throw failures.get(job);};
   }
   const service=createSnoozeService(adapter);
+  let reminderIndex=null;
+  service.subscribe(()=>{reminderIndex=null;});
+  service.forHeaders=headers=>{
+    if(!reminderIndex){
+      reminderIndex=new Map();
+      for(const job of service.list())for(const message of job.messages){const key=returnKey(message),jobs=reminderIndex.get(key)||[];jobs.push(job);reminderIndex.set(key,jobs);}
+    }
+    const found=new Set();
+    for(const header of headers){
+      if(!header?.folder?.server)continue;
+      const key=JSON.stringify([accountId(header.folder.server),messageId(header),header.date]);
+      for(const job of reminderIndex.get(key)||[])found.add(job);
+    }
+    return [...found];
+  };
   const listener={
     msgAdded(header){if(header.folder?.flags&folderFlags.Inbox){replyCache?.delete(accountId(header.folder.server));stampReturned(header);service.check().catch(adapter.report);}},
     msgsMoveCopyCompleted(move,headers){if(move)this.msgsDeleted(headers);},

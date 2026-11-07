@@ -280,7 +280,13 @@ function installReadingMode(win) {
     // Resolve the operation at click time, not from the initial button label.
     () => command(readAction().name, true));
   syncReadAction();
-  const snoozeUI = typeof thunderGSnooze !== 'undefined' && thunderGSnooze ? installSnoozeUI(win,thunderGSnooze) : null;
+  const snoozeUI = typeof thunderGSnooze !== 'undefined' && thunderGSnooze ? installSnoozeUI(win,thunderGSnooze,{onMoveAccepted(context){
+    if(closed||!snoozeSelectionUnchanged(win,context))return;
+    // Native row removal may select a successor. Suppress that implicit
+    // selection until the next deliberate pointer/keyboard action.
+    tree._gmSmartActionPending=true;
+    leave(false);clearBulk();tree.invalidate?.();
+  }}) : null;
   const snoozeButton = action(gmText("Snooze until…"), 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 6v6l4 3', () => {
     const headers=snoozeSelectedMessages(win.gDBView,resolveConversation(conversationDocument()),!!(win.gDBView?.viewFlags&Ci.nsMsgViewFlagsType.kThreadedDisplay));
     if(headers.length)snoozeUI?.choose(headers,null,snoozeButton);
@@ -667,6 +673,7 @@ function installReadingMode(win) {
     tree.selectedIndices = [];
     win.threadPaneHeader?.updateSelectedCount();
     syncBulk();
+    if(win.Event)tree.dispatchEvent?.(new win.Event('gm-selection-cleared'));
   }
   function headingClick(event) {
     if (event.button !== 0) return;
@@ -888,6 +895,7 @@ function installReadingMode(win) {
       bulk = indices.length > 0;
       win.threadPaneHeader?.updateSelectedCount();
       syncBulk();
+      if(!indices.length&&win.Event)tree.dispatchEvent?.(new win.Event('gm-selection-cleared'));
     }
   };
 }

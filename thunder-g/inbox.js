@@ -397,6 +397,14 @@ function selectInboxMode(win,reader,mode) {
   }
   apply(indices);
 }
+// Recycled row images and native ancestor styles must not retain a checkmark
+// after the actual selection has been cleared by a message action.
+function syncInboxRowCheckbox(row,selected){
+  const checkbox=row.querySelector('.tree-view-row-select-checkbox');
+  if(!checkbox?.setAttribute)return;
+  checkbox.setAttribute('data-gm-selection-checked',String(!(row.dataset.properties||'').split(' ').includes('dummy')&&selected.has(row.index)));
+}
+
 function inboxSelectionState(view,selectedIndices,range=null){
   const selected=new Set(selectedIndices || []);let total=0,count=0;
   const start=range?.rowStart ?? 0,end=range?.rowEnd ?? view?.rowCount ?? 0;
@@ -554,13 +562,13 @@ function installInboxIdleActions(win,reader=null) {
   const alignmentObserver=win.ResizeObserver?new win.ResizeObserver(alignCheckbox):null;
   alignmentObserver?.observe(header);
   if(alignmentTree)alignmentObserver?.observe(alignmentTree);
-  for(const name of ['select','viewchange','rowcountchange','gm-page-changed'])alignmentTree?.addEventListener?.(name,syncSelection);
+  for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])alignmentTree?.addEventListener?.(name,syncSelection);
   syncSelection();
   alignmentTree?.addEventListener?.('viewchange',alignCheckbox);
   alignmentTree?.addEventListener?.('rowcountchange',alignCheckbox);
   alignCheckbox();
   return {close(){closed=true;win.removeEventListener?.('gm-label-navigation',syncLabelBack);reader?.setSelectionControl?.(null);alignmentObserver?.disconnect();
-    for(const name of ['select','viewchange','rowcountchange','gm-page-changed'])alignmentTree?.removeEventListener?.(name,syncSelection);
+    for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])alignmentTree?.removeEventListener?.(name,syncSelection);
     alignmentTree?.removeEventListener?.('viewchange',alignCheckbox);
     alignmentTree?.removeEventListener?.('rowcountchange',alignCheckbox);
     if(selectionFrame!==null)win.cancelAnimationFrame(selectionFrame);popup.hidePopup();popup.remove();bar.remove();style.remove();}};
@@ -1239,6 +1247,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   `;
   doc.head.append(style);
   function render(row) {
+    syncInboxRowCheckbox(row,new Set(tree.selectedIndices||[]));
     renderThreadGuide(row);
     stars.render(row);
     row.querySelector('.gm-unread-thread-senders')?.remove();
@@ -1339,10 +1348,10 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   function clearSmartSelection(event){
     if(!tree._gmSmartActionPending || clearingSmartSelection)return;
     event.stopImmediatePropagation?.();
-    if(!tree.selectedIndices?.length)return;
+    if(!tree.selectedIndices?.length){syncRowCheckboxes();return;}
     clearingSmartSelection=true;
     try{if(reader)reader.selectIndices([]);else tree.selectedIndices=[];}
-    finally{clearingSmartSelection=false;}
+    finally{clearingSmartSelection=false;syncRowCheckboxes();if(win.Event)tree.dispatchEvent?.(new win.Event('gm-selection-cleared'));}
   }
   function resumeSelection(){tree._gmSmartActionPending=false;}
   function resumeHover(event){
@@ -1352,6 +1361,12 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
     if(focusedActions && focusedActions.closest('tr')!==hoveredRow)focused.blur();
     tree.removeAttribute?.('data-gm-smart-action-done');
   }
+  function syncRowCheckboxes(){
+    if(closed)return;
+    const selected=new Set(tree.selectedIndices||[]);
+    for(const row of doc.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout'))syncInboxRowCheckbox(row,selected);
+  }
+  for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])tree.addEventListener(name,syncRowCheckboxes);
   tree.addEventListener('select',clearSmartSelection,true);
   tree.addEventListener('pointerdown',resumeSelection,true);
   tree.addEventListener('keydown',resumeSelection,true);
@@ -1359,6 +1374,8 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,co
   function close() {
     if (closed) return;
     closed = true;
+    for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])tree.removeEventListener(name,syncRowCheckboxes);
+    for(const checkbox of doc.querySelectorAll('[data-gm-selection-checked]'))checkbox.removeAttribute('data-gm-selection-checked');
     tree.removeEventListener('select',clearSmartSelection,true);
     tree.removeEventListener('pointerdown',resumeSelection,true);
     tree.removeEventListener('keydown',resumeSelection,true);

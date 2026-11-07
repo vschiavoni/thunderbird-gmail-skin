@@ -2211,5 +2211,8 @@
   },
   "settings_no_results": {
     "message": "Nessuna impostazione trovata. Prova un’altra ricerca."
+  },
+  "snooze_removed": {
+    "message": "Posticipo annullato"
   }
 }

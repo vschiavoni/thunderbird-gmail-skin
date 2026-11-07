@@ -68,6 +68,16 @@ test('generic folder wrappers expose IMAP refresh only through QueryInterface',a
   await f.service.cancel(f.saved[0].id);assert.equal(f.saved.length,0);
 });
 
+test('held headers and original headers resolve to the same durable reminder',async()=>{
+  const f=fixture(),a=f.header('a');await f.service.snooze([a],Date.now()+100000);
+  const held=f.folders.find(folder=>folder.name==='Thunder-G Snoozed').messages[0];
+  assert.equal(f.service.forHeaders([held])[0].id,f.saved[0].id);
+  assert.equal(f.service.forHeaders([a])[0].id,f.saved[0].id);
+  assert.equal(f.service.forHeaders([f.header('other')]).length,0);
+  const otherAccount={...held,folder:{server:{...f.server,key:'different'}}};
+  assert.equal(f.service.forHeaders([otherAccount]).length,0);
+});
+
 test('a 120-message conversation uses three bounded native moves in each direction',async()=>{
   const f=fixture(),headers=Array.from({length:120},(_,i)=>f.header('batch-'+i,f.inbox,{refs:i?['batch-0']:[]}));
   await f.service.snooze(headers,Date.now()+100000);
