@@ -1274,6 +1274,15 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   `;
   doc.head.append(style);
   function render(row) {
+    row.querySelector('.gm-message-drag-handle')?.remove();
+    const selectionCell=row.querySelector('.selectcol-column, .tree-view-row-select');
+    if(selectionCell && !(row.dataset.properties || '').split(' ').includes('dummy')){
+      const handle=doc.createElement('span');
+      handle.className='gm-message-drag-handle';
+      handle.draggable=true;
+      handle.title=gmText("Drag conversation");
+      selectionCell.append(handle);
+    }
     renderPersonalIndicator(row);
     renderThreadGuide(row);
     stars.render(row);
@@ -1363,6 +1372,9 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     prototype = rowClass.prototype;
     original = prototype.fillRow;
     wrapped = function(...args) {
+      // Native fillRow treats the first child of a selection cell as its
+      // checkbox. Never let a surviving drag handle stand in for that image.
+      this.querySelector('.gm-message-drag-handle')?.remove();
       const result = original.apply(this,args);
       render(this);
       return result;
@@ -1382,6 +1394,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   }
   function resumeSelection(){tree._gmSmartActionPending=false;}
   function resumeHover(event){
+    if(event.buttons===0)dragEnded();
     const focused=doc.activeElement;
     const focusedActions=focused?.closest?.('.gm-row-actions');
     const hoveredRow=event.target?.closest?.('tr.table-layout, tr.card-layout');
@@ -1392,16 +1405,26 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   tree.addEventListener('pointerdown',resumeSelection,true);
   tree.addEventListener('keydown',resumeSelection,true);
   tree.addEventListener('pointermove',resumeHover);
+  function dragStarted(event){
+    if(event.target?.closest?.('tr.table-layout, tr.card-layout'))tree.setAttribute('data-gm-dragging','');
+  }
+  function dragEnded(){tree.removeAttribute?.('data-gm-dragging');}
+  tree.addEventListener('dragstart',dragStarted);
+  const dragReleaseEvents=['pointerup','mouseup','drop','dragend'];
+  for(const name of dragReleaseEvents)doc.addEventListener?.(name,dragEnded,true);
   function close() {
     if (closed) return;
     closed = true;
+    tree.removeEventListener('dragstart',dragStarted);
+    for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);
+    dragEnded();
     tree.removeEventListener('select',clearSmartSelection,true);
     tree.removeEventListener('pointerdown',resumeSelection,true);
     tree.removeEventListener('keydown',resumeSelection,true);
     tree.removeEventListener('pointermove',resumeHover);
     delete tree._gmSmartActionPending;tree.removeAttribute?.('data-gm-smart-action-done');
     if (prototype?.fillRow === wrapped) prototype.fillRow = original;
-    for (const node of doc.querySelectorAll('.gm-row-actions, .gm-message-snippet')) node.remove();
+    for (const node of doc.querySelectorAll('.gm-row-actions, .gm-message-snippet, .gm-message-drag-handle')) node.remove();
     for (const line of doc.querySelectorAll('.gm-has-snippet')) line.classList.remove('gm-has-snippet');
     for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) delete row.dataset.gmThreadGuide;
     style.remove();

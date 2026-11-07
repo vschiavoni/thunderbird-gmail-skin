@@ -130,8 +130,7 @@
   background: light-dark(#4285f4, #8ab4f8);
   pointer-events: none;
 }
-#threadTree tr.table-layout:hover > td.tree-view-row-select::after {
-  content: "";
+#threadTree .gm-message-drag-handle {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 5px;
@@ -139,8 +138,8 @@
   block-size: 15px;
   transform: translateY(-50%);
   background: radial-gradient(circle, currentColor 1.25px, transparent 1.75px) 0 0 / 5px 5px;
-  opacity: .45;
-  pointer-events: none;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* Keep the hover circle behind the native checkbox and inside its gutter. */
@@ -184,4 +183,18 @@
   place-items: center;
   color: light-dark(#185abc, #a8c7fa);
   font: 600 18px/1 sans-serif;
+}
+
+/* Message rows open a conversation when clicked. */
+#threadTree tbody > tr:is(.table-layout, .card-layout):not([data-properties~="dummy"]):not([data-gm-outside-page]),
+#threadTree tbody > tr:is(.table-layout, .card-layout):not([data-properties~="dummy"]):not([data-gm-outside-page]) :is(td, .cell-text, .subject-line, .gm-message-snippet, .tree-view-row-select img),
+#threadTree .flaggedcol-column button {
+  cursor: pointer;
+}
+
+
+#threadTree tr:hover .gm-message-drag-handle { opacity: .45; }
+#threadTree[data-gm-dragging],
+#threadTree[data-gm-dragging] * {
+  cursor: grabbing !important;
 }

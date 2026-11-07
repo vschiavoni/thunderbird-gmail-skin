@@ -82,7 +82,10 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
       querySelector(selector){if(selector==='.subject-line')return this.line;
         if(selector.startsWith('.gm-'))return this.line?.children.find(item=>item.className===selector.slice(1))}};
   }
-  class Row{static ROW_HEIGHT=22;fillRow(){}}
+  class Row{static ROW_HEIGHT=22;fillRow(){
+    assert.equal(this.querySelector('.gm-message-drag-handle'),undefined,
+      'native row filling must never encounter a surviving drag handle');
+  }}
   let resets=0;
   const row=Object.assign(new Row(),element());row.index=0;row.line=element();
   const native=Row.prototype.fillRow;let read=false,preview='';
@@ -98,7 +101,10 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
   assert.equal(row.line.children.length,1);
   assert.equal(row.line.children[0].children[2].title,'Mark conversation as read');
   assert.equal(row.dataset.gmThreadGuide,'start');
+  const staleHandle=element();staleHandle.className='gm-message-drag-handle';
+  row.line.append(staleHandle);
   read=true;row.fillRow();
+  assert.equal(row.line.children.includes(staleHandle),false);
   assert.equal(row.line.children.length,1,'recycled row has only one action group');
   assert.equal(row.line.children[0].children[2].title,'Mark conversation as unread');
   preview='Text <b>only</b>';row.fillRow();

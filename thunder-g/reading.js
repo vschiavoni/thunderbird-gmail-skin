@@ -749,6 +749,11 @@ function installReadingMode(win) {
     syncBulk();
   }
   function selectionClick(event) {
+    if(event.target.closest('.gm-message-drag-handle')){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     if (event.target.closest('.gm-row-actions')) {
       if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
       return;
