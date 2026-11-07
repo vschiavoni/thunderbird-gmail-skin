@@ -24,6 +24,32 @@ function independentFolderThread(header) {
   } catch (_) { /* An unindexed/deleted folder still allows the selected message. */ }
   return independentMessages(messages,header);
 }
+function independentInboxFolder(headers, flags=Ci.nsMsgFolderFlags, removed=new Set()) {
+  return headers.find(header=>!removed.has(independentMessageKey(header)) &&
+    header.folder?.isSpecialFolder?.(flags.Inbox,false))?.folder || null;
+}
+function archiveConversationInbox(win, headers, Archiver=null) {
+  const messages=conversationPhysicalMessages(headers).filter(header=>
+    header.folder?.isSpecialFolder?.(Ci.nsMsgFolderFlags.Inbox,false));
+  if(!messages.length)return;
+  Archiver ||= ChromeUtils.importESModule('resource:///modules/MessageArchiver.sys.mjs').MessageArchiver;
+  if(!Archiver.canArchive(messages,false))throw new Error(gmText("Archiving is disabled for this account."));
+  const archiver=new Archiver();
+  archiver.msgWindow=win.msgWindow;
+  archiver.archiveMessages(messages);
+}
+
+function openConversationInbox(win, folder) {
+  win.dispatchEvent(new win.CustomEvent('gm-open-label-view'));
+  const bar=win.quickFilterBar;
+  if(bar?.filterer?.clear){
+    bar.filterer.clear();
+    bar.updateSearch();
+    bar.reflectFiltererState();
+  }
+  win.displayFolder(folder.URI);
+}
+
 function independentReferenceIds(header) {
   const normalize=value=>String(value || '').trim().replace(/^<|>$/g,'');
   const ids=new Set();
@@ -445,6 +471,7 @@ function installIndependentReader(win) {
   scope.className='scope';scope.hidden=true;
   status.className='status';status.setAttribute('role','status');cards.className='cards';
   conversation.append(title,scope,status,cards);root.append(style,conversation);
+  const removedInboxMessages=new Set();
   const titleTags=doc.createElement('span');titleTags.className='title-tags';gmBindAttribute(titleTags, 'aria-label', () => gmText("Labels in this conversation"));
   const cleanups=new Set(),tagRenderers=new Set(),securityRenderers=new Set(),frames=new Map(),messageDocs=new Map(),messageCards=new Map();let currentHeaders=[],actionHeader=null,activeHeader=null,activeCard=null,historyExpanded=false;
   const zoomResizers=new Map();
@@ -547,6 +574,43 @@ function installIndependentReader(win) {
     for(const render of securityRenderers)render();
     for(const render of tagRenderers)render();
     titleTags.replaceChildren();
+    const inbox=independentInboxFolder(currentHeaders,Ci.nsMsgFolderFlags,removedInboxMessages);
+    if(inbox){
+      const chip=text('span','tag gm-inbox-chip',gmText("Inbox"));
+      chip.style.backgroundColor='light-dark(#e0e3e1,#444746)';
+      chip.style.color='inherit';
+      chip.setAttribute('role','link');
+      chip.setAttribute('tabindex','0');
+      chip.title=gmText("Open Inbox");
+      chip.style.cursor='pointer';
+      function navigate(event){
+        if(event.target?.closest?.('button'))return;
+        event.preventDefault();
+        event.stopPropagation();
+        openConversationInbox(win,inbox);
+      }
+      chip.addEventListener('click',navigate);
+      chip.addEventListener('keydown',event=>{
+        if(['Enter',' '].includes(event.key))navigate(event);
+      });
+      const remove=text('button','tag-remove','×');
+      remove.type='button';
+      remove.title=gmText("Remove label Inbox from this conversation");
+      remove.setAttribute('aria-label',remove.title);
+      remove.addEventListener('click',event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          archiveConversationInbox(win,currentHeaders.filter(header=>
+            !removedInboxMessages.has(independentMessageKey(header))));
+        }catch(error){
+          status.hidden=false;
+          status.textContent=error.message || gmText("Could not archive this conversation.");
+        }
+      });
+      chip.append(remove);
+      titleTags.append(chip);
+    }
     if(typeof assignedTags!=='function')return;
     const tags=new Map(),definitions=MailServices.tags.getAllTags();
     for(const header of currentHeaders)for(const tag of assignedTags(header,definitions))tags.set(tag.key,tag);
@@ -582,7 +646,15 @@ function installIndependentReader(win) {
     tagListener[name]=()=>sentCache.invalidate();notifications|=Ci.nsIMsgFolderNotificationService[name] || 0;
   }
   tagListener.msgsDeleted=headers=>sentCache.invalidateFolders(headers?Array.from(headers,header=>header.folder):null);
-  tagListener.msgsMoveCopyCompleted=(_move,headers,destination)=>sentCache.invalidateFolders(headers?[...Array.from(headers,header=>header.folder),destination]:null);
+  tagListener.msgsMoveCopyCompleted=(move,headers,destination)=>{
+    sentCache.invalidateFolders(headers?[...Array.from(headers,header=>header.folder),destination]:null);
+    if(!move || !headers || destination?.isSpecialFolder?.(Ci.nsMsgFolderFlags.Inbox,false))return;
+    for(const header of headers){
+      if(header.folder?.isSpecialFolder?.(Ci.nsMsgFolderFlags.Inbox,false))
+        removedInboxMessages.add(independentMessageKey(header));
+    }
+    if(!closed && currentHeaders.length)refreshTags();
+  };
   tagListener.msgKeyChanged=(_oldKey,header)=>sentCache.invalidateFolders([header?.folder]);
   tagListener.msgAdded=header=>{
     sentCache.invalidateFolders([header?.folder]);
@@ -632,7 +704,7 @@ function installIndependentReader(win) {
   if(MailServices.mfn)MailServices.mfn.addListener(tagListener,notifications);
   const stopLanguageRefresh=gmOnLanguageChange(refreshTags);
   win.addEventListener?.('focus',refreshTags);
-  function clearCards(){pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
+  function clearCards(){removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
   function text(tag,className,value){const node=doc.createElement(tag);node.className=className;node.textContent=value;return node}
   function buildCard(header,expand,token,before=null,hydration=null) {
     const article=hydration?.card || doc.createElement('article');

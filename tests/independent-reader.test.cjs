@@ -827,3 +827,38 @@ test('ordinary refreshes retain settled counts after idle time until a relevant 
   time=86400000;for(let i=0;i<100;i++)assert.equal(cache.get(anchor),1);
   assert.equal(calls,1,'elapsed time and repaint do not rescan a settled conversation');cache.close();
 });
+
+test('Inbox system chip uses actual folder membership and opens that account Inbox',()=>{
+  const scope=context({});
+  const inbox={URI:'account-one/Inbox',isSpecialFolder:flag=>flag===4096};
+  const sent={URI:'account-one/Sent',isSpecialFolder:()=>false};
+  assert.equal(scope.independentInboxFolder([{folder:sent},{folder:inbox}],{Inbox:4096}),inbox);
+  assert.equal(scope.independentInboxFolder([{folder:sent}],{Inbox:4096}),null);
+  const calls=[];
+  scope.openConversationInbox({
+    CustomEvent:class {constructor(type){this.type=type}},
+    dispatchEvent:event=>calls.push(event.type),
+    quickFilterBar:{filterer:{clear:()=>calls.push('clear')},updateSearch(){},reflectFiltererState(){}},
+    displayFolder:uri=>calls.push(uri),
+  },inbox);
+  assert.deepEqual(calls,['gm-open-label-view','clear','account-one/Inbox']);
+});
+
+test('removing Inbox archives only Inbox copies and honors disabled archiving',()=>{
+  const scope=context({Ci:{nsMsgFolderFlags:{Inbox:4096}}});
+  scope.conversationPhysicalMessages=messages=>messages;
+  const inbox={messageKey:1,folder:{URI:'Inbox',isSpecialFolder:flag=>flag===4096}};
+  const sent={messageKey:2,folder:{URI:'Sent',isSpecialFolder:()=>false}};
+  const calls=[];
+  class Archiver {
+    static canArchive(messages){assert.deepEqual(Array.from(messages),[inbox]);return true}
+    archiveMessages(messages){calls.push([this.msgWindow,Array.from(messages)])}
+  }
+  scope.archiveConversationInbox({msgWindow:'native-window'},[inbox,sent],Archiver);
+  assert.deepEqual(calls,[['native-window',[inbox]]]);
+  Archiver.canArchive=()=>false;
+  assert.throws(()=>scope.archiveConversationInbox({},[inbox,sent],Archiver),/disabled/);
+  assert.equal(calls.length,1);
+  const removed=new Set([scope.independentMessageKey(inbox)]);
+  assert.equal(scope.independentInboxFolder([inbox,sent],{Inbox:4096},removed),null);
+});
