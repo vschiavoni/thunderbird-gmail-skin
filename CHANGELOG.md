@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.28.0
+
+- Add optional personal level indicators beside message stars.
+- Show label-change notices with Undo in conversations and the message list’s label picker.
+- Count unread conversations in the Labels sidebar.
+- Add an active-row stripe, hover dots, and aligned selection checkboxes.
+- Reduce scrolling overhead and add elastic feedback at list and page boundaries.
+- Keep labeled message text stable on hover (#38).
+- Unify colored marker styling and improve click cycling (#37).
+- Decode encoded address names in pending reply cards.
+
 ## 0.27.0
 
 - Show distinct unread senders in collapsed conversations.
