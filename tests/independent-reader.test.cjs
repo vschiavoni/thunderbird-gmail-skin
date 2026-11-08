@@ -887,3 +887,22 @@ test('index enrichment preserves the first card and loaded viewer instead of res
   assert.equal(f.reader.getMessages().length,2);
   f.reader.close();
 });
+
+test('returning to the list paints before viewer disposal and reopening cancels stale cleanup',async()=>{
+  const f=readerFixture();
+  await f.reader.open(f.anchor);f.loaded();
+  const browser=f.browsers[0];
+  f.reader.hide(false);
+  assert.notEqual(browser.removed,true,'viewer disposal waits for the list repaint');
+  f.flush();
+  const cleanup=[...f.timers.values()].at(-1);
+  assert.equal(typeof cleanup,'function');
+  await f.reader.open(f.anchor);
+  cleanup();
+  assert.equal(f.reader.getMessages().length,1,'old cleanup cannot dispose a newly opened reader');
+  assert.notEqual(f.browsers.at(-1).removed,true);
+  f.reader.hide(false);f.flush();
+  [...f.timers.values()].at(-1)();
+  assert.equal(f.cards.children.length,0);
+  f.reader.close();
+});

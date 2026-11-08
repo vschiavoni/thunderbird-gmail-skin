@@ -704,7 +704,14 @@ function installIndependentReader(win) {
   if(MailServices.mfn)MailServices.mfn.addListener(tagListener,notifications);
   const stopLanguageRefresh=gmOnLanguageChange(refreshTags);
   win.addEventListener?.('focus',refreshTags);
-  function clearCards(){removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
+  let hideCleanupFrame=null,hideCleanupTimer=null;
+  function cancelHideCleanup(){
+    if(hideCleanupFrame!==null)win.cancelAnimationFrame(hideCleanupFrame);
+    if(hideCleanupTimer!==null)win.clearTimeout(hideCleanupTimer);
+    hideCleanupFrame=null;
+    hideCleanupTimer=null;
+  }
+  function clearCards(){cancelHideCleanup();removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
   function text(tag,className,value){const node=doc.createElement(tag);node.className=className;node.textContent=value;return node}
   function buildCard(header,expand,token,before=null,hydration=null) {
     const article=hydration?.card || doc.createElement('article');
@@ -1140,8 +1147,22 @@ function installIndependentReader(win) {
         }).catch(error=>{if(!closed && token===ticket){status.hidden=false;status.textContent=error.message || 'Could not resume the saved draft.'}});
       }
     },
-    hide(){if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();++ticket;query?.cancel();query=null;resolving=false;host.hidden=true;layout.classList.remove('gm-independent-open');clearCards()},
-    close(){this.hide();closed=true;contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
+    hide(immediate=true){
+      if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();
+      ++ticket;query?.cancel();query=null;resolving=false;
+      host.hidden=true;layout.classList.remove('gm-independent-open');
+      cancelHideCleanup();
+      if(immediate){clearCards();return;}
+      // Paint the inbox before unloading potentially many native message viewers.
+      hideCleanupFrame=win.requestAnimationFrame(()=>{
+        hideCleanupFrame=null;
+        hideCleanupTimer=win.setTimeout(()=>{
+          hideCleanupTimer=null;
+          if(host.hidden && !closed)clearCards();
+        },0);
+      });
+    },
+    close(){this.hide(true);closed=true;contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
     refresh:refreshTags,
     navigateMessage(direction){
       if(resolving || !currentHeaders.length)return;

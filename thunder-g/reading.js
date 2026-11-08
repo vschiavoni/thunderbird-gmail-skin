@@ -784,7 +784,7 @@ function installReadingMode(win) {
     if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
     if (!active) return;
     active = false;
-    independent?.hide();
+    independent?.hide(false);
     layout.classList.remove('gm-reading');
     bulk = false;
     toolbar.hidden = true;
