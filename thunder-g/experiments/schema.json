@@ -147,6 +147,12 @@
         "parameters": [{"name":"value","type":"any"}]
       },
       {
+        "name": "setShowNewMessageSymbol",
+        "type": "function",
+        "async": true,
+        "parameters": [{"name": "enabled", "type": "boolean"}]
+      },
+      {
         "name": "setGmailLabelIcons",
         "type": "function",
         "async": true,

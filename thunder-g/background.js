@@ -12,9 +12,9 @@ async function startThunderG() {
   // Optional settings must never prevent the companion from starting.
   let previewTrimming=null;
   let coloredStars=null,dockIconEnabled=false,dockIconPreferences={};
-  let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
+  let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
   try {
-    const settings = await browser.storage.local.get({previewTrimming:null,dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,personalIndicators:false,gmailLabelIcons:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
+    const settings = await browser.storage.local.get({previewTrimming:null,dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,personalIndicators:false,gmailLabelIcons:false,showNewMessageSymbol:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
     searchResultsAsList=settings.searchResultsAsList!==false;
     coloredStars=settings.coloredStars;
     previewTrimming=settings.previewTrimming;
@@ -23,6 +23,7 @@ async function startThunderG() {
     threadExpandArrows=settings.threadExpandArrows===true;
     personalIndicators=settings.personalIndicators===true;
     gmailLabelIcons=settings.gmailLabelIcons===true;
+    showNewMessageSymbol=settings.showNewMessageSymbol===true;
     showColumnHeaders = settings.showColumnHeaders === true;
     threadGuides = settings.threadGuides !== false;
     bimiEnabled = settings.bimiEnabled === true;
@@ -45,6 +46,7 @@ async function startThunderG() {
   await browser.inlineLabels.setThreadExpandArrows?.(threadExpandArrows);
   await browser.inlineLabels.setPersonalIndicators?.(personalIndicators);
   await browser.inlineLabels.setGmailLabelIcons?.(gmailLabelIcons);
+  await browser.inlineLabels.setShowNewMessageSymbol?.(showNewMessageSymbol);
   await browser.inlineLabels.setThreadGuides?.(threadGuides);
   await browser.inlineLabels.setHideTodayPane(hideTodayPane);
   await browser.inlineLabels.setComposeAutosave(composeAutosave,composeAutosaveMinutes || 1,composeAutosaveMode);
@@ -65,6 +67,7 @@ async function startThunderG() {
     if(area==='local' && changes.previewTrimming)browser.inlineLabels.setPreviewTrimming?.(changes.previewTrimming.newValue ?? null)?.catch(console.error);
     if(area==='local' && changes.coloredStars)browser.inlineLabels.setColoredStars?.(changes.coloredStars.newValue ?? null)?.catch(console.error);
     if(area==='local' && changes.gmailLabelIcons)browser.inlineLabels.setGmailLabelIcons?.(changes.gmailLabelIcons.newValue===true)?.catch(console.error);
+    if(area==='local' && changes.showNewMessageSymbol)browser.inlineLabels.setShowNewMessageSymbol?.(changes.showNewMessageSymbol.newValue===true)?.catch(console.error);
     if(area==='local' && changes.personalIndicators)browser.inlineLabels.setPersonalIndicators?.(changes.personalIndicators.newValue===true)?.catch(console.error);
     if(area==='local' && changes.threadExpandArrows)browser.inlineLabels.setThreadExpandArrows?.(changes.threadExpandArrows.newValue===true)?.catch(console.error);
     if(area==='local' && changes.threadGuides)browser.inlineLabels.setThreadGuides(changes.threadGuides.newValue!==false).catch(console.error);

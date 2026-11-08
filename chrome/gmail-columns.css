@@ -217,3 +217,7 @@
 #folderTree [data-mode="tags"] > .mode-container > .mode-name {
   font-weight: 400 !important;
 }
+
+:root:not([data-gm-new-message-symbol]) #threadTree tr.table-layout[data-properties~="new"]:not([data-properties~="replied"]):not([data-properties~="forwarded"]):not([data-properties~="redirected"]) .subject-line > img {
+  display: none !important;
+}

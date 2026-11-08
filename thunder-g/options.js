@@ -138,6 +138,26 @@ threadGuides.addEventListener('change', async () => {
   } finally { threadGuides.disabled = false; }
 });
 
+const showNewMessageSymbol = document.getElementById('new-message-symbol');
+if (showNewMessageSymbol) {
+  showNewMessageSymbol.disabled = true;
+  browser.storage.local.get({showNewMessageSymbol:false}).then(settings => {
+    showNewMessageSymbol.checked = settings.showNewMessageSymbol === true;
+    showNewMessageSymbol.disabled = false;
+  }).catch(console.error);
+  showNewMessageSymbol.addEventListener('change', async () => {
+    showNewMessageSymbol.disabled = true;
+    try {
+      await browser.storage.local.set({showNewMessageSymbol:showNewMessageSymbol.checked});
+    } catch (error) {
+      showNewMessageSymbol.checked = !showNewMessageSymbol.checked;
+      console.error(error);
+    } finally {
+      showNewMessageSymbol.disabled = false;
+    }
+  });
+}
+
 const gmailLabelIcons = document.getElementById('gmail-label-icons');
 if (gmailLabelIcons) {
   gmailLabelIcons.disabled = true;
