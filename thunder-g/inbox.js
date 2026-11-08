@@ -406,11 +406,53 @@ function inboxSelectionState(view,selectedIndices,range=null){
   }
   return {checked:total>0 && count===total,indeterminate:count>0 && count<total};
 }
+// Follow GetFolderMessages/GetNewMsgs routing, retaining native error reporting,
+// but supply URL listeners so feedback tracks the operations we actually start.
+function refreshInboxFolder(main,folder,done) {
+  const offline=main.MailOfflineMgr;
+  if(offline && !offline.isOnline() && !offline.getNewMail()){done();return;}
+  const flags=(typeof Ci==='undefined'?null:Ci.nsMsgFolderFlags) || {Inbox:0x1000};
+  folder ||= main.GetDefaultAccountRootFolder?.();
+  if(!folder){done();return;}
+  let pending=1,finished=false;
+  function complete(){if(--pending===0 && !finished){finished=true;done();}}
+  function run(start){
+    pending++;
+    let stopped=false;
+    const errors=typeof main.TransportErrorUrlListener==='function'?new main.TransportErrorUrlListener():null;
+    const listener={OnStartRunningUrl(){},OnStopRunningUrl(url,status){
+      if(stopped)return;stopped=true;
+      try{errors?.OnStopRunningUrl?.(url,status);}finally{complete();}
+    }};
+    try{start(listener);}catch(error){if(!stopped){stopped=true;complete();}throw error;}
+  }
+  try{
+    let target=folder,server=folder.server;
+    if(server?.type==='none' && !server.isDeferredTo){target=main.GetDefaultAccountRootFolder?.();server=target?.server;}
+    if(target?.isServer && server?.type==='imap')target=server.rootMsgFolder.getFolderWithFlags(flags.Inbox) || server.rootFolder;
+    const targets=target?.isServer && server?.type==='nntp'?Array.from(server.rootFolder.subFolders):target?[target]:[];
+    for(const item of targets){
+      run(listener=>{
+        if(server.type==='nntp' && target.isServer)item.getNewMessages(main.msgWindow,listener);
+        else{
+          item.biffState=1; // nsMsgBiffState_NoMail, as in Thunderbird GetNewMsgs.
+          item.clearNewMessages();server.getNewMessages(item,main.msgWindow,listener);
+        }
+      });
+    }
+    if(typeof folder.updateFolderWithListener==='function')run(listener=>folder.updateFolderWithListener(main.msgWindow,listener));
+    else folder.updateFolder?.(main.msgWindow);
+  }finally{complete();}
+}
+
 function installInboxIdleActions(win,reader=null) {
   const doc=win.document,header=doc.getElementById('threadPaneHeaderBar');
   const host=header?.querySelector?.('.list-header-bar-container-start');
   if(!host)return {close(){}};
-  let closed=false,selectionFrame=null;
+  let closed=false,selectionFrame=null,refreshTimer=null,refreshing=false;
+  const loading=doc.createElement('div');loading.className='gm-inbox-refresh-notice';loading.hidden=true;
+  loading.setAttribute('role','status');loading.setAttribute('aria-live','polite');
+  gmBindValue(loading,'textContent',()=>gmText("Loading…"));doc.documentElement.append(loading);
   const bar=doc.createElement('div');bar.className='gm-inbox-idle-actions';bar.setAttribute('role','toolbar');gmBindAttribute(bar, 'aria-label', () => gmText("Message list actions"));
   const select=doc.createElement('input');select.type='checkbox';gmBindValue(select, "title", () => gmText("Select all messages on this page"));gmBindAttribute(select,'aria-label',()=>select.title);
   function syncSelection(){
@@ -451,13 +493,24 @@ function installInboxIdleActions(win,reader=null) {
     if(handler)node.addEventListener('click',handler);return node;
   }
   const refresh=button(gmText("Refresh"),'M20 7v5h-5 M19 12a7 7 0 1 0-1 5',()=>{
+    if(closed || refreshing)return;
+    if(refreshTimer!==null)win.clearTimeout(refreshTimer);
+    refresh.removeAttribute('data-gm-refresh-feedback');
+    // Restart the short pulse even when Refresh is clicked repeatedly.
+    void refresh.offsetWidth;
+    refresh.setAttribute('data-gm-refresh-feedback','true');loading.hidden=false;
+    refreshTimer=win.setTimeout(()=>{refreshTimer=null;refresh.removeAttribute('data-gm-refresh-feedback');},300);
+    refreshing=true;
+    const finish=()=>{refreshing=false;if(!closed)loading.hidden=true;};
     const main=win.browsingContext?.topChromeWindow;
     try{
-      if(typeof main?.MsgGetMessage!=='function')throw new Error(gmText("Mail refresh is unavailable."));
-      main.MsgGetMessage(win.gFolder?[win.gFolder]:undefined);
-      win.gFolder?.updateFolder?.(main.msgWindow);
+      if(!main)throw new Error(gmText("Mail refresh is unavailable."));
+      refreshInboxFolder(main,win.gFolder,finish);
       gmBindValue(refresh, "title", () => gmText("Refresh"));
-    }catch(error){gmBindValue(refresh, "title", () => error.message || gmText("Could not refresh mail."));}
+    }catch(error){
+      win.clearTimeout(refreshTimer);refreshTimer=null;finish();refresh.removeAttribute('data-gm-refresh-feedback');
+      gmBindValue(refresh, "title", () => error.message || gmText("Could not refresh mail."));
+    }
   });
   const group=doc.createElement('div');group.className='gm-inbox-select-group';
   const dropdown=button('Select messages','M8 10l4 4 4-4');dropdown.className='gm-inbox-select-dropdown';
@@ -535,6 +588,15 @@ function installInboxIdleActions(win,reader=null) {
       :is(.gm-inbox-action):is(:hover,:focus-visible) { background:transparent !important; }
     :is(.gm-inbox-action)::before { transition:transform 180ms cubic-bezier(.2,0,0,1), opacity 120ms ease-out; }
     }
+    .gm-inbox-refresh-notice{position:fixed;inset-block-start:0;inset-inline-start:50%;transform:translateX(-50%);z-index:2147483647;padding:3px 10px;border:1px solid #e6c873;border-radius:0 0 2px 2px;background:#fff1c2;color:#202124;box-shadow:0 1px 4px #0003;font:500 12px/1.4 system-ui,sans-serif;pointer-events:none;}
+    .gm-inbox-refresh-notice[hidden]{display:none!important;}
+    @keyframes gm-refresh-collapse{from{opacity:1;transform:scale(1);}to{opacity:0;transform:scale(0);}}
+    @media(prefers-reduced-motion:no-preference){
+      .gm-inbox-action[data-gm-refresh-feedback]::before{animation:gm-refresh-collapse 280ms ease-out forwards;}
+    }
+    @media(prefers-reduced-motion:reduce){
+      .gm-inbox-action[data-gm-refresh-feedback]::before{opacity:0!important;}
+    }
     .gm-inbox-action:disabled{opacity:.5;cursor:default}
     .gm-inbox-action:focus-visible{outline:2px solid #1a73e8;outline-offset:-2px}
   `;doc.head.append(style);
@@ -559,7 +621,7 @@ function installInboxIdleActions(win,reader=null) {
   alignmentTree?.addEventListener?.('viewchange',alignCheckbox);
   alignmentTree?.addEventListener?.('rowcountchange',alignCheckbox);
   alignCheckbox();
-  return {close(){closed=true;win.removeEventListener?.('gm-label-navigation',syncLabelBack);reader?.setSelectionControl?.(null);alignmentObserver?.disconnect();
+  return {close(){closed=true;if(refreshTimer!==null)win.clearTimeout(refreshTimer);loading.remove();win.removeEventListener?.('gm-label-navigation',syncLabelBack);reader?.setSelectionControl?.(null);alignmentObserver?.disconnect();
     for(const name of ['select','viewchange','rowcountchange','gm-page-changed'])alignmentTree?.removeEventListener?.(name,syncSelection);
     alignmentTree?.removeEventListener?.('viewchange',alignCheckbox);
     alignmentTree?.removeEventListener?.('rowcountchange',alignCheckbox);
@@ -1023,7 +1085,9 @@ function installInboxEdgeBounce(win, tree) {
     const page=tree._gmPageScrollLimits;
     const min=page?.min ?? 0;
     const max=page?.max ?? tree.scrollHeight-tree.clientHeight;
-    const atEdge=max>min && (event.deltaY<0 ? tree.scrollTop<=min+1 : tree.scrollTop>=max-1);
+    // Moving the virtual table upward at the bottom exposes its trailing
+    // spacer and can flicker while native pagination clamps the scroll offset.
+    const atEdge=max>min && event.deltaY<0 && tree.scrollTop<=min+1;
     if(!atEdge){
       if(timer!==null)reset();
       return;

@@ -351,17 +351,18 @@ test('threaded views start collapsed, including async searches, and later manual
 });
 
 test('idle toolbar delegates page selection, refreshes the current account and cleans up',()=>{
- function node(){return {children:[],events:{},setAttribute(k,v){this[k]=v},append(...items){this.children.push(...items)},prepend(item){this.children.unshift(item)},addEventListener(name,fn){this.events[name]=fn},focus(){},openPopup(){this.open=true},hidePopup(){this.open=false},remove(){this.removed=true}}}
- const host=node(),head=node(),tree={selectedIndices:[],hasAttribute:()=>true,_gmPageSelectionBounds:()=>({rowStart:50,rowEnd:53})},selected=[],calls=[],frames=new Map();let id=0,nativeClicks=0;
- const folder={updateFolder(window){calls.push(['update',window])}},msgWindow={};
+ function node(){return {children:[],events:{},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},append(...items){this.children.push(...items)},prepend(item){this.children.unshift(item)},addEventListener(name,fn){this.events[name]=fn},focus(){},openPopup(){this.open=true},hidePopup(){this.open=false},remove(){this.removed=true}}}
+ const host=node(),head=node(),tree={selectedIndices:[],hasAttribute:()=>true,_gmPageSelectionBounds:()=>({rowStart:50,rowEnd:53})},selected=[],calls=[],frames=new Map(),timers=new Map();let id=0,nativeClicks=0;
+ const listeners=[];const folder={server:{type:'imap',getNewMessages(folder,window,listener){calls.push(['download',[folder]]);listeners.push(listener)}},clearNewMessages(){},updateFolderWithListener(window,listener){calls.push(['update',window]);listeners.push(listener)}},msgWindow={};
  const main={msgWindow,MsgGetMessage(folders){calls.push(['download',folders])}};
  const nativeSelect={click(){nativeClicks++;tree.selectedIndices=[50,51,52]}};
  const doc={head,documentElement:node(),createXULElement:node,getElementById:key=>({threadPaneHeaderBar:{querySelector:()=>host},threadTree:tree,selectColButton:nativeSelect})[key],createElement:node,createElementNS:node};
- const win={document:doc,gDBView:{rowCount:100,getFlagsAt:()=>0},gFolder:folder,browsingContext:{topChromeWindow:main},requestAnimationFrame(fn){frames.set(++id,fn);return id},cancelAnimationFrame(key){frames.delete(key)}};
+ const win={setTimeout(fn){timers.set(++id,fn);return id},clearTimeout(key){timers.delete(key)},document:doc,gDBView:{rowCount:100,getFlagsAt:()=>0},gFolder:folder,browsingContext:{topChromeWindow:main},requestAnimationFrame(fn){frames.set(++id,fn);return id},cancelAnimationFrame(key){frames.delete(key)}};
  const controller=scope.installInboxIdleActions(win,{selectIndices(indices){tree.selectedIndices=indices;selected.push(indices)}});
  const bar=host.children[0],[group,refresh,more]=bar.children,[checkbox,dropdown]=group.children;
  tree._gmSmartActionPending=true;
- const popup=doc.documentElement.children[0];dropdown.events.click();assert.equal(popup.open,true);
+ const notice=doc.documentElement.children[0];assert.equal(notice.hidden,true);assert.equal(notice.role,'status');
+ const popup=doc.documentElement.children[1];dropdown.events.click();assert.equal(popup.open,true);
  const choices=popup.children[0].children;assert.deepEqual(choices.map(item=>item.textContent),['All','None','Read','Unread','Starred','Unstarred']);
  choices[1].events.click();assert.equal(tree._gmSmartActionPending,false,'menu selection releases suppression from a previous action');assert.deepEqual(Array.from(selected.pop()),[]);
  checkbox.checked=true;checkbox.events.change();assert.equal(nativeClicks,1);
@@ -378,8 +379,18 @@ test('idle toolbar delegates page selection, refreshes the current account and c
  }
  tree.hasAttribute=()=>true;
  refresh.events.click();assert.equal(calls[0][0],'download');assert.equal(calls[0][1][0],folder);assert.deepEqual(calls[1],['update',msgWindow]);
+ assert.equal(notice.hidden,false);assert.equal(refresh['data-gm-refresh-feedback'],'true');
+ refresh.events.click();assert.equal(timers.size,1,'repeat clicks do not start overlapping downloads');assert.equal(listeners.length,2);
+ const finish=timers.values().next().value;timers.clear();finish();
+ assert.equal(notice.hidden,false,'animation timer must not dismiss ongoing refresh');assert.equal(refresh['data-gm-refresh-feedback'],undefined);
+ listeners[1].OnStopRunningUrl(null,0);assert.equal(notice.hidden,false,'wait for download as well as folder update');
+ listeners[0].OnStopRunningUrl(null,0);assert.equal(notice.hidden,true);
+ folder.server.getNewMessages=()=>{throw Error('offline')};refresh.events.click();
+ assert.equal(notice.hidden,true);assert.equal(timers.size,0);assert.equal(refresh.title,'offline');
+ folder.server.getNewMessages=(_folder,_window,listener)=>listeners.push(listener);refresh.events.click();
  assert.equal(more.disabled,true);
  checkbox.events.change();controller.close();assert.equal(frames.size,0);
+ assert.equal(timers.size,0);assert.equal(notice.removed,true);
  assert.equal(bar.removed,true);assert.equal(head.children[0].removed,true);
 });
 
@@ -806,4 +817,37 @@ test('personal indicators distinguish sole recipients, shared recipients, and ma
   assert.equal(level('other@example.org','me@example.org'),1);
   assert.equal(level('other@example.org'),0);
   assert.equal(level('me@example.org','','list.example.org'),0);
+});
+
+test('edge bounce stays at the top and never exposes the virtual list bottom',()=>{
+  const events={},properties=new Map(),timers=new Map();let id=0;
+  const tree={scrollTop:0,scrollHeight:1000,clientHeight:200,
+    style:{setProperty:(key,value)=>properties.set(key,value),removeProperty:key=>properties.delete(key)},
+    addEventListener:(name,fn)=>events[name]=fn,removeEventListener:name=>delete events[name]};
+  const win={matchMedia:()=>({matches:false}),setTimeout(fn){timers.set(++id,fn);return id},clearTimeout:id=>timers.delete(id)};
+  const bounce=scope.installInboxEdgeBounce(win,tree);
+  events.wheel({deltaX:0,deltaY:-40,deltaMode:0});
+  assert.ok(parseFloat(properties.get('--gm-edge-bounce'))>0);
+  tree.scrollTop=800;events.wheel({deltaX:0,deltaY:40,deltaMode:0});
+  assert.equal(properties.has('--gm-edge-bounce'),false);
+  tree._gmPageScrollLimits={min:200,max:400};
+  tree.scrollTop=200;events.wheel({deltaX:0,deltaY:-40,deltaMode:0});
+  assert.ok(parseFloat(properties.get('--gm-edge-bounce'))>0);
+  tree.scrollTop=400;events.wheel({deltaX:0,deltaY:40,deltaMode:0});
+  assert.equal(properties.has('--gm-edge-bounce'),false);
+  bounce.close();assert.equal(timers.size,0);
+});
+
+
+test('refresh completion waits for every URL, handles offline cancellation and ignores duplicate stops',()=>{
+ const callbacks=[];let finished=0;
+ const inbox={clearNewMessages(){},updateFolderWithListener(_window,listener){callbacks.push(listener)}};
+ const server={type:'imap',rootMsgFolder:{getFolderWithFlags:()=>inbox},getNewMessages(folder,_window,listener){assert.equal(folder,inbox);callbacks.push(listener)}};
+ const root={isServer:true,server,updateFolderWithListener:inbox.updateFolderWithListener};
+ scope.refreshInboxFolder({},root,()=>finished++);
+ assert.equal(finished,0);callbacks[0].OnStopRunningUrl(null,0);assert.equal(finished,0);
+ callbacks[0].OnStopRunningUrl(null,0);assert.equal(finished,0);
+ callbacks[1].OnStopRunningUrl(null,0x80004005);assert.equal(finished,1,'failed operations also finish feedback');
+ scope.refreshInboxFolder({MailOfflineMgr:{isOnline:()=>false,getNewMail:()=>false}},root,()=>finished++);
+ assert.equal(finished,2);assert.equal(callbacks.length,2,'cancelled offline prompt starts no requests');
 });

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.29.0
+
+- Animate Refresh and show a top loading notice until mail download and folder updates finish.
+- Add an Inbox chip to conversations, with Inbox navigation and an archive action.
+- Open conversations faster by preserving message viewers during enrichment.
+- Return to the message list faster after deleting or archiving a conversation.
+- Improve drag cursors and preserve checkboxes when virtual rows are recycled.
+- Add optional Gmail-style sidebar label icons and use a plus button with a regular-weight Labels header.
+- Make Thunderbird’s new-message symbol optional and hidden by default.
+- Avoid bottom-edge elastic scrolling artifacts in the virtual message list.
+
 ## 0.28.0
 
 - Add optional personal level indicators beside message stars.
