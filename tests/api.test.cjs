@@ -14,6 +14,7 @@ test('native keyword notifications refresh open conversations and unsubscribe on
     installGmailSearchStatus:()=>({close(){}}),installGmailSearch:()=>({close(){}}),
     createSnoozeOrder:()=>({close(){}}),
     createNativeSnooze:()=>({close(){}}),
+    installConversationLabelInheritance:()=>({close(){}}),
     createComposeAutosave:()=>({set(enabled,minutes){assert.equal(enabled,true);assert.equal(minutes,1)},close(){}}),
     installMailZoom:()=>({close(){}}),
     installConversationStyle:()=>({refresh(){refreshed++},close(){disposed++}})});
@@ -78,6 +79,7 @@ test('mail-window startup uses the packaged logo, runs once and closes on unload
     installGmailSearchStatus:()=>({close(){}}),installGmailSearch:()=>({close(){}}),
     createSnoozeOrder:()=>({close(){}}),
     createNativeSnooze:()=>({close(){}}),
+    installConversationLabelInheritance:()=>({close(){}}),
     createComposeAutosave:()=>({set(){},close(){}}),installMailZoom:()=>({close(){}}),
     installStartupSplash(win,options){const record={win,options,closed:0,refreshed:0};startups.push(record);return {close(){record.closed++},refresh(){record.refreshed++}}}});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);

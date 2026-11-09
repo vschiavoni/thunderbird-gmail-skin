@@ -208,7 +208,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
         if(container.children[index]!==row)container.insertBefore(row,container.children[index] || null);
         const name=node.parent?node.path.slice(node.parent.path.length+1):node.path;
         if(row.name!==name)row.name=name;if(row.fullName!==node.path)row.fullName=node.path;
-        row.dataset.gmNestedLabel='true';menu.decorate(row,node.tag);place(node.children,row.childList);
+        row.dataset.gmNestedLabel='true';row.dataset.gmUncoloredLabel=String(!/^#[0-9a-f]{6}$/i.test(node.tag.color || ''));menu.decorate(row,node.tag);place(node.children,row.childList);
       });}
       try{place(hierarchy,list);rowsDirty=false;}finally{observer.observe(tree,{childList:true,subtree:true});}
       menu.prune?.();
@@ -255,7 +255,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
     more?.remove();moreStyle?.remove();
     for(const [row,state] of rowStates){row.classList.remove('gm-sidebar-hidden');row.classList.toggle('unselectable',state.unselectable);if(state.aria===null)row.removeAttribute('aria-hidden');else row.setAttribute('aria-hidden',state.aria);}
     const list=win.folderPane?._modes?.tags?.containerList;
-    if(list?.isConnected)for(const tag of mailServices.tags.getAllTags()){const row=saved.get(tag.key);if(!row)continue;list.append(row);row.name=tag.tag;row.fullName=tag.tag;delete row.dataset.gmNestedLabel;if(counts && row.folder)row.unreadCount=row.folder.getNumUnread(row.classList.contains('collapsed'));}
+    if(list?.isConnected)for(const tag of mailServices.tags.getAllTags()){const row=saved.get(tag.key);if(!row)continue;list.append(row);row.name=tag.tag;row.fullName=tag.tag;delete row.dataset.gmNestedLabel;delete row.dataset.gmUncoloredLabel;if(counts && row.folder)row.unreadCount=row.folder.getNumUnread(row.classList.contains('collapsed'));}
     for(const [node,previous] of vocabulary){if(!previous.tooltip)node.textContent=previous.text;for(const [name,value] of previous.attributes){if(value===null)node.removeAttribute(name);else node.setAttribute(name,value);}}
     for(const [button,handler] of createButtons)button.removeEventListener('click',handler,true);
     createButtons.clear();vocabulary.clear();saved.clear();rowStates.clear();uriKeys.clear();unread.clear();hierarchy=[];definitions=[];

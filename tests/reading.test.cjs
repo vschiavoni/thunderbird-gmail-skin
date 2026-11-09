@@ -278,6 +278,10 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   scope.MailServices={mfn:{addListener(){},removeListener(){}},tags:{getAllTags:()=>[
     {key:'one',tag:'Project One',color:'#ff0000'},{key:'two',tag:'Other'},
     {key:'child',tag:'Project One/Child'},{key:'leaf',tag:'Project One/Child/Leaf'}]}};
+  for(const header of messages){
+    header.folder.addKeywordsToMessages=(headers,key)=>calls.push(['add',Array.from(headers,h=>h.messageKey),key]);
+    header.folder.removeKeywordsFromMessages=(headers,key)=>calls.push(['remove',Array.from(headers,h=>h.messageKey),key]);
+  }
   const nativeCommands=[];
   const win={document:doc,top:{document:doc},gDBView:{rowCount:2,getFlagsAt:()=>0,getMsgHdrAt:i=>messages[i],getSelectedMsgHdrs:()=>selected},commandController:{_toggleMessageTag:(...args)=>calls.push(args),doCommand:name=>nativeCommands.push(name)},
     setTimeout(){return 1},clearTimeout(){},addEventListener(){},removeEventListener(){}};
@@ -325,8 +329,8 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.deepEqual(flat.children.map(row=>row.children[1].textContent),['Project One/Child','Project One/Child/Leaf'],'search preserves the full path at every nesting depth');
   search.value='';search.events.input[0]();
   const first=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');assert.equal(first.indeterminate,true);
-  first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['one',true]]);
-  first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['one',false]);
+  first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['add',[2],'one']]);
+  first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['remove',[1],'one']);
   const undone=[];
   messages[0].folder.addKeywordsToMessages=(headers,key)=>undone.push([Array.from(headers,h=>h.messageKey),key]);
   assert.ok(nodes.some(n=>n.textContent==='Conversation removed from Project One'));
@@ -357,7 +361,7 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   newName.value='New Child';nest.checked=true;parentSelect.value='Project One';
   form.events.submit[0]({preventDefault(){}});
   assert.deepEqual(additions,[['Project One/New Child','','']]);
-  assert.deepEqual(calls.at(-1),['new-child-key',true],'apply only the child key to the exact selection');
+  assert.deepEqual(undone.at(-1),[[1,2],'new-child-key'],'apply the new label to all selected conversation messages');
   controller.close();
 });
 test('conversation scope resolves exact Conversations IDs across Inbox and Sent, deduplicating copies of the same header',()=>{

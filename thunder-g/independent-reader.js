@@ -777,10 +777,10 @@ function installIndependentReader(win) {
         if(common.has(tag.key))continue;
         const chip=text('span','tag',''),label=text('span','tag-label',tag.tag),colors=chipColors(tag.color);
         chip.style.backgroundColor=colors.background;chip.style.color=colors.foreground;bindLabelNavigation(label,tag,win);
-        const remove=text('button','tag-remove','×');remove.type='button';remove.setAttribute('aria-label',`Remove ${tag.tag} from this message`);
+        const remove=text('button','tag-remove','×');remove.type='button';remove.setAttribute('aria-label',`Remove ${tag.tag} from this conversation`);
         remove.addEventListener('click',event=>{
           event.preventDefault();event.stopPropagation();if(closed || token!==ticket)return;
-          try{applyConversationLabel([header],tag.key,false);if(tag.key===`$label${header.label}`)header.label=0;refreshTags();}
+          try{applyConversationLabel(currentHeaders,tag.key,false,win,refreshTags);if(tag.key===`$label${header.label}`)header.label=0;refreshTags();}
           catch(_){remove.title='Could not remove label. Try again.';}
         });
         chip.append(label,remove);messageTags.append(chip);
@@ -1090,7 +1090,7 @@ function installIndependentReader(win) {
   function setMessageTag(header,key,add) {
     if(closed || !currentHeaders.includes(header))return;
     activateMessage(header);
-    applyConversationLabel([header],key,add);
+    applyConversationLabel(currentHeaders,key,add,win,refreshTags);
     if(!add && header.label && key===`$label${header.label}`)header.label=0;
     refreshTags();
   }
@@ -1099,8 +1099,7 @@ function installIndependentReader(win) {
     activateMessage(header);
     const tags=MailServices.tags.getAllTags();
     if(number===0) {
-      const keys=new Set((header.getStringProperty('keywords') || '').split(/\s+/));
-      for(const tag of tags)if(keys.has(tag.key) || tag.key===`$label${header.label}`)setMessageTag(header,tag.key,false);
+      for(const tag of tags)if(currentHeaders.some(message=>assignedTags(message,[tag]).length))setMessageTag(header,tag.key,false);
       return;
     }
     const tag=tags[number-1];if(!tag)return;

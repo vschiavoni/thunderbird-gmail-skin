@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Show uncolored sidebar labels in neutral gray instead of Thunderbird’s default pink, consistent with message chips.
+
+- Apply labels consistently to whole conversations from the label picker, native tag menus, numeric shortcuts and message chips.
+- Let incoming follow-ups inherit existing conversation labels without removing historical assignments or changing read/unread status.
+
 ## 0.29.0
 
 - Animate Refresh and show a top loading notice until mail download and folder updates finish.

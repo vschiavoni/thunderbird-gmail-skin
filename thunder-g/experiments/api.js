@@ -131,7 +131,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       try {await popup.browserLoaded;await popup.contentReadyAndResized.promise;if(!disposed && button.isConnected)popup.viewNode.openPopup(button,'bottomleft topleft',0,0);else close();}
       catch(error){close();throw error;}
     };
-    let gmailImporter = null,labelBackupController=null;
+    let gmailImporter = null,labelBackupController=null,conversationLabelInheritance=null;
+    const labelCommandDocuments=new Map();
     const documents = new Map();
     const pendingDocuments = new Map();
     const windows = new Map(),tabWatchers=new Map(),startupWindows=new Map();
@@ -186,6 +187,10 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     let started = false;
     let closed = false;
     const attach = doc => {
+      if(!closed && ['about:3pane','about:message'].includes(doc?.documentURI) && doc.defaultView?.commandController && !labelCommandDocuments.has(doc)){
+        const controller=installConversationLabelCommands(doc.defaultView);labelCommandDocuments.set(doc,controller);
+        doc.defaultView.addEventListener('unload',()=>{controller.close();labelCommandDocuments.delete(doc);},{once:true});
+      }
       if (!closed && doc?.documentURI === "chrome://messenger/content/multimessageview.xhtml") {
         if (!conversationDocuments.has(doc)) conversationDocuments.set(doc,installNativeSummaryStyle(doc.defaultView,MailServices));
         return;
@@ -320,6 +325,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       thunderGSnooze?.close();thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
       labelBackupController?.close();labelBackupController=null;
+      conversationLabelInheritance?.close();conversationLabelInheritance=null;
+      for(const controller of labelCommandDocuments.values())controller.close();labelCommandDocuments.clear();
       for(const close of [...dkimPopups])close();openIndependentDkimPopup=null;
       verifyIndependentDkim=null;
       for(const pending of dkimRequests.values()){clearTimeout(pending.timer);pending.reject(new Error(gmText("Reader closed")));}dkimRequests.clear();
@@ -433,6 +440,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       } catch (_) { console.warn('Thunder-G: could not configure draft autosave settings.'); }
       try{thunderGSnooze=createNativeSnooze();thunderGSnoozeOrder=createSnoozeOrder();}
       catch(error){console.error('Thunder-G snooze initialization:',error);}
+      conversationLabelInheritance=installConversationLabelInheritance();
       started = true;
       Services.prefs.addObserver("mailnews.tags.", observer);
       Services.prefs.addObserver(HIDDEN_MESSAGE_LABELS_PREF, observer);

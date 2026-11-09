@@ -199,6 +199,13 @@
   cursor: grabbing !important;
 }
 
+/* Native tag icons default to pink when the tag has no explicit color.
+   Use neutral gray, matching the uncolored message chip, in either icon mode. */
+#folderTree [data-gm-uncolored-label="true"] > .container > .icon {
+  --icon-color: #5f6368 !important;
+  color: #5f6368 !important;
+}
+
 :root[data-gm-label-icons] #folderTree [data-tag-key] > .container > .icon {
   background-image: none !important;
   background-color: var(--icon-color, #5f6368) !important;

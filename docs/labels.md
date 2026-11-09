@@ -8,10 +8,13 @@ same mail on the new computer, preview and restore the saved file. See the
 See the [keyboard shortcut reference](keyboard-shortcuts.md) for the complete supported list.
 
 Press **L** to search and apply labels; use Up/Down, Space to toggle and Escape to close.
-In the list, changes apply to selected messages; in the conversation reader, they apply to the whole resolved conversation, including sent replies.
-Numeric tag shortcuts target the active message, identified by a slim marker.
+In the list, changes apply to the conversations containing the selected messages. In the conversation reader, they apply to the whole resolved conversation, including sent replies. Numeric tag shortcuts, native tag menus, and the **×** removal button use that same conversation-wide scope. Clicking the chip opens matching mail across folders.
 
-The **×** removes a label only from that message; clicking the chip opens matching mail across folders.
+When a new message arrives, it inherits the union of the conversation’s existing labels, including labels on incoming and sent messages. This adds missing assignments without removing existing ones, changing read/unread state, or copying internal flags such as junk status. Installation does not relabel the mailbox in bulk. Existing partial assignments are preserved until a conversation-wide action or a new-message inheritance event updates them.
+
+Conversation matching uses native threads and exact Message-ID/References links in available local account summaries. It does not fetch message bodies, search the server, or group messages by subject text. Unavailable local summaries can limit which messages are resolved.
+
+**Inbox** is a system chip derived from actual Inbox membership. It is not a user label. Messages received into the Inbox show it automatically; archived messages do not. Removing its **×** archives the conversation.
 
 <img src="resources/microelements/label_menu.svg" align="right" width="110" alt="Docs tree">
 A mixed checkbox means only some messages have the label; wait for conversation loading before applying changes, and check reported failures on cross-folder updates.
@@ -33,7 +36,7 @@ Show/Hide is a local skin preference: hiding a chip preserves its native assignm
 
 ## Click a label to find matching mail
 
-Click a label chip in the message list or conversation view to open its native Thunderbird tag view across folders. The tooltip identifies the label, and Enter/Space also activates a focused chip. This uses the exact tag key, including nested labels, and does not require global search indexing or Gmail query syntax. Existing quick-filter constraints are cleared for the results while preserving the sticky-filter preference. The conversation reader closes to reveal the matching list. The separate × button still removes the tag from that message; it does not open the tag view.
+Click a label chip in the message list or conversation view to open its native Thunderbird tag view across folders. The tooltip identifies the label, and Enter/Space also activates a focused chip. This uses the exact tag key, including nested labels, and does not require global search indexing or Gmail query syntax. Existing quick-filter constraints are cleared for the results while preserving the sticky-filter preference. The conversation reader closes to reveal the matching list. The separate × button removes the tag from the conversation; it does not open the tag view.
 
 Hiding chips keeps assignments; removing a label keeps emails and sublabels.
 **Edit** renames descendants too, unlike Thunderbird’s native tag editor; **Add sublabel** creates a label without assigning it to selected mail.
