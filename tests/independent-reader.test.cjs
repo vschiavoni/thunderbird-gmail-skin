@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8');
-function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(source,scope);return scope;}
+function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/shortcuts.js'),'utf8'),scope);vm.runInContext(source,scope);return scope;}
 function message(key,id,folder='inbox',date=key){return {messageKey:key,messageId:id,dateInSeconds:date,folder:{URI:folder},mime2DecodedSubject:'Subject',mime2DecodedAuthor:'Sender',getStringProperty(name){return name==='keywords' && this.tagged?'work':''}}}
 test('conversation grouping deduplicates physical and logical copies, retains selected copy and sorts by date',()=>{
   const scope=context(),anchor=message(1,'same','inbox',20),sent=message(2,'other','sent',10);
@@ -905,4 +905,12 @@ test('returning to the list paints before viewer disposal and reopening cancels 
   [...f.timers.values()].at(-1)();
   assert.equal(f.cards.children.length,0);
   f.reader.close();
+});
+
+test('all numeric tag keys respect native search, shadow focus and editable original targets',()=>{
+ const s=context();
+ for(let number=0;number<=9;number++){
+  assert.equal(s.independentTagKey({key:String(number),target:{closest:()=>null}}),number);
+  for(const extra of [{target:{closest:selector=>selector.includes('search-bar')?{}:null}},{composedPath:()=>[{isContentEditable:true}]},{originalTarget:{isContentEditable:true}},{target:{ownerDocument:{activeElement:{shadowRoot:{activeElement:{isContentEditable:true}}}}}}])assert.equal(s.independentTagKey({key:String(number),...extra}),null);
+ }
 });

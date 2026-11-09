@@ -252,7 +252,7 @@ function independentAvatar(address) {
 function independentTagKey(event) {
   const target=event.composedPath?.()[0] || event.target;
   if(event.defaultPrevented || event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ||
-    target?.isContentEditable || target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'))return null;
+    gmailTypingTarget(event) || target?.closest?.('input,textarea,select'))return null;
   return /^[0-9]$/.test(event.key || '')?Number(event.key):null;
 }
 function independentDkimStatus(header, live) {

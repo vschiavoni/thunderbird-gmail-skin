@@ -17,9 +17,7 @@ function readingMessageWasMoved(previous, move, messages) {
 function isLabelShortcut(event) {
   return event.key?.toLowerCase() === 'l' && !event.ctrlKey && !event.metaKey &&
     !event.altKey && !event.shiftKey && !event.repeat && !event.isComposing &&
-    !event.defaultPrevented && !event.target?.isContentEditable &&
-    !event.target?.ownerDocument?.documentURI?.includes('/messengercompose/') &&
-    !event.target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, dialog, [role="dialog"], [role="menu"]');
+    !event.defaultPrevented && !gmailTypingTarget(event);
 }
 function labelMatchesQuery(name, query) {
   return name.normalize('NFKC').toLocaleLowerCase().includes(query.trim().normalize('NFKC').toLocaleLowerCase());

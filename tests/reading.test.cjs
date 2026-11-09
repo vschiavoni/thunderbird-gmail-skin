@@ -402,9 +402,8 @@ test('conversation tag add/remove writes exact headers to every folder, includin
 });
 
 test('L accepts selection checkboxes and radio controls but still ignores writing fields and composer documents',()=>{
- const selector='input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, dialog, [role="dialog"], [role="menu"]';
  for(const type of ['checkbox','radio','text','search']){
-  const target={closest:value=>{assert.equal(value,selector);return ['checkbox','radio'].includes(type)?null:{};}};
+  const target={closest:value=>{assert.ok(value.includes('input:not([type="checkbox"]):not([type="radio"])'));return ['checkbox','radio'].includes(type)?null:{};}};
   assert.equal(scope.isLabelShortcut({key:'l',target}),['checkbox','radio'].includes(type));
  }
  assert.equal(scope.isLabelShortcut({key:'l',target:{ownerDocument:{documentURI:'chrome://messenger/content/messengercompose/messengercompose.xhtml'},closest:()=>null}}),false);
@@ -427,3 +426,8 @@ test('labels reach hidden physical Sent copies without matching subjects or scan
 });
 
 test('label shortcuts cannot escape a snooze dialog or time-picker popover',()=>{for(const container of ['dialog','[role="dialog"]','[role="menu"]']){const target={closest:selector=>selector.split(', ').includes(container)?{}:null};assert.equal(scope.isLabelShortcut({key:'l',target}),false);}});
+
+test('independent L label shortcut respects retargeted typing even with Gmail mappings disabled',()=>{
+ for(const extra of [{target:{closest:selector=>selector.includes('search-bar')?{}:null}},{composedPath:()=>[{isContentEditable:true}]},{target:{ownerDocument:{activeElement:{isContentEditable:true}}}}])assert.equal(scope.isLabelShortcut({key:'l',...extra}),false);
+ assert.equal(scope.isLabelShortcut({key:'l',target:{closest:()=>null}}),true);
+});
