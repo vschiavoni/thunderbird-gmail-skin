@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prefill the new-label name from the label picker’s search text.
+
 - Show uncolored sidebar labels in neutral gray instead of Thunderbird’s default pink, consistent with message chips.
 
 - Apply labels consistently to whole conversations from the label picker, native tag menus, numeric shortcuts and message chips.

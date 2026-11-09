@@ -346,6 +346,8 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.ok(nodes.some(n=>n.textContent==='Label as:'),'a single native selection is labelled explicitly');
   assert.equal(nodes.find(n=>n.name==='panel').getAttribute('aria-label'),'Label as — 1 selected messages');
   selected=messages;nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
+  search.value='  pippo  ';search.events.input[0]();
+  assert.equal(list.childElementCount,0,'the searched label does not exist');
   nodes.find(n=>n.textContent==='Create new').events.click[0]();
   assert.deepEqual(nativeCommands,['cmd_manageTags']);
   assert.ok(nodes.some(n=>n.className==='gm-new-label'));
@@ -354,6 +356,15 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   const parentSelect=nodes.find(n=>n.getAttribute('aria-label')==='Parent label');
   const nest=nodes.find(n=>n.type==='checkbox' && !n.getAttribute('aria-label'));
   const form=nodes.find(n=>n.className==='gm-new-label');
+  assert.equal(newName.value,'pippo','Create new reuses the trimmed label query');
+  const createButton=form.children.at(-1).children.at(-1);
+  assert.equal(createButton.disabled,false,'prefilled names are validated immediately');
+  assert.equal(doc.activeElement,newName,'the prefilled name remains focused and editable');
+  newName.value='Edited name';newName.events.input[0]();assert.equal(createButton.disabled,false);
+  nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
+  nodes.find(n=>n.textContent==='Create new').events.click[0]();
+  assert.equal(newName.value,'','an empty search does not retain an earlier name');
+  assert.equal(createButton.disabled,true,'empty names still require input');
   const additions=[];scope.MailServices.tags.addTag=(...args)=>additions.push(args);
   scope.MailServices.tags.getKeyForTag=()=> 'new-child-key';
   newName.value='Project One';form.events.submit[0]({preventDefault(){}});

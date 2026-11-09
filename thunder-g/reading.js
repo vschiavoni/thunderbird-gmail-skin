@@ -484,8 +484,9 @@ function installReadingMode(win) {
     const button = doc.createElement('button'); button.type = 'button'; gmBindAction(button,'textContent',title);
     button.addEventListener('click', () => {
       if (command === 'cmd_addTag' && !sameSelection()) { tagPopup.hidePopup(); return; }
+      const initialName=command === 'cmd_addTag' ? search.value.trim() : '';
       tagPopup.hidePopup();
-      if (command === 'cmd_addTag') showNewLabel(button);
+      if (command === 'cmd_addTag') showNewLabel(button,true,initialName);
       else win.commandController.doCommand(command);
     });
     footer.append(button);
@@ -595,9 +596,9 @@ function installReadingMode(win) {
     parent.disabled=!nest.checked;
   }
   let applyNewLabel=true;
-  function showNewLabel(anchor,apply=true){
+  function showNewLabel(anchor,apply=true,initialName=''){
     applyNewLabel=apply;
-    newName.value='';nest.checked=false;parent.replaceChildren();error.hidden=true;
+    newName.value=initialName;nest.checked=false;parent.replaceChildren();error.hidden=true;
     const placeholder=doc.createElement('option');placeholder.value='';gmBindValue(placeholder, "textContent", () => gmText("Choose a parent label"));parent.append(placeholder);
     for(const entry of nestedLabelRows(MailServices.tags.getAllTags())){
       const option=doc.createElement('option');option.value=entry.path;option.textContent=entry.path;parent.append(option);
