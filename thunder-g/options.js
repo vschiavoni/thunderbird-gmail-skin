@@ -138,6 +138,66 @@ threadGuides.addEventListener('change', async () => {
   } finally { threadGuides.disabled = false; }
 });
 
+const showNewMessageSymbol = document.getElementById('new-message-symbol');
+if (showNewMessageSymbol) {
+  showNewMessageSymbol.disabled = true;
+  browser.storage.local.get({showNewMessageSymbol:false}).then(settings => {
+    showNewMessageSymbol.checked = settings.showNewMessageSymbol === true;
+    showNewMessageSymbol.disabled = false;
+  }).catch(console.error);
+  showNewMessageSymbol.addEventListener('change', async () => {
+    showNewMessageSymbol.disabled = true;
+    try {
+      await browser.storage.local.set({showNewMessageSymbol:showNewMessageSymbol.checked});
+    } catch (error) {
+      showNewMessageSymbol.checked = !showNewMessageSymbol.checked;
+      console.error(error);
+    } finally {
+      showNewMessageSymbol.disabled = false;
+    }
+  });
+}
+
+const gmailLabelIcons = document.getElementById('gmail-label-icons');
+if (gmailLabelIcons) {
+  gmailLabelIcons.disabled = true;
+  browser.storage.local.get({gmailLabelIcons:false}).then(settings => {
+    gmailLabelIcons.checked = settings.gmailLabelIcons === true;
+    gmailLabelIcons.disabled = false;
+  }).catch(console.error);
+  gmailLabelIcons.addEventListener('change', async () => {
+    gmailLabelIcons.disabled = true;
+    try {
+      await browser.storage.local.set({gmailLabelIcons:gmailLabelIcons.checked});
+    } catch (error) {
+      gmailLabelIcons.checked = !gmailLabelIcons.checked;
+      console.error(error);
+    } finally {
+      gmailLabelIcons.disabled = false;
+    }
+  });
+}
+
+const personalIndicators = document.getElementById('personal-indicators');
+if (personalIndicators) {
+  personalIndicators.disabled = true;
+  browser.storage.local.get({personalIndicators:false}).then(settings => {
+    personalIndicators.checked = settings.personalIndicators === true;
+    personalIndicators.disabled = false;
+  }).catch(console.error);
+  personalIndicators.addEventListener('change', async () => {
+    personalIndicators.disabled = true;
+    try {
+      await browser.storage.local.set({personalIndicators:personalIndicators.checked});
+    } catch (error) {
+      personalIndicators.checked = !personalIndicators.checked;
+      console.error(error);
+    } finally {
+      personalIndicators.disabled = false;
+    }
+  });
+}
+
 const threadExpandArrows = document.getElementById('thread-expand-arrows');
 if(threadExpandArrows){
   threadExpandArrows.disabled=true;

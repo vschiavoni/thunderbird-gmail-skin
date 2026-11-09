@@ -26,7 +26,7 @@ test('a full path under the selected parent is used as entered',()=>{
 });
 
 test('sidebar visibility keeps parent paths and selected labels reachable',()=>{
- const definitions=[{key:'p',tag:'Parent'},{key:'c',tag:'Parent/Child'},{key:'u',tag:'Unread'},{key:'s',tag:'Shown'}];
+ const definitions=[{key:'p',tag:'Parent',color:'#00aabb'},{key:'c',tag:'Parent/Child',color:''},{key:'u',tag:'Unread'},{key:'s',tag:'Shown'}];
  const tree=scope.nestedLabelTree(definitions),modes=new Map([['p','hide'],['c','hide'],['u','unread']]);
  assert.deepEqual([...scope.sidebarLabelVisibleKeys(tree,modes,new Map())],['s']);
  modes.set('c','show');const visible=scope.sidebarLabelVisibleKeys(tree,modes,new Map([['u',2]]));
@@ -45,7 +45,7 @@ test('More/Less uses native unread notifications without rebuilding definitions 
    addEventListener(name,fn){this.events[name]=fn},removeEventListener(name){delete this.events[name]},
    querySelectorAll(){return this.children.flatMap(child=>[...(child.dataset.tagKey?[child]:[]),...child.querySelectorAll()])},querySelector(){return this.querySelectorAll()[0] || null}};
  }
- const definitions=[{key:'p',tag:'Parent'},{key:'c',tag:'Parent/Child'},{key:'u',tag:'Unread'},{key:'s',tag:'Shown'}];
+ const definitions=[{key:'p',tag:'Parent',color:'#00aabb'},{key:'c',tag:'Parent/Child',color:''},{key:'u',tag:'Unread'},{key:'s',tag:'Shown'}];
  const list=node(),container=node(),header=node(),name=node(),create=node(),tree=node(),head=node();container.append(header);container.append(list);
  header.querySelector=()=>name;container.querySelector=()=>create;
  const rows=new Map(definitions.map(tag=>{const row=node();row.dataset.tagKey=tag.key;row.uri='tag://'+tag.key;row.unreadCount=0;row.childList=node();row.append(row.childList);list.append(row);return [tag.key,row]}));
@@ -61,6 +61,14 @@ test('More/Less uses native unread notifications without rebuilding definitions 
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/nested-labels.js'),'utf8'),local);
  const controller=local.installNestedLabelSidebar(win,services,prefs);
  const flush=()=>{const pending=[...timers.values()];timers.clear();for(const fn of pending)fn()};flush();
+ assert.equal(rows.get('p').dataset.gmUncoloredLabel,'false','explicit parent color stays intact');
+ assert.equal(rows.get('c').dataset.gmUncoloredLabel,'true','new uncolored sublabels use the gray icon fallback');
+ assert.equal(rows.get('u').dataset.gmUncoloredLabel,'true','missing color also uses gray');
+ assert.equal(definitions[1].color,'','presentation does not rewrite stored colors');
+ definitions[1].color='#cc33aa';controller.refresh();flush();
+ assert.equal(rows.get('c').dataset.gmUncoloredLabel,'false','choosing a color restores native explicit-color rendering');
+ definitions[1].color='';controller.refresh();flush();
+ assert.equal(rows.get('c').dataset.gmUncoloredLabel,'true','Remove color returns the icon to gray');
  const more=container.children.at(-1),event={preventDefault(){},stopPropagation(){}};
  assert.equal(rows.get('p').classList.contains('gm-sidebar-hidden'),true);assert.equal(rows.get('u').classList.contains('unselectable'),true);
  assert.equal(more.hidden,false);assert.match(more.textContent,/More/);more.events.click(event);
@@ -73,5 +81,14 @@ test('More/Less uses native unread notifications without rebuilding definitions 
  assert.equal(rows.get('u').classList.contains('gm-sidebar-hidden'),false,'selected label remains reachable');
  tree.selectedRow=null;tree.events.select();flush();assert.equal(rows.get('u').classList.contains('gm-sidebar-hidden'),true);
  controller.close();assert.equal(removed,true);assert.equal(prefListeners.size,0);assert.equal(more.isConnected,false);
- for(const row of rows.values()){assert.equal(row.classList.contains('gm-sidebar-hidden'),false);assert.equal(row.classList.contains('unselectable'),false)}
+ for(const row of rows.values()){assert.equal(row.dataset.gmUncoloredLabel,undefined,'disable removes the color override marker');assert.equal(row.classList.contains('gm-sidebar-hidden'),false);assert.equal(row.classList.contains('unselectable'),false)}
+});
+
+
+test('uncolored sidebar icons override native pink while message chips retain the neutral palette',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../chrome/gmail-columns.css'),'utf8');
+ assert.match(css,/#folderTree \[data-gm-uncolored-label="true"\] > \.container > \.icon\s*\{[^}]*--icon-color: #5f6368 !important;/);
+ const colors=require('./localization-context.cjs').createContext({});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8'),colors);
+ assert.deepEqual(colors.chipColors(''),colors.chipColors('#80868b'));
 });

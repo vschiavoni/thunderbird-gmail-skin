@@ -14,6 +14,7 @@ test('native keyword notifications refresh open conversations and unsubscribe on
     installGmailSearchStatus:()=>({close(){}}),installGmailSearch:()=>({close(){}}),
     createSnoozeOrder:()=>({close(){}}),
     createNativeSnooze:()=>({close(){}}),
+    installConversationLabelInheritance:()=>({close(){}}),
     createComposeAutosave:()=>({set(enabled,minutes){assert.equal(enabled,true);assert.equal(minutes,1)},close(){}}),
     installMailZoom:()=>({close(){}}),
     installConversationStyle:()=>({refresh(){refreshed++},close(){disposed++}})});
@@ -78,6 +79,7 @@ test('mail-window startup uses the packaged logo, runs once and closes on unload
     installGmailSearchStatus:()=>({close(){}}),installGmailSearch:()=>({close(){}}),
     createSnoozeOrder:()=>({close(){}}),
     createNativeSnooze:()=>({close(){}}),
+    installConversationLabelInheritance:()=>({close(){}}),
     createComposeAutosave:()=>({set(){},close(){}}),installMailZoom:()=>({close(){}}),
     installStartupSplash(win,options){const record={win,options,closed:0,refreshed:0};startups.push(record);return {close(){record.closed++},refresh(){record.refreshed++}}}});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);
@@ -257,4 +259,30 @@ test('language overrides propagate from storage to Thunderbird UI independently 
  assert.deepEqual(calls,['en']);changed({interfaceLanguage:{newValue:'it'}},'local');assert.deepEqual(calls,['en','it']);
  changed({interfaceLanguage:{newValue:'en'}},'local');assert.equal(calls.at(-1),'en');
  changed({interfaceLanguage:{newValue:'auto'}},'local');assert.equal(calls.at(-1),'en');
+});
+
+test('Gmail label icons default off and follow live local preference changes',async()=>{
+ for(const initial of [undefined,true]){
+  let changed;const calls=[];
+  const scope=require('./localization-context.cjs').createContext({console,browser:{storage:{local:{async get(defaults){return {...defaults,...(initial===undefined?{}:{gmailLabelIcons:initial})}}},onChanged:{addListener(fn){changed=fn}}},
+  inlineLabels:{onDkimRequest:{addListener(){}},async setGmailLabelIcons(value){calls.push(value)},async setHideTodayPane(){},async setComposeAutosave(){},async setMessagesPerPage(){},async setCompactConversations(){},async setIndependentReader(){},async start(){}}}});
+  await vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/background.js'),'utf8'),scope);
+  assert.deepEqual(calls,[initial===true]);
+  changed({gmailLabelIcons:{newValue:false}},'local');changed({gmailLabelIcons:{newValue:true}},'local');
+  assert.deepEqual(calls,[initial===true,false,true]);
+  changed({gmailLabelIcons:{newValue:false}},'sync');assert.equal(calls.length,3);
+ }
+});
+
+test('New-message symbol defaults off and follow live local preference changes',async()=>{
+ for(const initial of [undefined,true]){
+  let changed;const calls=[];
+  const scope=require('./localization-context.cjs').createContext({console,browser:{storage:{local:{async get(defaults){return {...defaults,...(initial===undefined?{}:{showNewMessageSymbol:initial})}}},onChanged:{addListener(fn){changed=fn}}},
+  inlineLabels:{onDkimRequest:{addListener(){}},async setShowNewMessageSymbol(value){calls.push(value)},async setHideTodayPane(){},async setComposeAutosave(){},async setMessagesPerPage(){},async setCompactConversations(){},async setIndependentReader(){},async start(){}}}});
+  await vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/background.js'),'utf8'),scope);
+  assert.deepEqual(calls,[initial===true]);
+  changed({showNewMessageSymbol:{newValue:false}},'local');changed({showNewMessageSymbol:{newValue:true}},'local');
+  assert.deepEqual(calls,[initial===true,false,true]);
+  changed({showNewMessageSymbol:{newValue:false}},'sync');assert.equal(calls.length,3);
+ }
 });

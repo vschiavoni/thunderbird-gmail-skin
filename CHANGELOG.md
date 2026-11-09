@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- Prefill the new-label name from the label picker’s search text.
+
+- Show uncolored sidebar labels in neutral gray instead of Thunderbird’s default pink, consistent with message chips.
+
+- Apply labels consistently to whole conversations from the label picker, native tag menus, numeric shortcuts and message chips.
+- Let incoming follow-ups inherit existing conversation labels without removing historical assignments or changing read/unread status.
+
+## 0.29.0
+
+- Animate Refresh and show a top loading notice until mail download and folder updates finish.
+- Add an Inbox chip to conversations, with Inbox navigation and an archive action.
+- Open conversations faster by preserving message viewers during enrichment.
+- Return to the message list faster after deleting or archiving a conversation.
+- Improve drag cursors and preserve checkboxes when virtual rows are recycled.
+- Add optional Gmail-style sidebar label icons and use a plus button with a regular-weight Labels header.
+- Make Thunderbird’s new-message symbol optional and hidden by default.
+- Avoid bottom-edge elastic scrolling artifacts in the virtual message list.
+
+## 0.28.0
+
+- Add optional personal level indicators beside message stars.
+- Show label-change notices with Undo in conversations and the message list’s label picker.
+- Count unread conversations in the Labels sidebar.
+- Add an active-row stripe, hover dots, and aligned selection checkboxes.
+- Reduce scrolling overhead and add elastic feedback at list and page boundaries.
+- Keep labeled message text stable on hover (#38).
+- Unify colored marker styling and improve click cycling (#37).
+- Decode encoded address names in pending reply cards.
+
 ## 0.27.0
 
 - Show distinct unread senders in collapsed conversations.

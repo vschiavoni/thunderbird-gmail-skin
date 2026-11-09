@@ -131,7 +131,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       try {await popup.browserLoaded;await popup.contentReadyAndResized.promise;if(!disposed && button.isConnected)popup.viewNode.openPopup(button,'bottomleft topleft',0,0);else close();}
       catch(error){close();throw error;}
     };
-    let gmailImporter = null,labelBackupController=null;
+    let gmailImporter = null,labelBackupController=null,conversationLabelInheritance=null;
+    const labelCommandDocuments=new Map();
     const documents = new Map();
     const pendingDocuments = new Map();
     const windows = new Map(),tabWatchers=new Map(),startupWindows=new Map();
@@ -142,7 +143,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const skinWindows = new Map(),gmailSearchWindows=new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
     const searchViews=new Map();
-    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, coloredStars=null,previewTrimming=null;
+    let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, coloredStars=null,previewTrimming=null;
     const readers = new Map();
     const pagedDocuments = new Map(), zoomWindows = new Map();
     const fontSize = ChromeUtils.importESModule("resource:///modules/UIFontSize.sys.mjs").UIFontSize;
@@ -186,6 +187,10 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     let started = false;
     let closed = false;
     const attach = doc => {
+      if(!closed && ['about:3pane','about:message'].includes(doc?.documentURI) && doc.defaultView?.commandController && !labelCommandDocuments.has(doc)){
+        const controller=installConversationLabelCommands(doc.defaultView);labelCommandDocuments.set(doc,controller);
+        doc.defaultView.addEventListener('unload',()=>{controller.close();labelCommandDocuments.delete(doc);},{once:true});
+      }
       if (!closed && doc?.documentURI === "chrome://messenger/content/multimessageview.xhtml") {
         if (!conversationDocuments.has(doc)) conversationDocuments.set(doc,installNativeSummaryStyle(doc.defaultView,MailServices));
         return;
@@ -212,8 +217,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
           const extension=ExtensionParent.GlobalManager.extensionMap.get("gconversation@xulforum.org");
           const headers=ids.map(id=>Number.isSafeInteger(id) && id>0 ? extension?.messageManager?.get(id) : null);
           if(!headers.length || headers.some(header=>!header?.folder))throw new Error('Conversation is still loading');
-          applyConversationLabel(headers,key,false);
-          for(const header of headers)if(header.label && key===`$label${header.label}`)header.label=0;
+          applyConversationLabel(headers,key,false,doc.defaultView);
         }));
         return;
       }
@@ -230,6 +234,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       doc.documentElement.toggleAttribute("data-gm-hide-column-headers", !showColumnHeaders);
       const labels = installInlineLabels(doc.defaultView, MailServices, Services.prefs);
       const nestedLabels = installNestedLabelSidebar(doc.defaultView);
+      doc.documentElement.toggleAttribute("data-gm-label-icons",gmailLabelIcons);
+      doc.documentElement.toggleAttribute("data-gm-new-message-symbol",showNewMessageSymbol);
       const reader = installReadingMode(doc.defaultView);
       const snoozeOrder=thunderGSnoozeOrder?.attach(doc.defaultView);
       readers.set(doc,reader); reader.setIndependent(independentReader);
@@ -237,17 +243,19 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       pagedDocuments.set(doc,pages); pages.setSize(messagesPerPage);
       const zoom = installMailZoom(doc.defaultView,fontSize,action=>reader.zoom(action));
       const dates = installCompactDates(doc.defaultView);
-      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
+      const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,personalIndicators,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
       const searchStatus=installGmailSearchStatus(doc.defaultView);
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
       const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
       doc.defaultView.addEventListener('unload',detach,{once:true});
-      documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
+      documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setPersonalIndicators:inbox.setPersonalIndicators, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
         doc.defaultView.removeEventListener('unload',detach);
         searchStatus.close();
         readers.delete(doc);
         snoozeOrder?.close();
         pages.close(); pagedDocuments.delete(doc); zoom.close();
+        doc.documentElement.removeAttribute("data-gm-label-icons");
+        doc.documentElement.removeAttribute("data-gm-new-message-symbol");
         nestedLabels.close(); conversationBrowser.close(); inbox.close(); dates.close(); reader.close(); labels.close();
       }});
     };
@@ -317,6 +325,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       thunderGSnooze?.close();thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
       labelBackupController?.close();labelBackupController=null;
+      conversationLabelInheritance?.close();conversationLabelInheritance=null;
+      for(const controller of labelCommandDocuments.values())controller.close();labelCommandDocuments.clear();
       for(const close of [...dkimPopups])close();openIndependentDkimPopup=null;
       verifyIndependentDkim=null;
       for(const pending of dkimRequests.values()){clearTimeout(pending.timer);pending.reject(new Error(gmText("Reader closed")));}dkimRequests.clear();
@@ -383,6 +393,9 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       },
       async setPreviewTrimming(value){previewTrimming=value;for(const controller of documents.values())controller.setPreviewTrimming?.(value);},
       async setColoredStars(value){coloredStars=value;for(const controller of documents.values())controller.setColoredStars?.(value);},
+      async setGmailLabelIcons(enabled){gmailLabelIcons=enabled===true;for(const doc of documents.keys())doc.documentElement.toggleAttribute("data-gm-label-icons",gmailLabelIcons);},
+      async setShowNewMessageSymbol(enabled){showNewMessageSymbol=enabled===true;for(const doc of documents.keys())doc.documentElement.toggleAttribute("data-gm-new-message-symbol",showNewMessageSymbol);},
+      async setPersonalIndicators(enabled){personalIndicators=enabled===true;for(const controller of documents.values())controller.setPersonalIndicators(personalIndicators);},
       async setThreadExpandArrows(enabled){threadExpandArrows=enabled===true;for(const controller of documents.values())controller.setThreadExpandArrows?.(threadExpandArrows);},
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},
       async setGmailShortcuts(enabled){gmailShortcutsEnabled=enabled===true;},
@@ -427,6 +440,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       } catch (_) { console.warn('Thunder-G: could not configure draft autosave settings.'); }
       try{thunderGSnooze=createNativeSnooze();thunderGSnoozeOrder=createSnoozeOrder();}
       catch(error){console.error('Thunder-G snooze initialization:',error);}
+      conversationLabelInheritance=installConversationLabelInheritance();
       started = true;
       Services.prefs.addObserver("mailnews.tags.", observer);
       Services.prefs.addObserver(HIDDEN_MESSAGE_LABELS_PREF, observer);

@@ -53,6 +53,99 @@ function sameLabelMessages(first, second) {
   const keys = new Set(first.map(message => JSON.stringify([message.folder?.URI, message.messageKey])));
   return second.every(message => keys.has(JSON.stringify([message.folder?.URI, message.messageKey])));
 }
+// Expand exact References/Message-ID links across local account summaries.
+// No subject matching, body reads, network searches or mailbox-wide header scan.
+function conversationLabelScope(messages,folders=null) {
+  if(folders===null){
+    try{folders=Array.from(MailServices.accounts.allFolders);}catch(_){folders=[];}
+  }
+  const found=new Map(),queue=[],lookedUp=new Set(),threads=new Set();
+  const normalize=id=>String(id || '').trim().replace(/^<|>$/g,'');
+  const account=folder=>folder?.rootFolder?.URI || folder?.server?.key || folder?.server?.rootFolder?.URI || folder?.URI;
+  function remember(header){
+    if(!header?.folder?.URI || header.messageKey===undefined)return;
+    const key=JSON.stringify([header.folder.URI,header.messageKey]);
+    if(!found.has(key)){found.set(key,header);queue.push(header);}
+  }
+  for(const header of messages)remember(header);
+  for(let cursor=0;cursor<queue.length;cursor++){
+    const header=queue[cursor],owner=account(header.folder);
+    try{
+      const thread=header.folder.msgDatabase?.getThreadContainingMsgHdr(header);
+      const key=JSON.stringify([header.folder.URI,thread?.threadKey ?? header.messageKey]);
+      if(thread && !threads.has(key)){
+        threads.add(key);for(let i=0;i<thread.numChildren;i++)remember(thread.getChildHdrAt(i));
+      }
+    }catch(_){/* Missing summaries must not block the available messages. */}
+    const ids=new Set([normalize(header.messageId)]);
+    for(let i=0;i<(header.numReferences || 0);i++){
+      try{ids.add(normalize(header.getStringReference(i)));}catch(_){break;}
+    }
+    for(const id of ids){
+      if(!id)continue;
+      const key=JSON.stringify([owner,id]);if(lookedUp.has(key))continue;lookedUp.add(key);
+      for(const folder of folders){
+        if(folder.isServer || account(folder)!==owner)continue;
+        try{remember(folder.msgDatabase?.getMsgHdrForMessageID(id));}catch(_){/* Offline/unavailable summary. */}
+      }
+    }
+  }
+  return [...found.values()];
+}
+
+// Union only defined labels. Existing assignments and internal keywords survive.
+function inheritConversationLabels(messages,services=MailServices) {
+  const definitions=services.tags.getAllTags(),keys=new Set();
+  for(const header of messages)for(const tag of assignedTags(header,definitions))keys.add(tag.key);
+  const batches=new Map();
+  for(const header of messages){
+    const existing=new Set(assignedTags(header,definitions).map(tag=>tag.key));
+    const missing=[...keys].filter(key=>!existing.has(key));if(!missing.length)continue;
+    const keywords=missing.sort().join(' '),id=JSON.stringify([header.folder.URI,keywords]);
+    if(!batches.has(id))batches.set(id,{folder:header.folder,headers:[],keywords});
+    batches.get(id).headers.push(header);
+  }
+  for(const {folder,headers,keywords} of batches.values())folder.addKeywordsToMessages(headers,keywords);
+}
+
+function installConversationLabelInheritance(services=MailServices,clock={setTimeout,clearTimeout},interfaces=Ci) {
+  const pending=new Map();let timer=null,closed=false;
+  function enqueue(header){
+    if(closed || !header?.folder?.URI || header.messageKey===undefined)return;
+    if(header.folder.isSpecialFolder?.(interfaces.nsMsgFolderFlags.Drafts,false))return;
+    pending.set(JSON.stringify([header.folder.URI,header.messageKey]),header);
+    if(timer===null)timer=clock.setTimeout(drain,0);
+  }
+  function drain(){
+    timer=null;if(closed)return;
+    const first=pending.entries().next();if(first.done)return;
+    const [key,header]=first.value;pending.delete(key);
+    try{
+      const messages=conversationPhysicalMessages(conversationLabelScope([header]));
+      inheritConversationLabels(messages,services);
+      for(const item of messages)pending.delete(JSON.stringify([item.folder.URI,item.messageKey]));
+    }catch(error){console.warn('Thunder-G: could not inherit conversation labels.',error);}
+    if(pending.size)timer=clock.setTimeout(drain,0);
+  }
+  const listener={msgAdded:enqueue,msgsClassified(headers){for(const header of headers || [])enqueue(header);}};
+  services.mfn.addListener(listener,interfaces.nsIMsgFolderNotificationService.msgAdded | interfaces.nsIMsgFolderNotificationService.msgsClassified);
+  return {close(){closed=true;if(timer!==null)clock.clearTimeout(timer);pending.clear();services.mfn.removeListener(listener);}};
+}
+
+// Native context menus and numeric tag shortcuts must use the same scope as L.
+function installConversationLabelCommands(win) {
+  const commands=win.commandController,saved=new Map();
+  if(!commands)return {close(){}};
+  const selected=()=>Array.from(win.gDBView?.getSelectedMsgHdrs?.() || (win.gMessage?[win.gMessage]:[]));
+  function replace(name,fn){if(typeof commands[name]!=='function')return;const original=commands[name];commands[name]=fn;saved.set(name,{original,fn});}
+  replace('_toggleMessageTag',(key,add)=>applyConversationLabel(selected(),key,add,win));
+  replace('_removeAllMessageTags',()=>{
+    const messages=conversationLabelScope(selected());
+    for(const tag of MailServices.tags.getAllTags())if(messages.some(header=>assignedTags(header,[tag]).length))applyConversationLabel(messages,tag.key,false,win);
+  });
+  return {close(){for(const [name,{original,fn}] of saved)if(commands[name]===fn)commands[name]=original;saved.clear();}};
+}
+
 // Conversation rendering deduplicates Message-IDs, but Inbox and Sent still
 // hold separate physical messages. Resolve exact IDs in local summary databases
 // when labeling; never scan message bodies or match unrelated subjects.
@@ -72,25 +165,90 @@ function conversationPhysicalMessages(messages,copyFolders=null) {
     const id=String(message.messageId || '').trim().replace(/^<|>$/g,'');if(!id)continue;
     for(const folder of folders.values()){
       if(folder.URI===message.folder.URI)continue;
+      const owner=message.folder.rootFolder?.URI || message.folder.server?.key;
+      const candidate=folder.rootFolder?.URI || folder.server?.key;
+      if(owner && candidate && owner!==candidate)continue;
       try{const copy=folder.msgDatabase?.getMsgHdrForMessageID(id);if(copy?.folder)remember(copy);}
       catch(_){/* Missing/offline summaries must not block the selected messages. */}
     }
   }
   return [...physical.values()];
 }
-function applyConversationLabel(messages, key, add) {
-  const folders = new Map();
-  for (const message of conversationPhysicalMessages(messages)) {
-    const uri = message.folder.URI;
-    if (!folders.has(uri)) folders.set(uri, {folder:message.folder, messages:[]});
-    folders.get(uri).messages.push(message);
+const conversationLabelNotices = new WeakMap();
+function showConversationLabelNotice(win, name, add, undo) {
+  conversationLabelNotices.get(win)?.();
+  const doc = win.document;
+  const notice = doc.createElement('div');
+  notice.style.cssText = 'position:fixed;inset-block-end:24px;inset-inline-start:24px;z-index:10000;display:flex;align-items:center;gap:20px;max-inline-size:calc(100vw - 48px);padding:12px 16px;border-radius:4px;background:#202124;color:#fff;box-shadow:0 4px 16px #0004;';
+  const message = doc.createElement('span');
+  message.setAttribute('role','status');
+  message.textContent = add ? gmText("Conversation added to $1", name) : gmText("Conversation removed from $1", name);
+  const button = doc.createElement('button');
+  button.type = 'button';
+  button.textContent = gmText("Undo");
+  button.style.cssText = 'appearance:none;border:0;background:none;color:#a8c7fa;cursor:pointer;font:inherit;';
+  const dismiss = doc.createElement('button');
+  dismiss.type = 'button';
+  dismiss.textContent = '×';
+  dismiss.setAttribute('aria-label',gmText("Dismiss"));
+  dismiss.style.cssText = 'appearance:none;border:0;background:none;color:inherit;cursor:pointer;font:inherit;';
+  function close() {
+    win.clearTimeout(timer);
+    notice.remove();
+    conversationLabelNotices.delete(win);
   }
-  // Same native folder operations used by Thunderbird's tag command; no selection
-  // manipulation, message copying, or account/provider-specific tag storage.
-  for (const {folder,messages} of folders.values()) {
-    if (add) folder.addKeywordsToMessages(messages, key);
-    else folder.removeKeywordsFromMessages(messages, key);
+  button.addEventListener('click',()=>{
+    try {
+      undo();
+      close();
+    } catch(error) {
+      message.textContent = gmText("Could not undo the label change.");
+      button.disabled = true;
+      console.error(error);
+    }
+  });
+  dismiss.addEventListener('click',close);
+  notice.append(message,button,dismiss);
+  doc.documentElement.append(notice);
+  const timer = win.setTimeout(close,10000);
+  conversationLabelNotices.set(win,close);
+}
+
+function applyConversationLabel(messages, key, add, win=null, refresh=null) {
+  const physical = conversationPhysicalMessages(conversationLabelScope(messages));
+  function write(headers, adding) {
+    const folders = new Map();
+    for (const header of headers) {
+      if (!folders.has(header.folder.URI)) folders.set(header.folder.URI, {folder:header.folder, messages:[]});
+      folders.get(header.folder.URI).messages.push(header);
+    }
+    for (const {folder,messages} of folders.values()) {
+      if (adding) folder.addKeywordsToMessages(messages, key);
+      else folder.removeKeywordsFromMessages(messages, key);
+    }
   }
+  if (!win) {
+    write(physical,add);
+    if(!add)for(const header of physical)if(header.label && key===`$label${header.label}`)header.label=0;
+    return;
+  }
+  const changed = [], legacy = [];
+  for (const header of physical) {
+    const hasKeyword = (header.getStringProperty?.('keywords') || '').split(/\s+/).includes(key);
+    const oldLabel = header.label;
+    const hasLegacy = oldLabel && key === `$label${oldLabel}`;
+    if (add ? !hasKeyword && !hasLegacy : hasKeyword) changed.push(header);
+    if (!add && hasLegacy) legacy.push([header,oldLabel]);
+  }
+  write(changed,add);
+  for (const [header] of legacy) header.label=0;
+  if (!changed.length && !legacy.length) return;
+  const name = MailServices.tags.getAllTags().find(tag=>tag.key===key)?.tag || key;
+  showConversationLabelNotice(win,name,add,()=>{
+    write(changed,!add);
+    for (const [header,label] of legacy) header.label=label;
+    refresh?.();
+  });
 }
 
 function adjacentMessageIndex(view, index, direction) {
@@ -332,8 +490,9 @@ function installReadingMode(win) {
     const button = doc.createElement('button'); button.type = 'button'; gmBindAction(button,'textContent',title);
     button.addEventListener('click', () => {
       if (command === 'cmd_addTag' && !sameSelection()) { tagPopup.hidePopup(); return; }
+      const initialName=command === 'cmd_addTag' ? search.value.trim() : '';
       tagPopup.hidePopup();
-      if (command === 'cmd_addTag') showNewLabel(button);
+      if (command === 'cmd_addTag') showNewLabel(button,true,initialName);
       else win.commandController.doCommand(command);
     });
     footer.append(button);
@@ -360,10 +519,10 @@ function installReadingMode(win) {
   }
   function applyPickerLabel(key, add) {
     if (pickerConversation) {
-      applyConversationLabel(pickerMessages, key, add);
+      applyConversationLabel(pickerMessages, key, add, win, () => independent?.refresh?.());
       independent?.refresh?.();
     }
-    else win.commandController._toggleMessageTag(key, add);
+    else applyConversationLabel(pickerMessages, key, add, win);
   }
   function sameSelection() {
     const selected = win.gDBView?.getSelectedMsgHdrs() || [];
@@ -443,9 +602,9 @@ function installReadingMode(win) {
     parent.disabled=!nest.checked;
   }
   let applyNewLabel=true;
-  function showNewLabel(anchor,apply=true){
+  function showNewLabel(anchor,apply=true,initialName=''){
     applyNewLabel=apply;
-    newName.value='';nest.checked=false;parent.replaceChildren();error.hidden=true;
+    newName.value=initialName;nest.checked=false;parent.replaceChildren();error.hidden=true;
     const placeholder=doc.createElement('option');placeholder.value='';gmBindValue(placeholder, "textContent", () => gmText("Choose a parent label"));parent.append(placeholder);
     for(const entry of nestedLabelRows(MailServices.tags.getAllTags())){
       const option=doc.createElement('option');option.value=entry.path;option.textContent=entry.path;parent.append(option);
@@ -691,6 +850,11 @@ function installReadingMode(win) {
     syncBulk();
   }
   function selectionClick(event) {
+    if(event.target.closest('.gm-message-drag-handle')){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     if (event.target.closest('.gm-row-actions')) {
       if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
       return;
@@ -721,7 +885,7 @@ function installReadingMode(win) {
     if (pending !== null) { win.cancelAnimationFrame(pending); pending = null; ++openTicket; }
     if (!active) return;
     active = false;
-    independent?.hide();
+    independent?.hide(false);
     layout.classList.remove('gm-reading');
     bulk = false;
     toolbar.hidden = true;

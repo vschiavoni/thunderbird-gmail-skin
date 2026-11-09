@@ -216,12 +216,12 @@ test('title aggregates labels across incoming and sent cards and stays synchroni
   const sentTags=f.cards.children[1].children[0].children[0].children[1].children[3];
   assert.equal(sentTags.children.length,1);
   sentTags.children[0].children[1].emit('click',{preventDefault(){},stopPropagation(){}});
-  assert.equal(f.removals.at(-1).headers.length,1);assert.equal(f.removals.at(-1).headers[0],sent);
+  assert.equal(f.removals.at(-1).headers.length,2);assert.ok(f.removals.at(-1).headers.includes(sent));
   assert.equal(sentTags.children.length,0);
   sent.tagged=false;f.tagListener.msgPropertyChanged(sent,'keywords');assert.equal(titleTags.children.length,0);
   f.reader.close();
 });
-test('numeric shortcuts and native tag menu target the opened Sent reply, never the first inbox message',async()=>{
+test('numeric shortcuts and native tag menu label the whole conversation while retaining the active card',async()=>{
   const f=readerFixture(),sent=f.prepare(message(2,'sent','sent',2)),latest=f.prepare(message(3,'latest','inbox',3));
   f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:3,getChildHdrAt:i=>[f.anchor,sent,latest][i]})};
   await f.reader.open(f.anchor);f.loaded();
@@ -233,16 +233,16 @@ test('numeric shortcuts and native tag menu target the opened Sent reply, never 
   assert.equal(f.cards.children[2].getAttribute('data-active-message'),undefined);
   const event=()=>({key:'1',target:{closest:()=>null},preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}});
   const key=event();assert.equal(f.reader.handleTagKey(key),true);assert.equal(key.prevented,true);
-  assert.equal(sent.tagged,true);assert.notEqual(f.anchor.tagged,true);assert.notEqual(latest.tagged,true);
-  assert.equal(f.removals[0].headers[0],sent);
-  f.reader.handleTagKey(event());assert.equal(sent.tagged,false,'pressing 1 twice toggles only that reply');
+  assert.equal(sent.tagged,true);assert.equal(f.anchor.tagged,true);assert.equal(latest.tagged,true);
+  assert.equal(f.removals[0].headers.length,3);assert.ok(f.removals[0].headers.includes(sent));
+  f.reader.handleTagKey(event());assert.equal(sent.tagged,false,'pressing 1 twice removes the label from every reply');
   const frame=f.browsers.at(-1);frame.contentWindow.commandController._toggleMessageTagKey(1);
-  assert.equal(f.removals.at(-1).headers[0],sent,'native menu and command routing also use the exact embedded header');
+  assert.equal(f.removals.at(-1).headers.length,3,'native menu and command routing label the entire thread');
   frame.contentWindow.commandController._toggleMessageTag('work',false);assert.equal(sent.tagged,false);
   f.cards.children[2].emit('pointerdown');f.reader.handleTagKey(event());assert.equal(latest.tagged,true);
   assert.deepEqual(active(),[f.cards.children[2]]);
   // Events originating inside another message use that document, even if focus tracking was stale.
-  f.reader.handleTagKey({...event(),currentTarget:frame.contentDocument});assert.equal(sent.tagged,true);
+  f.reader.handleTagKey({...event(),currentTarget:frame.contentDocument});assert.equal(sent.tagged,false);
   assert.deepEqual(active(),[f.cards.children[1]],'document-based key routing also corrects the visible marker');
   f.cards.children[0].emit('focusin');assert.deepEqual(active(),[f.cards.children[0]],'keyboard focus on a folded card selects only that message');
   assert.notEqual(f.anchor.tagged,true,'moving focus never changes labels');
@@ -352,7 +352,7 @@ test('actual body context menu is routed from the outer inbox to the exact embed
   assert.deepEqual(shown,[[100,200,true]]);assert.equal(contexts[0][0],event.data);assert.equal(contexts[0][1],actorContext);
   assert.equal(f.cards.children[1].getAttribute('aria-current'),'true');
   win.commandController._toggleMessageTag('work',true);
-  assert.equal(sent.tagged,true);assert.notEqual(f.anchor.tagged,true);assert.notEqual(latest.tagged,true);
+  assert.equal(sent.tagged,true);assert.equal(f.anchor.tagged,true);assert.equal(latest.tagged,true);
   assert.equal(f.win.openContextMenu(event,{}),false,'unrelated browsers retain the native path');
   delete win.mailContextMenu;
   assert.equal(f.win.openContextMenu(event,frame.pane),true,'an unavailable message menu must not label the inbox selection');
@@ -826,6 +826,85 @@ test('ordinary refreshes retain settled counts after idle time until a relevant 
   cache.get(anchor);await new Promise(setImmediate);
   time=86400000;for(let i=0;i<100;i++)assert.equal(cache.get(anchor),1);
   assert.equal(calls,1,'elapsed time and repaint do not rescan a settled conversation');cache.close();
+});
+
+test('Inbox system chip uses actual folder membership and opens that account Inbox',()=>{
+  const scope=context({});
+  const inbox={URI:'account-one/Inbox',isSpecialFolder:flag=>flag===4096};
+  const sent={URI:'account-one/Sent',isSpecialFolder:()=>false};
+  assert.equal(scope.independentInboxFolder([{folder:sent},{folder:inbox}],{Inbox:4096}),inbox);
+  assert.equal(scope.independentInboxFolder([{folder:sent}],{Inbox:4096}),null);
+  const calls=[];
+  scope.openConversationInbox({
+    CustomEvent:class {constructor(type){this.type=type}},
+    dispatchEvent:event=>calls.push(event.type),
+    quickFilterBar:{filterer:{clear:()=>calls.push('clear')},updateSearch(){},reflectFiltererState(){}},
+    displayFolder:uri=>calls.push(uri),
+  },inbox);
+  assert.deepEqual(calls,['gm-open-label-view','clear','account-one/Inbox']);
+});
+
+test('removing Inbox archives only Inbox copies and honors disabled archiving',()=>{
+  const scope=context({Ci:{nsMsgFolderFlags:{Inbox:4096}}});
+  scope.conversationPhysicalMessages=messages=>messages;
+  const inbox={messageKey:1,folder:{URI:'Inbox',isSpecialFolder:flag=>flag===4096}};
+  const sent={messageKey:2,folder:{URI:'Sent',isSpecialFolder:()=>false}};
+  const calls=[];
+  class Archiver {
+    static canArchive(messages){assert.deepEqual(Array.from(messages),[inbox]);return true}
+    archiveMessages(messages){calls.push([this.msgWindow,Array.from(messages)])}
+  }
+  scope.archiveConversationInbox({msgWindow:'native-window'},[inbox,sent],Archiver);
+  assert.deepEqual(calls,[['native-window',[inbox]]]);
+  Archiver.canArchive=()=>false;
+  assert.throws(()=>scope.archiveConversationInbox({},[inbox,sent],Archiver),/disabled/);
+  assert.equal(calls.length,1);
+  const removed=new Set([scope.independentMessageKey(inbox)]);
+  assert.equal(scope.independentInboxFolder([inbox,sent],{Inbox:4096},removed),null);
+});
+
+test('index enrichment preserves the first card and loaded viewer instead of restarting them',async()=>{
+  const f=readerFixture();
+  let lookup,conversation;
+  f.scope.Services.prefs.getBoolPref=()=>true;
+  f.scope.ChromeUtils.importESModule=()=>({UIFontSize:{},Gloda:{
+    getMessageCollectionForHeader(_header,listener){lookup=listener;return {}},
+  }});
+  const opening=f.reader.open(f.anchor);
+  f.loaded();
+  const originalCard=f.cards.children[0],originalBrowser=f.browsers[0];
+  const reply=f.prepare(message(2,'reply','sent'));
+  lookup.onQueryCompleted({items:[{conversation:{
+    getMessagesCollection(listener){conversation=listener;return {}},
+  }}]});
+  conversation.onQueryCompleted({items:[{folderMessage:f.anchor},{folderMessage:reply}]});
+  await opening;
+  assert.equal(f.cards.children[0],originalCard);
+  assert.equal(f.browsers[0],originalBrowser);
+  assert.notEqual(originalBrowser.removed,true);
+  assert.equal(f.browsers.length,2,'only the newly discovered reply creates a viewer');
+  assert.equal(f.loads.filter(uri=>uri==='mailbox://inbox/1').length,1);
+  assert.equal(f.reader.getMessages().length,2);
+  f.reader.close();
+});
+
+test('returning to the list paints before viewer disposal and reopening cancels stale cleanup',async()=>{
+  const f=readerFixture();
+  await f.reader.open(f.anchor);f.loaded();
+  const browser=f.browsers[0];
+  f.reader.hide(false);
+  assert.notEqual(browser.removed,true,'viewer disposal waits for the list repaint');
+  f.flush();
+  const cleanup=[...f.timers.values()].at(-1);
+  assert.equal(typeof cleanup,'function');
+  await f.reader.open(f.anchor);
+  cleanup();
+  assert.equal(f.reader.getMessages().length,1,'old cleanup cannot dispose a newly opened reader');
+  assert.notEqual(f.browsers.at(-1).removed,true);
+  f.reader.hide(false);f.flush();
+  [...f.timers.values()].at(-1)();
+  assert.equal(f.cards.children.length,0);
+  f.reader.close();
 });
 
 test('open conversation shows its snooze deadline and updates after reschedule and unsnooze',async()=>{

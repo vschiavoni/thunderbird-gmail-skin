@@ -291,9 +291,13 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   scope.MailServices={mfn:{addListener(){},removeListener(){}},tags:{getAllTags:()=>[
     {key:'one',tag:'Project One',color:'#ff0000'},{key:'two',tag:'Other'},
     {key:'child',tag:'Project One/Child'},{key:'leaf',tag:'Project One/Child/Leaf'}]}};
+  for(const header of messages){
+    header.folder.addKeywordsToMessages=(headers,key)=>calls.push(['add',Array.from(headers,h=>h.messageKey),key]);
+    header.folder.removeKeywordsFromMessages=(headers,key)=>calls.push(['remove',Array.from(headers,h=>h.messageKey),key]);
+  }
   const nativeCommands=[];
   const win={document:doc,top:{document:doc},gDBView:{rowCount:2,getFlagsAt:()=>0,getMsgHdrAt:i=>messages[i],getSelectedMsgHdrs:()=>selected},commandController:{_toggleMessageTag:(...args)=>calls.push(args),doCommand:name=>nativeCommands.push(name)},
-    addEventListener(){},removeEventListener(){}};
+    setTimeout(){return 1},clearTimeout(){},addEventListener(){},removeEventListener(){}};
   let conversationMessages=[...messages,{messageKey:1,folder:{URI:'Sent'},getStringProperty:()=>''}],refreshes=0;
   if(independentMode) {
     scope.installIndependentReader=()=>({open:()=>Promise.resolve(),getMessages:()=>conversationMessages,refresh(){refreshes++},hide(){},close(){}});
@@ -311,12 +315,15 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     assert.equal(nodes.find(n=>n.className==='gm-label-scope').hidden,true,'scope remains in the accessible panel name');
     assert.equal(nodes.find(n=>n.name==='panel').getAttribute('aria-label'),'Label as — entire conversation, 3 messages, includes sent replies');
     const checkbox=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');checkbox.checked=true;checkbox.events.change[0]();
-    assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['add','inbox',[1,2],'one'],['add','Sent',[1],'one']]);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['add','inbox',[2],'one'],['add','Sent',[1],'one']]);
+    assert.ok(nodes.some(n=>n.textContent==='Conversation added to Project One'));
+    nodes.find(n=>n.textContent==='Undo').events.click[0]();
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(2))),[['remove','inbox',[2],'one'],['remove','Sent',[1],'one']]);
     checkbox.checked=false;checkbox.events.change[0]();
-    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(2))),[['remove','inbox',[1,2],'one'],['remove','Sent',[1],'one']]);
-    assert.equal(refreshes,2,'message chips and title labels refresh after a conversation-wide write');
+    assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(4))),[['remove','inbox',[1],'one']]);
+    assert.equal(refreshes,3,'message chips and title labels refresh after a conversation-wide write');
     conversationMessages=conversationMessages.slice(0,1);checkbox.checked=true;checkbox.events.change[0]();
-    assert.equal(calls.length,4,'changing conversation membership invalidates the open picker');
+    assert.equal(calls.length,5,'changing conversation membership invalidates the open picker');
     conversationMessages=[];pressL();
     assert.ok(nodes.some(n=>n.getAttribute?.('aria-label')?.includes('loading')),'loading must never imply a partial message count');
     assert.equal(nodes.find(n=>n.type==='search').disabled,true,'loading cannot fall back to labeling just the selected row');
@@ -335,8 +342,13 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.deepEqual(flat.children.map(row=>row.children[1].textContent),['Project One/Child','Project One/Child/Leaf'],'search preserves the full path at every nesting depth');
   search.value='';search.events.input[0]();
   const first=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');assert.equal(first.indeterminate,true);
-  first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['one',true]]);
-  first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['one',false]);
+  first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['add',[2],'one']]);
+  first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['remove',[1],'one']);
+  const undone=[];
+  messages[0].folder.addKeywordsToMessages=(headers,key)=>undone.push([Array.from(headers,h=>h.messageKey),key]);
+  assert.ok(nodes.some(n=>n.textContent==='Conversation removed from Project One'));
+  nodes.filter(n=>n.textContent==='Undo').at(-1).events.click[0]();
+  assert.deepEqual(undone,[[[1],'one']]);
   search.value='Other';search.events.input[0]();
   const list=nodes.find(n=>n.className==='gm-label-list');assert.equal(list.childElementCount,1);
   const other=list.children[0].children.find(n=>n.type==='checkbox');selected=[messages[0]];
@@ -347,6 +359,8 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.ok(nodes.some(n=>n.textContent==='Label as:'),'a single native selection is labelled explicitly');
   assert.equal(nodes.find(n=>n.name==='panel').getAttribute('aria-label'),'Label as — 1 selected messages');
   selected=messages;nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
+  search.value='  pippo  ';search.events.input[0]();
+  assert.equal(list.childElementCount,0,'the searched label does not exist');
   nodes.find(n=>n.textContent==='Create new').events.click[0]();
   assert.deepEqual(nativeCommands,['cmd_manageTags']);
   assert.ok(nodes.some(n=>n.className==='gm-new-label'));
@@ -355,6 +369,15 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   const parentSelect=nodes.find(n=>n.getAttribute('aria-label')==='Parent label');
   const nest=nodes.find(n=>n.type==='checkbox' && !n.getAttribute('aria-label'));
   const form=nodes.find(n=>n.className==='gm-new-label');
+  assert.equal(newName.value,'pippo','Create new reuses the trimmed label query');
+  const createButton=form.children.at(-1).children.at(-1);
+  assert.equal(createButton.disabled,false,'prefilled names are validated immediately');
+  assert.equal(doc.activeElement,newName,'the prefilled name remains focused and editable');
+  newName.value='Edited name';newName.events.input[0]();assert.equal(createButton.disabled,false);
+  nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
+  nodes.find(n=>n.textContent==='Create new').events.click[0]();
+  assert.equal(newName.value,'','an empty search does not retain an earlier name');
+  assert.equal(createButton.disabled,true,'empty names still require input');
   const additions=[];scope.MailServices.tags.addTag=(...args)=>additions.push(args);
   scope.MailServices.tags.getKeyForTag=()=> 'new-child-key';
   newName.value='Project One';form.events.submit[0]({preventDefault(){}});
@@ -362,7 +385,7 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   newName.value='New Child';nest.checked=true;parentSelect.value='Project One';
   form.events.submit[0]({preventDefault(){}});
   assert.deepEqual(additions,[['Project One/New Child','','']]);
-  assert.deepEqual(calls.at(-1),['new-child-key',true],'apply only the child key to the exact selection');
+  assert.deepEqual(undone.at(-1),[[1,2],'new-child-key'],'apply the new label to all selected conversation messages');
   controller.close();
 });
 test('conversation scope resolves exact Conversations IDs across Inbox and Sent, deduplicating copies of the same header',()=>{

@@ -24,6 +24,32 @@ function independentFolderThread(header) {
   } catch (_) { /* An unindexed/deleted folder still allows the selected message. */ }
   return independentMessages(messages,header);
 }
+function independentInboxFolder(headers, flags=Ci.nsMsgFolderFlags, removed=new Set()) {
+  return headers.find(header=>!removed.has(independentMessageKey(header)) &&
+    header.folder?.isSpecialFolder?.(flags.Inbox,false))?.folder || null;
+}
+function archiveConversationInbox(win, headers, Archiver=null) {
+  const messages=conversationPhysicalMessages(headers).filter(header=>
+    header.folder?.isSpecialFolder?.(Ci.nsMsgFolderFlags.Inbox,false));
+  if(!messages.length)return;
+  Archiver ||= ChromeUtils.importESModule('resource:///modules/MessageArchiver.sys.mjs').MessageArchiver;
+  if(!Archiver.canArchive(messages,false))throw new Error(gmText("Archiving is disabled for this account."));
+  const archiver=new Archiver();
+  archiver.msgWindow=win.msgWindow;
+  archiver.archiveMessages(messages);
+}
+
+function openConversationInbox(win, folder) {
+  win.dispatchEvent(new win.CustomEvent('gm-open-label-view'));
+  const bar=win.quickFilterBar;
+  if(bar?.filterer?.clear){
+    bar.filterer.clear();
+    bar.updateSearch();
+    bar.reflectFiltererState();
+  }
+  win.displayFolder(folder.URI);
+}
+
 function independentReferenceIds(header) {
   const normalize=value=>String(value || '').trim().replace(/^<|>$/g,'');
   const ids=new Set();
@@ -448,6 +474,7 @@ function installIndependentReader(win) {
   status.className='status';status.setAttribute('role','status');cards.className='cards';
   const snoozeNotice=doc.createElement('div');snoozeNotice.className='snooze-notice';snoozeNotice.hidden=true;snoozeNotice.setAttribute('role','status');
   conversation.append(snoozeNotice,title,scope,status,cards);root.append(style,conversation);
+  const removedInboxMessages=new Set();
   const titleTags=doc.createElement('span');titleTags.className='title-tags';gmBindAttribute(titleTags, 'aria-label', () => gmText("Labels in this conversation"));
   const cleanups=new Set(),tagRenderers=new Set(),securityRenderers=new Set(),frames=new Map(),messageDocs=new Map(),messageCards=new Map();let currentHeaders=[],actionHeader=null,activeHeader=null,activeCard=null,historyExpanded=false;
   const snoozeService=typeof thunderGSnooze!=='undefined'?thunderGSnooze:null;
@@ -558,6 +585,43 @@ function installIndependentReader(win) {
     for(const render of securityRenderers)render();
     for(const render of tagRenderers)render();
     titleTags.replaceChildren();
+    const inbox=independentInboxFolder(currentHeaders,Ci.nsMsgFolderFlags,removedInboxMessages);
+    if(inbox){
+      const chip=text('span','tag gm-inbox-chip',gmText("Inbox"));
+      chip.style.backgroundColor='light-dark(#e0e3e1,#444746)';
+      chip.style.color='inherit';
+      chip.setAttribute('role','link');
+      chip.setAttribute('tabindex','0');
+      chip.title=gmText("Open Inbox");
+      chip.style.cursor='pointer';
+      function navigate(event){
+        if(event.target?.closest?.('button'))return;
+        event.preventDefault();
+        event.stopPropagation();
+        openConversationInbox(win,inbox);
+      }
+      chip.addEventListener('click',navigate);
+      chip.addEventListener('keydown',event=>{
+        if(['Enter',' '].includes(event.key))navigate(event);
+      });
+      const remove=text('button','tag-remove','×');
+      remove.type='button';
+      remove.title=gmText("Remove label Inbox from this conversation");
+      remove.setAttribute('aria-label',remove.title);
+      remove.addEventListener('click',event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          archiveConversationInbox(win,currentHeaders.filter(header=>
+            !removedInboxMessages.has(independentMessageKey(header))));
+        }catch(error){
+          status.hidden=false;
+          status.textContent=error.message || gmText("Could not archive this conversation.");
+        }
+      });
+      chip.append(remove);
+      titleTags.append(chip);
+    }
     if(typeof assignedTags!=='function')return;
     const tags=new Map(),definitions=MailServices.tags.getAllTags();
     for(const header of currentHeaders)for(const tag of assignedTags(header,definitions))tags.set(tag.key,tag);
@@ -573,8 +637,7 @@ function installIndependentReader(win) {
         event.preventDefault();event.stopPropagation();
         if(closed || chip.isConnected===false || !currentHeaders.length)return;
         try {
-          applyConversationLabel(currentHeaders,tag.key,false);
-          for(const header of currentHeaders)if(header.label && tag.key===`$label${header.label}`)header.label=0;
+          applyConversationLabel(currentHeaders,tag.key,false,win,refreshTags);
           refreshTags();
         }catch(_){status.hidden=false;status.textContent='Could not remove the label from every message. Try again.';refreshTags();}
       });
@@ -594,7 +657,15 @@ function installIndependentReader(win) {
     tagListener[name]=()=>sentCache.invalidate();notifications|=Ci.nsIMsgFolderNotificationService[name] || 0;
   }
   tagListener.msgsDeleted=headers=>sentCache.invalidateFolders(headers?Array.from(headers,header=>header.folder):null);
-  tagListener.msgsMoveCopyCompleted=(_move,headers,destination)=>sentCache.invalidateFolders(headers?[...Array.from(headers,header=>header.folder),destination]:null);
+  tagListener.msgsMoveCopyCompleted=(move,headers,destination)=>{
+    sentCache.invalidateFolders(headers?[...Array.from(headers,header=>header.folder),destination]:null);
+    if(!move || !headers || destination?.isSpecialFolder?.(Ci.nsMsgFolderFlags.Inbox,false))return;
+    for(const header of headers){
+      if(header.folder?.isSpecialFolder?.(Ci.nsMsgFolderFlags.Inbox,false))
+        removedInboxMessages.add(independentMessageKey(header));
+    }
+    if(!closed && currentHeaders.length)refreshTags();
+  };
   tagListener.msgKeyChanged=(_oldKey,header)=>sentCache.invalidateFolders([header?.folder]);
   tagListener.msgAdded=header=>{
     sentCache.invalidateFolders([header?.folder]);
@@ -644,7 +715,14 @@ function installIndependentReader(win) {
   if(MailServices.mfn)MailServices.mfn.addListener(tagListener,notifications);
   const stopLanguageRefresh=gmOnLanguageChange(refreshTags);
   win.addEventListener?.('focus',refreshTags);
-  function clearCards(){pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
+  let hideCleanupFrame=null,hideCleanupTimer=null;
+  function cancelHideCleanup(){
+    if(hideCleanupFrame!==null)win.cancelAnimationFrame(hideCleanupFrame);
+    if(hideCleanupTimer!==null)win.clearTimeout(hideCleanupTimer);
+    hideCleanupFrame=null;
+    hideCleanupTimer=null;
+  }
+  function clearCards(){cancelHideCleanup();removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
   function text(tag,className,value){const node=doc.createElement(tag);node.className=className;node.textContent=value;return node}
   function buildCard(header,expand,token,before=null,hydration=null) {
     const article=hydration?.card || doc.createElement('article');
@@ -710,10 +788,10 @@ function installIndependentReader(win) {
         if(common.has(tag.key))continue;
         const chip=text('span','tag',''),label=text('span','tag-label',tag.tag),colors=chipColors(tag.color);
         chip.style.backgroundColor=colors.background;chip.style.color=colors.foreground;bindLabelNavigation(label,tag,win);
-        const remove=text('button','tag-remove','×');remove.type='button';remove.setAttribute('aria-label',`Remove ${tag.tag} from this message`);
+        const remove=text('button','tag-remove','×');remove.type='button';remove.setAttribute('aria-label',`Remove ${tag.tag} from this conversation`);
         remove.addEventListener('click',event=>{
           event.preventDefault();event.stopPropagation();if(closed || token!==ticket)return;
-          try{applyConversationLabel([header],tag.key,false);if(tag.key===`$label${header.label}`)header.label=0;refreshTags();}
+          try{applyConversationLabel(currentHeaders,tag.key,false,win,refreshTags);if(tag.key===`$label${header.label}`)header.label=0;refreshTags();}
           catch(_){remove.title='Could not remove label. Try again.';}
         });
         chip.append(label,remove);messageTags.append(chip);
@@ -988,10 +1066,42 @@ function installIndependentReader(win) {
       if(!closed && token===ticket)selectedCard?.scrollIntoView({block:'nearest',inline:'nearest'});
     });
   }
+  function enrichConversation(headers,anchor,token,focusMessage) {
+    const existing=new Map(currentHeaders.map(header=>[independentMessageKey(header),header]));
+    if(!currentHeaders.every(header=>headers.some(next=>independentMessageKey(next)===independentMessageKey(header)))){
+      render(headers,anchor,token,focusMessage);
+      return;
+    }
+    // Keep the headers captured by existing viewers and their event handlers.
+    currentHeaders=headers.map(header=>existing.get(independentMessageKey(header)) || header);
+    const previous=messageCards.get(actionHeader);
+    previous?.removeAttribute('data-latest');
+    const previousToggle=previous?.children[0]?.children[0];
+    previousToggle?.removeAttribute('aria-disabled');
+    if(previousToggle)previousToggle.title='';
+    actionHeader=currentHeaders.at(-1) || anchor;
+    const selected=(focusMessage && currentHeaders.find(header=>
+      independentMessageKey(header)===independentMessageKey(anchor))) || actionHeader;
+    for(let index=currentHeaders.length-1;index>=0;index--){
+      const header=currentHeaders[index];
+      let card=messageCards.get(header);
+      if(!card)card=buildCard(header,header===selected || header===actionHeader || header.isRead===false,
+        token,messageCards.get(currentHeaders[index+1]));
+      if(header===actionHeader){
+        card.setAttribute('data-latest','');
+        const toggle=card.children[0]?.children[0];
+        toggle?.setAttribute('aria-disabled','true');
+        if(card.getAttribute('data-expanded')===null)toggle?.click();
+      }
+    }
+    updateActions();
+    refreshTags();
+    reconcilePendingReplies();
+  }
   function setMessageTag(header,key,add) {
     if(closed || !currentHeaders.includes(header))return;
     activateMessage(header);
-    applyConversationLabel([header],key,add);
+    applyConversationLabel(currentHeaders,key,add,win,refreshTags);
     if(!add && header.label && key===`$label${header.label}`)header.label=0;
     refreshTags();
   }
@@ -1000,8 +1110,7 @@ function installIndependentReader(win) {
     activateMessage(header);
     const tags=MailServices.tags.getAllTags();
     if(number===0) {
-      const keys=new Set((header.getStringProperty('keywords') || '').split(/\s+/));
-      for(const tag of tags)if(keys.has(tag.key) || tag.key===`$label${header.label}`)setMessageTag(header,tag.key,false);
+      for(const tag of tags)if(currentHeaders.some(message=>assignedTags(message,[tag]).length))setMessageTag(header,tag.key,false);
       return;
     }
     const tag=tags[number-1];if(!tag)return;
@@ -1036,7 +1145,7 @@ function installIndependentReader(win) {
       // running. Keep that confirmed message when the older query finishes.
       result.messages=independentMessages([...result.messages,...currentHeaders],header).filter(message=>!draft || message.folder?.URI!==draft.folder?.URI);
       const same=currentHeaders.length===result.messages.length && currentHeaders.every((message,index)=>independentMessageKey(message)===independentMessageKey(result.messages[index]));
-      if(!same)render(result.messages,header,token,focusMessage);else updateActions();
+      if(!same)enrichConversation(result.messages,header,token,focusMessage);else updateActions();
       status.textContent=gmCount('$1 message','$1 messages',result.messages.length);
       status.hidden=result.messages.length===1;
       gmBindValue(status, "title", () => result.indexed?'':gmText("Conversation assembled from this folder and locally available sent messages"));
@@ -1048,8 +1157,22 @@ function installIndependentReader(win) {
         }).catch(error=>{if(!closed && token===ticket){status.hidden=false;status.textContent=error.message || 'Could not resume the saved draft.'}});
       }
     },
-    hide(){if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();++ticket;query?.cancel();query=null;resolving=false;host.hidden=true;layout.classList.remove('gm-independent-open');clearCards()},
-    close(){this.hide();closed=true;stopSnooze?.();contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
+    hide(immediate=true){
+      if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();
+      ++ticket;query?.cancel();query=null;resolving=false;
+      host.hidden=true;layout.classList.remove('gm-independent-open');
+      cancelHideCleanup();
+      if(immediate){clearCards();return;}
+      // Paint the inbox before unloading potentially many native message viewers.
+      hideCleanupFrame=win.requestAnimationFrame(()=>{
+        hideCleanupFrame=null;
+        hideCleanupTimer=win.setTimeout(()=>{
+          hideCleanupTimer=null;
+          if(host.hidden && !closed)clearCards();
+        },0);
+      });
+    },
+    close(){this.hide(true);closed=true;stopSnooze?.();contextMenu.close();sentCache.close();previews.close();win.removeEventListener?.('focus',refreshTags);MailServices.mfn?.removeListener(tagListener);stopLanguageRefresh();host.remove();layoutStyle.remove()},
     refresh:refreshTags,
     navigateMessage(direction){
       if(resolving || !currentHeaders.length)return;
