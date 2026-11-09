@@ -41,3 +41,21 @@ test('compose mappings use native formatting, Cc/Bcc controls and identity focus
  assert.deepEqual(f.clicked,['addr_ccShowAddressRowButton','addr_bccShowAddressRowButton']);assert.deepEqual(f.focused,['ccAddrInput','bccAddrInput','msgIdentity']);
  f.native.document.commandDispatcher.getControllerForCommand=()=>({isCommandEnabled:()=>false});const e=event('Enter',{metaKey:true});f.key(e);assert.ok(e.prevented);assert.equal(f.commands.length,2);f.controller.close();
 });
+
+test('shortcut help traps mail keys and Escape while leaving scrolling available',()=>{
+ const s=scope();let hidden=0,resets=0;const panel={state:'open',hidePopup(){hidden++}},router={reset(){resets++}};
+ for(const key of [...['c','r','a','f','e','#','!','s','I','U','u','j','k','o','Enter','l','v','b','?'],'g','*',...Array.from({length:10},(_,i)=>String(i))]){
+  const e=event(key);assert.equal(s.handleGmailShortcutHelpKey(e,panel,router),true);assert.ok(e.prevented&&e.stopped);
+ }
+ for(const key of ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' ']){
+  const e=event(key);assert.equal(s.handleGmailShortcutHelpKey(e,panel,router),true);assert.equal(e.prevented,undefined);assert.ok(e.stopped);
+ }
+ const esc=event('Escape');assert.equal(s.handleGmailShortcutHelpKey(esc,panel,router),true);assert.equal(hidden,1);assert.ok(esc.prevented&&esc.stopped);assert.ok(resets>0);
+ panel.state='closed';const after=event('o');assert.equal(s.handleGmailShortcutHelpKey(after,panel,router),false);assert.equal(after.stopped,undefined);
+});
+
+test('HTML shortcut overlay consumes Escape and releases routing after close',()=>{
+ const s=scope(),panel={open:true,hidePopup(){this.open=false}},e=event('Escape');
+ assert.equal(s.handleGmailShortcutHelpKey(e,panel),true);assert.equal(panel.open,false);assert.ok(e.prevented&&e.stopped);
+ assert.equal(s.handleGmailShortcutHelpKey(event('o'),panel),false);
+});

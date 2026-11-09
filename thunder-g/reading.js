@@ -670,12 +670,68 @@ function installReadingMode(win) {
     }
     if(action==='help'){
       if(!shortcutHelp){
-        shortcutHelp=doc.createXULElement('panel');shortcutHelp.setAttribute('aria-label',gmText('Gmail keyboard shortcuts'));
-        const content=doc.createElement('pre');content.style.cssText='padding:20px;margin:0;font:14px/1.8 sans-serif;white-space:pre-wrap;';
-        content.textContent='Gmail keyboard shortcuts\n\nCompose: c     Search: /\nReply: r     Reply all: a     Forward: f\nShift + r/a/f: separate window\nArchive: e     Delete: #     Spam: !\nStar: s     Read: Shift+i     Unread: Shift+u\nNext/previous conversation: j / k\nOpen: o or Enter     Return to list: u\nNext/previous message: n / p     Expand/collapse all: ; / :\nSelect focused row: x     Labels: l     Move: v\nSnooze: b     Undo: z     Focus toolbar: ,\nSelect: * then a / n / r / u / s / t\n  all / none / read / unread / starred / unstarred\nGo to Inbox / Sent / Drafts: g then i / t / d\n\nComposer (⌘ on Mac, Ctrl elsewhere):\nEnter: Send     Shift+c/b: Cc/Bcc     Shift+f: From\nb/i/u: Bold/Italic/Underline (native)\nShift+7/8: Numbered/Bulleted list\nShift+l/e/r: Align left/center/right\n[ / ]: Outdent/Indent     \\: Remove formatting\n\nEscape: close this help';
-        shortcutHelp.append(content);doc.documentElement.append(shortcutHelp);popups.push(shortcutHelp);
+        shortcutHelp=doc.createElement('dialog');
+        shortcutHelp.hidePopup=()=>shortcutHelp.close();shortcutHelp.setAttribute('aria-label',gmText('Gmail keyboard shortcuts'));
+        shortcutHelp.classList.add('gm-shortcut-help');
+        shortcutHelp.style.cssText='box-sizing:border-box;position:fixed;inset:16px;margin:auto;padding:0;border:0;border-radius:16px;background:rgba(32,33,36,.86);color:#fff;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);box-shadow:0 12px 40px #0003;';
+        const sheet=doc.createElement('div');sheet.className='gm-shortcut-sheet';
+        const header=doc.createElement('header'),title=doc.createElement('h2'),closeHelp=doc.createElement('button');
+        title.textContent=gmText('Keyboard shortcuts');closeHelp.textContent='×';closeHelp.setAttribute('aria-label',gmText('Close'));
+        closeHelp.addEventListener('click',()=>shortcutHelp.hidePopup());header.append(title,closeHelp);
+        const content=doc.createElement('div');content.className='gm-shortcut-sections';content.tabIndex=0;
+        const accel=/Mac/i.test(win.navigator?.platform || '')?'⌘':'Ctrl';
+        const sections=[
+          ['Compose and reply',[
+            ['c','Compose'],['r / a / f','Reply / Reply all / Forward'],['Shift + r / a / f','Reply or forward in a separate window'],
+            [accel+' + Enter','Send'],[accel+' + Shift + c / b','Show Cc / Bcc'],[accel+' + Shift + f','Focus From']]],
+          ['Navigation',[
+            ['/','Search'],['j / k','Next / Previous conversation'],['o / Enter','Open conversation'],['u','Return to list'],
+            ['n / p','Next / Previous message'],['; / :','Expand / Collapse all messages'],['g then i / t / d','Inbox / Sent / Drafts'],['g then n / p','Next / Previous page']]],
+          ['Actions',[
+            ['e','Archive'],['#','Delete'],['!','Mark as spam'],['s','Toggle star'],['Shift + i / u','Mark as read / unread'],
+            ['l / v','Labels / Move to'],['b','Snooze'],['z','Undo'],[',','Focus toolbar']]],
+          ['Selection',[
+            ['x','Toggle focused row'],['* then a / n','Select all / none'],['* then r / u','Select read / unread'],['* then s / t','Select starred / unstarred']]],
+          ['Formatting',[
+            [accel+' + b / i / u','Bold / Italic / Underline'],[accel+' + Shift + 7 / 8','Numbered / Bulleted list'],
+            [accel+' + Shift + l / e / r','Align left / center / right'],[accel+' + [ / ]','Outdent / Indent'],[accel+' + \\','Remove formatting']]]
+        ];
+        for(const [name,rows] of sections){
+          const section=doc.createElement('section'),heading=doc.createElement('h3');heading.textContent=gmText(name);section.append(heading);
+          for(const [keys,description] of rows){
+            const row=doc.createElement('div'),key=doc.createElement('kbd'),label=doc.createElement('span');
+            row.className='gm-shortcut-row';key.textContent=keys;label.textContent=gmText(description);row.append(key,label);section.append(row);
+          }
+          content.append(section);
+        }
+        const footer=doc.createElement('footer');footer.textContent=gmText('Esc: close · Letter shortcuts are inactive while typing.');
+        sheet.append(header,content,footer);
+        const helpStyle=doc.createElement('style');helpStyle.textContent=`
+          .gm-shortcut-help::backdrop{background:transparent;}
+          .gm-shortcut-sheet{box-sizing:border-box;display:flex;flex-direction:column;width:min(960px,calc(100vw - 64px));max-height:calc(100vh - 96px);color:#fff;background:transparent;font:14px/1.55 sans-serif;border-radius:16px;overflow:hidden;}
+          .gm-shortcut-sheet header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #ffffff60;gap:16px;}
+          .gm-shortcut-sheet h2{margin:0;font-size:22px;font-weight:600;}
+          .gm-shortcut-sheet header button{appearance:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;min-width:32px;max-width:32px;width:32px;min-height:32px;max-height:32px;height:32px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#f1f3f4;font:26px/1 sans-serif;cursor:pointer;}
+          .gm-shortcut-sheet header button:hover{background:#ffffff20;}
+          .gm-shortcut-sheet header button:focus-visible{outline:2px solid #a8c7fa;outline-offset:-2px;}
+          .gm-shortcut-sections:focus{outline:none;}
+          .gm-shortcut-sections{min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 36px;padding:20px 24px;}
+          .gm-shortcut-sheet h3{margin:0 0 12px;color:#e8ea4e;font-size:16px;font-weight:600;text-align:center;}
+          .gm-shortcut-row{display:grid;grid-template-columns:minmax(110px,40%) 1fr;gap:12px;margin:8px 0;align-items:baseline;}
+          .gm-shortcut-row kbd{font:600 13px/1.6 monospace;color:#e8ea4e;overflow-wrap:anywhere;text-align:right;}
+          .gm-shortcut-row kbd::after{content:" :";color:#fff;}
+          .gm-shortcut-sheet footer{padding:12px 24px;border-top:1px solid #ffffff40;color:#bdc1c6;font-size:12px;}
+          @media(max-width:700px){.gm-shortcut-sections{grid-template-columns:1fr;}}
+        `;
+        sheet.prepend(helpStyle);
+
+        shortcutHelp.addEventListener('close',()=>shortcutRouter?.reset());
+        shortcutHelp.append(sheet);doc.documentElement.append(shortcutHelp);popups.push(shortcutHelp);
       }
-      shortcutHelp.openPopup(toolbar.hidden?tree:back,'after_start',0,0,false,false);return true;
+      if(!shortcutHelp.open)shortcutHelp.showModal();
+      shortcutRouter?.reset();
+      const helpContent=shortcutHelp.querySelector('.gm-shortcut-sections');
+      helpContent.scrollTop=0;helpContent.focus({preventScroll:true});return true;
     }
     if(action.startsWith('folder-')){
       const name=action.slice(7),flags={inbox:Ci.nsMsgFolderFlags.Inbox,sent:Ci.nsMsgFolderFlags.SentMail,drafts:Ci.nsMsgFolderFlags.Drafts};
@@ -720,6 +776,7 @@ function installReadingMode(win) {
     return false;
   }
   function labelKey(event) {
+    if(handleGmailShortcutHelpKey(event,shortcutHelp,shortcutRouter))return;
     if(shortcutRouter?.handle(event))return;
     const action=mailZoomAction(event);
     if(action && zoomReading(action)){event.preventDefault();event.stopImmediatePropagation();return;}

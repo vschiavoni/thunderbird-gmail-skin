@@ -26,6 +26,16 @@ function gmailTypingTarget(event){
     doc?.documentURI?.includes('/messengercompose/') ||
     target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, panel, menupopup, [role="dialog"], [role="menu"]'));
 }
+function handleGmailShortcutHelpKey(event,panel,router){
+  if(!panel || !(panel.open || ['open','showing'].includes(panel.state)))return false;
+  router?.reset();
+  event.stopImmediatePropagation();
+  const scrollKey=!event.ctrlKey && !event.metaKey && !event.altKey &&
+    ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key);
+  if(!scrollKey)event.preventDefault();
+  if(event.key==='Escape')panel.hidePopup();
+  return true;
+}
 function gmailShortcutAction(key,prefix=''){
   if(prefix==='*')return ({a:'select-all',n:'select-none',r:'select-read',u:'select-unread',s:'select-starred',t:'select-unstarred'})[key];
   if(prefix==='g')return ({i:'folder-inbox',t:'folder-sent',d:'folder-drafts',n:'page-next',p:'page-previous'})[key];
