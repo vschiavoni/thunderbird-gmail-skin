@@ -138,7 +138,28 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const windows = new Map(),tabWatchers=new Map(),startupWindows=new Map();
     const conversationDocuments = new Map();
     const id = context.extension.id;
-    let dockIcon=null;
+    let dockIcon=null,dockSettings=null,dockReady=false;
+    const dockWork=new Map();
+    async function applyDockIcon(){
+      if(closed || !dockSettings)return;
+      if(dockSettings.enabled)dockIcon ||= createNativeDockIcon(context.extension);
+      await dockIcon?.setEnabled(dockSettings.enabled,dockSettings.options);
+    }
+    function scheduleDockIcon(){
+      if(closed || !started || dockReady || !dockSettings?.enabled)return;
+      for(const win of windows.keys()){
+        if(win.document.documentURI!=='chrome://messenger/content/messenger.xhtml' || dockWork.has(win))continue;
+        dockWork.set(win,deferMailWindowWork(win,()=>{
+          const state=startupMailState(win,doc=>documents.has(doc));
+          return state.usable || state.otherTab;
+        },()=>{
+          if(closed)return;
+          dockReady=true;
+          for(const task of dockWork.values())task.close();dockWork.clear();
+          applyDockIcon().catch(error=>console.error('Thunder-G Dock icon:',error));
+        }));
+      }
+    }
     let settingsFire;
     const skinWindows = new Map(),gmailSearchWindows=new Map();
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
@@ -230,6 +251,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         return;
       }
       pendingDocuments.get(doc)?.close(); pendingDocuments.delete(doc);
+      // Restore native ordering before skin/reader mutations invalidate layout.
+      const snoozeOrder=thunderGSnoozeOrder?.attach(doc.defaultView);
       loadSkin(doc.defaultView);
       doc.documentElement.toggleAttribute("data-gm-hide-column-headers", !showColumnHeaders);
       const labels = installInlineLabels(doc.defaultView, MailServices, Services.prefs);
@@ -237,7 +260,6 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       doc.documentElement.toggleAttribute("data-gm-label-icons",gmailLabelIcons);
       doc.documentElement.toggleAttribute("data-gm-new-message-symbol",showNewMessageSymbol);
       const reader = installReadingMode(doc.defaultView);
-      const snoozeOrder=thunderGSnoozeOrder?.attach(doc.defaultView);
       readers.set(doc,reader); reader.setIndependent(independentReader);
       const pages = installNativePagination(doc.defaultView,reader);
       pagedDocuments.set(doc,pages); pages.setSize(messagesPerPage);
@@ -306,6 +328,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       scan(win.document);
       if(!tabWatchers.has(win))tabWatchers.set(win,watchMailTabs(win,scan));
       startupWindows.get(win)?.refresh();
+      scheduleDockIcon();
     };
     const refresh = () => {
       for (const [doc, controller] of documents) {
@@ -321,6 +344,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
     };
     context.callOnClose({ close() {
+      for(const task of dockWork.values())task.close();dockWork.clear();
       dockIcon?.close();dockIcon=null;
       thunderGSnooze?.close();thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
@@ -385,7 +409,12 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
           return JSON.stringify({ok:false,error:error.message || gmText("The Gmail import operation failed.")});
         }
       },
-      async setDockIcon(enabled,options={}){if(enabled)dockIcon ||= createNativeDockIcon(context.extension);await dockIcon?.setEnabled(enabled===true,options);},
+      async setDockIcon(enabled,options={}){
+        if(closed)return;
+        dockSettings={enabled:enabled===true,options};
+        if(!dockSettings.enabled){for(const task of dockWork.values())task.close();dockWork.clear();}
+        if(dockReady)await applyDockIcon();else scheduleDockIcon();
+      },
       async setSearchResultsAsList(enabled){searchResultsAsList=enabled!==false;},
       async setShowColumnHeaders(enabled) {
         showColumnHeaders = enabled === true;
@@ -449,6 +478,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         chromeURLs: ["chrome://messenger/content/messenger.xhtml","chrome://messenger/content/messengercompose/messengercompose.xhtml"],
         onLoadWindow: loadWindow,
         onUnloadWindow(win) {
+          dockWork.get(win)?.close();dockWork.delete(win);
           gmailSearchWindows.get(win)?.close();gmailSearchWindows.delete(win);
           startupWindows.get(win)?.close();startupWindows.delete(win);
           nativeComposeAutosaves.get(win)?.close();nativeComposeAutosaves.delete(win);

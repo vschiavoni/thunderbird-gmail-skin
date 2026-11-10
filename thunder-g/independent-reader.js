@@ -132,8 +132,8 @@ function independentRelatedSent(messages,candidates) {
   }
   return result;
 }
-function independentConversation(win, header, gloda, sentFolders=[],sentCache=null) {
-  const fallback=independentFolderThread(header);
+function independentConversation(win, header, gloda, sentFolders=[],sentCache=null,localHeaders=null) {
+  const fallback=localHeaders || independentFolderThread(header);
   let finish,timer,settled=false,localDone=sentFolders.length===0,indexDone=!gloda,indexed=false;
   let sent=[],indexedMessages=[];
   const collections=[];
@@ -1123,10 +1123,11 @@ function installIndependentReader(win) {
       gmBindValue(title, "textContent", () => header.mime2DecodedSubject || gmText("(No subject)"));title.append(titleTags);status.hidden=false;gmBindValue(status, "textContent", () => gmText("Loading conversation…"));
       // Start the native viewer immediately. Index/Sent lookups enrich the
       // conversation asynchronously rather than holding the body behind them.
-      render(independentFolderThread(header).filter(message=>!draft || message.folder?.URI!==draft.folder?.URI),header,token,focusMessage);
+      const localHeaders=independentFolderThread(header);
+      render(localHeaders.filter(message=>!draft || message.folder?.URI!==draft.folder?.URI),header,token,focusMessage);
       let gloda=null;
       try {if(Services.prefs.getBoolPref('mailnews.database.global.indexer.enabled',true))gloda=ChromeUtils.importESModule('resource:///modules/gloda/GlodaPublic.sys.mjs').Gloda}catch(_){}
-      query=independentConversation(win,header,gloda,independentSentFolders(),sentCache);
+      query=independentConversation(win,header,gloda,independentSentFolders(),sentCache,localHeaders);
       const result=await query.promise;
       if(closed || token!==ticket)return;
       resolving=false;

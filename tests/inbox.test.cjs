@@ -851,3 +851,35 @@ test('refresh completion waits for every URL, handles offline cancellation and i
  scope.refreshInboxFolder({MailOfflineMgr:{isOnline:()=>false,getNewMail:()=>false}},root,()=>finished++);
  assert.equal(finished,2);assert.equal(callbacks.length,2,'cancelled offline prompt starts no requests');
 });
+
+test('initial row controls yield to paint, deduplicate resets and keep recycled rows current',()=>{
+  const tasks=new Map(),frames=new Map(),calls=[];let id=0,now=0;
+  const win={setTimeout(fn){tasks.set(++id,fn);return id},clearTimeout:id=>tasks.delete(id),
+    requestAnimationFrame(fn){frames.set(++id,fn);return id},cancelAnimationFrame:id=>frames.delete(id),performance:{now:()=>now}};
+  const rows=Array.from({length:20},(_,index)=>({index,isConnected:true}));
+  const work=scope.createInitialRowWork(win,row=>{calls.push(row.index);now+=2});
+  const step=map=>{const [id,fn]=map.entries().next().value;map.delete(id);fn()};
+  for(const row of rows){work.render(row);work.render(row)}
+  rows[1].index=100;rows[2].isConnected=false;
+  assert.equal(calls.length,0);step(frames);assert.equal(calls.length,0);step(frames);
+  assert.equal(calls.length,0,'no row decoration before the first paint');
+  step(tasks);assert.deepEqual(calls,[0,100],'a batch stops at its time budget and uses the latest row index');
+  rows[0].index=200;work.render(rows[0]);assert.equal(calls.at(-1),200,'already decorated rows recycle synchronously');
+  while(tasks.size)step(tasks);
+  assert.equal(calls.length,20,'19 connected rows plus one immediate recycle; reset duplicates were coalesced');
+  const next={index:300};work.render(next);assert.equal(calls.at(-1),300,'normal scrolling is synchronous after startup');
+  work.close();work.render(next);assert.equal(calls.length,21);
+  const cancelled=scope.createInitialRowWork(win,()=>assert.fail('closed queue rendered'));
+  cancelled.render(next);cancelled.close();assert.equal(frames.size+tasks.size,0);
+});
+
+test('startup collapses native threads only once while live arrow settings still collapse immediately',()=>{
+  let collapsed=0;const scope=vm.createContext({Ci:{nsMsgViewCommandType:{collapseAll:1}}});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),scope);
+  const tree={expandRowAtIndex(){},collapseRowAtIndex(){},toggleAttribute(){},removeAttribute(){},addEventListener(){},removeEventListener(){}};
+  const win={document:{getElementById:()=>tree},gDBView:{doCommand(){collapsed++}},gViewWrapper:{showThreaded:true},dbViewWrapperListener:{onCreatedView(){},onMessagesLoaded(){},allMessagesLoaded:true}};
+  const toggles=scope.installThreadToggles(win,false,{collapseInitially:false});assert.equal(collapsed,0);
+  const defaults=scope.installCollapsedThreadDefaults(win);assert.equal(collapsed,1);
+  toggles.setEnabled(false);assert.equal(collapsed,2,'a later user setting still applies immediately');
+  defaults.close();toggles.close();
+});

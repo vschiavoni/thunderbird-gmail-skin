@@ -914,3 +914,28 @@ test('all numeric tag keys respect native search, shadow focus and editable orig
   for(const extra of [{target:{closest:selector=>selector.includes('search-bar')?{}:null}},{composedPath:()=>[{isContentEditable:true}]},{originalTarget:{isContentEditable:true}},{target:{ownerDocument:{activeElement:{shadowRoot:{activeElement:{isContentEditable:true}}}}}}])assert.equal(s.independentTagKey({key:String(number),...extra}),null);
  }
 });
+
+test('conversation enrichment retains the opening snapshot when the folder summary becomes unavailable',async()=>{
+ const scope=context(),anchor=message(1,'a'),reply=message(2,'b');
+ reply.folder=anchor.folder;
+ const snapshot=[anchor,reply];
+ Object.defineProperty(anchor.folder,'msgDatabase',{get(){throw Error('summary unavailable')}});
+ const result=await scope.independentConversation({},anchor,null,[],null,snapshot).promise;
+ assert.equal(result.messages.length,2);
+ assert.equal(result.messages[0],anchor);
+ assert.equal(result.messages[1],reply);
+ assert.equal(result.indexed,false);
+});
+
+test('conversation enrichment reuses the initial local thread without reading its summary again',async()=>{
+ const scope=context(),anchor=message(1,'a'),reply=message(2,'b');let reads=0,visits=0;
+ reply.folder=anchor.folder;
+ Object.defineProperty(anchor.folder,'msgDatabase',{get(){reads++;return {
+  getThreadContainingMsgHdr:()=>({numChildren:2,getChildHdrAt(index){visits++;return [anchor,reply][index]}})
+ }}});
+ const snapshot=scope.independentFolderThread(anchor);
+ const result=await scope.independentConversation({},anchor,null,[],null,snapshot).promise;
+ assert.equal(result.messages.length,2);
+ assert.equal(reads,1,'opening and enrichment share one summary lookup');
+ assert.equal(visits,2,'each local header is enumerated once');
+});
