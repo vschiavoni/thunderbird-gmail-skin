@@ -286,3 +286,49 @@ test('New-message symbol defaults off and follow live local preference changes',
   changed({showNewMessageSymbol:{newValue:false}},'sync');assert.equal(calls.length,3);
  }
 });
+
+test('Dock startup is deferred until styled mail paints, uses current settings, and cancels pending work',async()=>{
+  let windows,cleanup,created=0;const tasks=[],applied=[];
+  const scope=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>({
+    ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},
+    ExtensionSupport:{registerWindowListener(id,value){windows=value},unregisterWindowListener(){}},MailServices:{mfn:{addListener(){},removeListener(){}}}})},
+    Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIDOMWindowUtils:{USER_SHEET:1},nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    createNativeDockIcon(){created++;return {async setEnabled(...args){applied.push(args)},close(){}}},
+    deferMailWindowWork(win,ready,run){const task={win,ready,run,cancelled:false,close(){this.cancelled=true}};tasks.push(task);return task},
+    startupMailState:()=>({usable:true}),
+    installGmailSearch:()=>({close(){}}),installStartupSplash:()=>({close(){},refresh(){}}),
+    createSnoozeOrder:()=>({close(){}}),createNativeSnooze:()=>({close(){}}),installConversationLabelInheritance:()=>({close(){}}),
+    createComposeAutosave:()=>({set(){},close(){}}),installMailZoom:()=>({close(){}})});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),scope);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);
+  const api=new scope.inlineLabels().getAPI({extension:{id:'test',baseURI:{resolve:x=>x}},callOnClose(value){cleanup=value}}).inlineLabels;
+  await api.setDockIcon(true,{mode:'light'});assert.equal(created,0);
+  await api.start();assert.equal(created,0);
+  const win={document:{documentURI:'chrome://messenger/content/messenger.xhtml',querySelectorAll:()=>[],getElementById:()=>null},
+    windowUtils:{loadSheetUsingURIString(){},removeSheetUsingURIString(){}},addEventListener(){},removeEventListener(){}};
+  windows.onLoadWindow(win);assert.equal(tasks.length,1);assert.equal(created,0);
+  await api.setDockIcon(false);assert.equal(tasks[0].cancelled,true);
+  await api.setDockIcon(true,{mode:'dark'});assert.equal(tasks.length,2);
+  await api.setDockIcon(true,{mode:'light'});assert.equal(tasks.length,2,'pending work is shared');
+  tasks[1].run();await Promise.resolve();assert.equal(created,1);assert.equal(applied[0][1].mode,'light');
+  await api.setDockIcon(false);assert.equal(applied.at(-1)[0],false,'live settings remain immediate after startup');
+  cleanup.close();await api.setDockIcon(true);assert.equal(applied.length,2,'closed extension ignores late requests');
+});
+
+test('optional Inbox ordering failure does not prevent labels, sidebar and reader from attaching',async()=>{
+ let windows,labels=0,sidebar=0,reader=0;const noop=()=>({close(){},setSize(){},refresh(){}});
+ const scope=require('./localization-context.cjs').createContext({console:{warn(){},error(){}},ChromeUtils:{importESModule:()=>({
+  ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},ExtensionSupport:{registerWindowListener(_id,value){windows=value}},
+  MailServices:{mfn:{addListener(){}}}})},Services:{prefs:{addObserver(){}}},Ci:{nsIDOMWindowUtils:{USER_SHEET:1},nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
+  GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',createComposeAutosave:()=>({set(){}}),createNativeSnooze:noop,
+  createSnoozeOrder:()=>({attach(){throw Error('native ordering unavailable')}}),installConversationLabelInheritance:noop,
+  installMailZoom:noop,installInlineLabels(){labels++;return noop()},installNestedLabelSidebar(){sidebar++;return noop()},
+  installReadingMode(){reader++;return {setIndependent(){}}},installNativePagination:noop,installCompactDates:noop,installInboxControls:noop,installGmailSearchStatus:noop,watchConversationBrowser:noop});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),scope);
+ const api=new scope.inlineLabels().getAPI({extension:{id:'test'},callOnClose(){}}).inlineLabels;await api.start();
+ const win={threadPane:{},windowUtils:{loadSheetUsingURIString(){}},addEventListener(){},removeEventListener(){}};
+ const doc={documentURI:'about:3pane',readyState:'complete',defaultView:win,documentElement:{toggleAttribute(){}},querySelectorAll:()=>[],getElementById:id=>['paneLayout','threadTree','folderTree'].includes(id)?{}:null};win.document=doc;
+ assert.doesNotThrow(()=>windows.onLoadWindow(win));assert.equal(labels,1);assert.equal(sidebar,1);assert.equal(reader,1);
+});

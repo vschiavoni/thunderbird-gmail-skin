@@ -150,3 +150,26 @@ test('an earlier account warning cannot keep startup open after messages become 
   f.reveal();
   f.pane.gDBView.rowCount=1;f.render();f.controller.refresh();f.assertClean();
 });
+
+test('optional window work waits for readiness and a paint, and cancels on unload',()=>{
+  const tasks=new Map(),frames=new Map(),idle=new Map(),events=new Map();let id=0,ready=false,runs=0;
+  const win={setTimeout(fn){tasks.set(++id,fn);return id},clearTimeout:id=>tasks.delete(id),
+    requestAnimationFrame(fn){frames.set(++id,fn);return id},cancelAnimationFrame:id=>frames.delete(id),
+    requestIdleCallback(fn){idle.set(++id,fn);return id},cancelIdleCallback:id=>idle.delete(id),
+    addEventListener:(name,fn)=>events.set(name,fn),removeEventListener:name=>events.delete(name)};
+  const step=map=>{const [id,fn]=map.entries().next().value;map.delete(id);fn()};
+  const work=scope.deferMailWindowWork(win,()=>ready,()=>runs++);
+  step(tasks);assert.equal(frames.size,0);assert.equal(tasks.size,1);
+  ready=true;step(tasks);step(frames);assert.equal(runs,0);step(frames);
+  assert.equal(runs,0);step(idle);assert.equal(runs,1);assert.equal(events.size,0);
+  work.close();assert.equal(runs,1);
+  for(const stage of ['timer','firstFrame','secondFrame','idle']){
+    scope.deferMailWindowWork(win,()=>true,()=>runs++);
+    if(stage!=='timer')step(tasks);
+    if(['secondFrame','idle'].includes(stage))step(frames);
+    if(stage==='idle')step(frames);
+    events.get('unload')();
+    assert.equal(tasks.size+frames.size+idle.size+events.size,0,stage+' is cancelled');
+    assert.equal(runs,1);
+  }
+});

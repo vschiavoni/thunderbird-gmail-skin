@@ -1,3 +1,39 @@
+function deferMailWindowWork(win, ready, run) {
+  let closed=false,timer=null,frame=null,idle=null;
+  function close(){
+    if(closed)return;closed=true;
+    if(timer!==null)win.clearTimeout(timer);
+    if(frame!==null)win.cancelAnimationFrame(frame);
+    if(idle!==null)win.cancelIdleCallback(idle);
+    win.removeEventListener('unload',close);
+  }
+  function finish(){
+    if(closed)return;
+    close();run();
+  }
+  function isReady(){
+    try{return ready();}catch(_){return false;} // A pane may be changing tabs.
+  }
+  function check(){
+    timer=null;
+    if(closed || win.closed){close();return;}
+    if(!isReady()){timer=win.setTimeout(check,100);return;}
+    // Give the styled native window a paint before optional native work.
+    frame=win.requestAnimationFrame(()=>{
+      frame=win.requestAnimationFrame(()=>{
+        frame=null;
+        if(closed)return;
+        if(!isReady()){timer=win.setTimeout(check,100);return;}
+        if(win.requestIdleCallback)idle=win.requestIdleCallback(()=>{idle=null;finish();},{timeout:500});
+        else timer=win.setTimeout(()=>{timer=null;finish();},0);
+      });
+    });
+  }
+  win.addEventListener('unload',close,{once:true});
+  timer=win.setTimeout(check,0);
+  return {close};
+}
+
 // One startup presentation per mail window. Read native state rather than
 // replacing DB-view callbacks (other controllers also use those callbacks).
 function startupMailState(win, isStyled) {

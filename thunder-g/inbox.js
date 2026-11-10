@@ -880,7 +880,7 @@ function installCompleteViewCopy(win) {
   return {close(){if(pane._applyView===applyView)pane._applyView=original;}};
 }
 
-function installThreadToggles(win, enabled=false) {
+function installThreadToggles(win, enabled=false,{collapseInitially=true}={}) {
   const tree=win.document.getElementById('threadTree');
   if(!tree?.expandRowAtIndex || !tree.collapseRowAtIndex)return {close(){}};
   const expand=tree.expandRowAtIndex;
@@ -890,10 +890,10 @@ function installThreadToggles(win, enabled=false) {
   }
   function allowed(){return enabled || win.gViewWrapper?.showGroupedBySort;}
   function expandRow(...args){return allowed()?expand.apply(this,args):0;}
-  function setEnabled(value){
+  function setEnabled(value,collapse=true){
     enabled=value===true;
     tree.toggleAttribute('data-gm-hide-thread-arrows',!enabled);
-    if(!allowed() && win.gViewWrapper?.showThreaded && win.gDBView){
+    if(collapse && !allowed() && win.gViewWrapper?.showThreaded && win.gDBView){
       win.gViewWrapper._threadExpandAll=false;
       win.gDBView.doCommand(Ci.nsMsgViewCommandType.collapseAll);
     }
@@ -907,7 +907,7 @@ function installThreadToggles(win, enabled=false) {
   tree.expandRowAtIndex=expandRow;
   if(command)controller.doCommand=doCommand;
   tree.addEventListener('keydown',keydown,true);
-  setEnabled(enabled);
+  setEnabled(enabled,collapseInitially);
   function threadRow(event) {
     if(event.button!==0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)return null;
     const row=event.target.closest?.('.twisty')?.closest('tr.table-layout, tr.card-layout');
@@ -1126,6 +1126,35 @@ function personalRecipientLevel(header, identities, parser) {
   return recipients.size === 1 ? 2 : 1;
 }
 
+// Startup rows need their native geometry first. Add their extra controls after
+// a paint, in short batches; later row recycling remains synchronous.
+function createInitialRowWork(win,render){
+  const pending=new Set(),rendered=new WeakSet();
+  let closed=false,settled=false,frame=null,timer=null;
+  function drain(){
+    timer=null;if(closed)return;
+    const now=()=>win.performance?.now() ?? Date.now(),start=now();let count=0;
+    while(pending.size && count<8 && (count===0 || now()-start<4)){
+      const row=pending.values().next().value;pending.delete(row);
+      if(row.isConnected!==false){render(row);rendered.add(row);}
+      count++;
+    }
+    if(pending.size)timer=win.setTimeout(drain,0);else settled=true;
+  }
+  return {
+    render(row){
+      if(closed)return;
+      if(settled || rendered.has(row) || !win.requestAnimationFrame){render(row);rendered.add(row);return;}
+      pending.add(row);
+      if(frame!==null || timer!==null)return;
+      frame=win.requestAnimationFrame(()=>{
+        frame=win.requestAnimationFrame(()=>{frame=null;timer=win.setTimeout(drain,0);});
+      });
+    },
+    close(){closed=true;pending.clear();if(frame!==null)win.cancelAnimationFrame(frame);if(timer!==null)win.clearTimeout(timer);},
+  };
+}
+
 function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,personalIndicators=false,coloredStars=null,previewTrimming=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
@@ -1169,7 +1198,9 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   const responsive = installResponsiveColumns(win);
   const viewCopy = installCompleteViewCopy(win);
   const newMessage = installInlineNewMessage(win);
-  const threadToggles = installThreadToggles(win,threadExpandArrows);
+  // The defaults controller below performs the initial collapse. Avoid
+  // issuing the same native command twice while the list is being attached.
+  const threadToggles = installThreadToggles(win,threadExpandArrows,{collapseInitially:false});
   const threadDefaults = installCollapsedThreadDefaults(win);
   let closed = false, prototype, original, wrapped, rowClass, originalHeight;
   let showThreadGuides=threadGuides===true;
@@ -1437,6 +1468,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     }
     line.append(actions);
   }
+  const initialRows=createInitialRowWork(win,render);
   win.customElements.whenDefined('thread-row').then(() => {
     if (closed) return;
     rowClass = win.customElements.get('thread-row');
@@ -1449,12 +1481,12 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       // checkbox. Never let a surviving drag handle stand in for that image.
       this.querySelector('.gm-message-drag-handle')?.remove();
       const result = original.apply(this,args);
-      render(this);
+      initialRows.render(this);
       return result;
     };
     prototype.fillRow = wrapped;
     if (Number.isFinite(originalHeight)) tree.reset();
-    for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) render(row);
+    for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) initialRows.render(row);
   });
   let clearingSmartSelection=false;
   function clearSmartSelection(event){
@@ -1494,6 +1526,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   function close() {
     if (closed) return;
     closed = true;
+    initialRows.close();
     tree.removeEventListener('dragstart',dragStarted);
     for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);
     dragEnded();
@@ -1533,7 +1566,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     win.removeEventListener('focus',refreshPreviews);
   }
   function refreshPreviews() {
-    if (!closed) for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) render(row);
+    if (!closed) for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) initialRows.render(row);
   }
   win.addEventListener('focus',refreshPreviews);
   win.addEventListener('unload',close,{once:true});

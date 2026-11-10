@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8');
-function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(source,scope);return scope;}
+function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/shortcuts.js'),'utf8'),scope);vm.runInContext(source,scope);return scope;}
 function message(key,id,folder='inbox',date=key){return {messageKey:key,messageId:id,dateInSeconds:date,folder:{URI:folder},mime2DecodedSubject:'Subject',mime2DecodedAuthor:'Sender',getStringProperty(name){return name==='keywords' && this.tagged?'work':''}}}
 test('conversation grouping deduplicates physical and logical copies, retains selected copy and sorts by date',()=>{
   const scope=context(),anchor=message(1,'same','inbox',20),sent=message(2,'other','sent',10);
@@ -915,4 +915,37 @@ test('open conversation shows its snooze deadline and updates after reschedule a
   assert.equal(banner.hidden,false);assert.match(banner.textContent,/Snoozed until/);assert.match(banner.textContent,/09:10|9:10/);
   reminder={...reminder,due:new Date(2026,10,11,10,20).getTime()};changed();assert.match(banner.textContent,/10:20/);
   reminder=null;changed();assert.equal(banner.hidden,true);f.reader.close();assert.equal(unsubscribed,true);
+});
+
+test('all numeric tag keys respect native search, shadow focus and editable original targets',()=>{
+ const s=context();
+ for(let number=0;number<=9;number++){
+  assert.equal(s.independentTagKey({key:String(number),target:{closest:()=>null}}),number);
+  for(const extra of [{target:{closest:selector=>selector.includes('search-bar')?{}:null}},{composedPath:()=>[{isContentEditable:true}]},{originalTarget:{isContentEditable:true}},{target:{ownerDocument:{activeElement:{shadowRoot:{activeElement:{isContentEditable:true}}}}}}])assert.equal(s.independentTagKey({key:String(number),...extra}),null);
+ }
+});
+
+test('conversation enrichment retains the opening snapshot when the folder summary becomes unavailable',async()=>{
+ const scope=context(),anchor=message(1,'a'),reply=message(2,'b');
+ reply.folder=anchor.folder;
+ const snapshot=[anchor,reply];
+ Object.defineProperty(anchor.folder,'msgDatabase',{get(){throw Error('summary unavailable')}});
+ const result=await scope.independentConversation({},anchor,null,[],null,snapshot).promise;
+ assert.equal(result.messages.length,2);
+ assert.equal(result.messages[0],anchor);
+ assert.equal(result.messages[1],reply);
+ assert.equal(result.indexed,false);
+});
+
+test('conversation enrichment reuses the initial local thread without reading its summary again',async()=>{
+ const scope=context(),anchor=message(1,'a'),reply=message(2,'b');let reads=0,visits=0;
+ reply.folder=anchor.folder;
+ Object.defineProperty(anchor.folder,'msgDatabase',{get(){reads++;return {
+  getThreadContainingMsgHdr:()=>({numChildren:2,getChildHdrAt(index){visits++;return [anchor,reply][index]}})
+ }}});
+ const snapshot=scope.independentFolderThread(anchor);
+ const result=await scope.independentConversation({},anchor,null,[],null,snapshot).promise;
+ assert.equal(result.messages.length,2);
+ assert.equal(reads,1,'opening and enrichment share one summary lookup');
+ assert.equal(visits,2,'each local header is enumerated once');
 });

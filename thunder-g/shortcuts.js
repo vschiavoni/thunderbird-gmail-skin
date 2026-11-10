@@ -1,10 +1,31 @@
 // Opt-in Gmail mappings. Native commands retain validation and sending policy.
 var gmailShortcutsEnabled=false;
 function gmailTypingTarget(event){
-  const target=event.target,doc=target?.ownerDocument;
-  return !!(target?.isContentEditable || doc?.designMode==='on' ||
-    doc?.documentURI?.includes('/messengercompose/') ||
-    target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, panel, menupopup, [role="dialog"], [role="menu"]'));
+  // Keyboard events from native search widgets are retargeted to their host.
+  // Inspect the original path as well as focus, including nested shadow roots.
+  const targets=[event.target,event.originalTarget,event.explicitOriginalTarget,...(event.composedPath?.() || [])];
+  const doc=event.target?.ownerDocument;
+  let focused=doc?.activeElement;
+  const seen=new Set();
+  while(focused && !seen.has(focused)){
+    seen.add(focused);targets.push(focused);focused=focused.shadowRoot?.activeElement;
+  }
+  return targets.some(target=>{
+    const document=target?.ownerDocument;
+    return !!(target?.isContentEditable || document?.designMode==='on' ||
+      document?.documentURI?.includes('/messengercompose/') ||
+      target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="searchbox"], search-textbox, search-bar, global-search-bar, textbox, dialog, panel, menupopup, [role="dialog"], [role="menu"]'));
+  });
+}
+function handleGmailShortcutHelpKey(event,panel,router){
+  if(!panel || !(panel.open || ['open','showing'].includes(panel.state)))return false;
+  router?.reset();
+  event.stopImmediatePropagation();
+  const scrollKey=!event.ctrlKey && !event.metaKey && !event.altKey &&
+    ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].includes(event.key);
+  if(!scrollKey)event.preventDefault();
+  if(event.key==='Escape')panel.hidePopup();
+  return true;
 }
 function gmailShortcutAction(key,prefix=''){
   if(prefix==='*')return ({a:'select-all',n:'select-none',r:'select-read',u:'select-unread',s:'select-starred',t:'select-unstarred'})[key];
