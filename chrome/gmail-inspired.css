@@ -346,3 +346,7 @@
 #threadTree :is(#attachmentColButton img, .attachmentcol-column img, .attachment-icon) {
   rotate:90deg !important;
 }
+
+/* Show the scheduled return date, without changing native message metadata. */
+#threadTree .datecol-column[data-gm-snoozed] { color:light-dark(#b45309,#ffb86b)!important; font-weight:600!important; }
+#threadTree .datecol-column[data-gm-snoozed="preparing"] { opacity:.8; }

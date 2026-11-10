@@ -23,21 +23,39 @@ function installCompactDates(win) {
   // Detached virtual rows must be collectable while scrolling through folders.
   let saved = new WeakMap();
   const formatters = new Map();
+  const snooze=typeof thunderGSnooze!=='undefined'?thunderGSnooze:null;
   let locale = gmLocale() || win.Services?.locale?.appLocalesAsBCP47 || win.navigator.languages;
   function render(row, nativeFill = false) {
     const cell = row.querySelector('.datecol-column');
     if (!cell) return;
     if (nativeFill || !saved.has(cell)) saved.set(cell, {
       text:cell.textContent, title:cell.getAttribute('title'),
-      args:cell.getAttribute('data-l10n-args')
+      args:cell.getAttribute('data-l10n-args'),snooze:saved.has(cell)?saved.get(cell).snooze:cell.getAttribute('data-gm-snoozed')
     });
+    cell.removeAttribute('data-gm-snoozed');
     if ((row.dataset.properties || '').split(' ').includes('dummy')) return;
+    function clearDate(){
+      cell.textContent='';cell.removeAttribute('title');
+      const id=cell.getAttribute('data-l10n-id');
+      if(id)doc.l10n.setAttributes(cell,id,{title:''});
+      else cell.removeAttribute('data-l10n-args');
+    }
     try {
-      const hdr = win.gDBView?.getMsgHdrAt(row.index);
-      if (!hdr) return;
-      const timestamp = hdr.dateInSeconds ? hdr.dateInSeconds * 1000 : hdr.date / 1000;
+      const view=win.gDBView;
+      if((row.view&&row.view!==view)||!view||(Number.isInteger(view.rowCount)&&row.index>=view.rowCount)){clearDate();return;}
+      const hdr = view.getMsgHdrAt(row.index);
+      if (!hdr){clearDate();return;}
+      const headers=[hdr];
+      if(snooze&&win.gDBView?.viewFlags&&(win.gDBView.viewFlags&Ci.nsMsgViewFlagsType.kThreadedDisplay)){
+        const thread=win.gDBView.getThreadContainingMsgHdr(hdr);
+        for(let i=0;i<thread.numChildren;i++)headers.push(thread.getChildHdrAt(i));
+      }
+      const reminder=typeof snoozeDisplayReminder==='function'?snoozeDisplayReminder(snooze,headers):null;
+      if(reminder)cell.setAttribute('data-gm-snoozed',reminder.state);else cell.removeAttribute('data-gm-snoozed');
+      const timestamp = reminder?.due || (hdr.dateInSeconds ? hdr.dateInSeconds * 1000 : hdr.date / 1000);
       const formatted = compactMessageDate(timestamp, new Date(), locale, formatters);
-      if (!formatted) return;
+      if (!formatted){clearDate();return;}
+      if(reminder)formatted.full=snoozeReminderText(reminder,locale);
       if(cell.textContent!==formatted.short)cell.textContent = formatted.short;
       if(cell.title!==formatted.full)cell.title = formatted.full;
       // Native Fluent translation runs asynchronously; give it the full tooltip
@@ -45,7 +63,7 @@ function installCompactDates(win) {
       const id = cell.getAttribute('data-l10n-id');
       if (id && cell.getAttribute('data-l10n-args')!==JSON.stringify({title:formatted.full}))
         doc.l10n.setAttributes(cell, id, {title:formatted.full});
-    } catch (error) { console.error(gmText("Compact message dates:"), error); }
+    } catch (error) { clearDate();console.error(gmText("Compact message dates:"), error); }
   }
   function refresh() {
     if (closed) return;
@@ -71,10 +89,12 @@ function installCompactDates(win) {
     prototype.fillRow = wrapped;
     refresh(); midnight();
   });
+  const stopSnooze=snooze?.subscribe(refresh);
   win.addEventListener('focus', refresh);
   function close() {
     if (closed) return;
     closed = true;
+    stopSnooze?.();
     win.clearTimeout(timer);
     win.removeEventListener('focus', refresh);
     win.removeEventListener('unload', close);
@@ -83,7 +103,7 @@ function installCompactDates(win) {
       const cell=row.querySelector('.datecol-column'),state=saved.get(cell);
       if(!state)continue;
       cell.textContent = state.text;
-      for (const [name, value] of [['title',state.title],['data-l10n-args',state.args]]) {
+      for (const [name, value] of [['title',state.title],['data-l10n-args',state.args],['data-gm-snoozed',state.snooze]]) {
         if (value === null) cell.removeAttribute(name); else cell.setAttribute(name, value);
       }
     }

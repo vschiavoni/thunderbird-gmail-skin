@@ -37,5 +37,5 @@ module.exports=function uiFixture(){
   const listeners={};doc.addEventListener=(name,callback)=>{(listeners[name]||=[]).push(callback)};doc.removeEventListener=(name,callback)=>{listeners[name]=(listeners[name]||[]).filter(fn=>fn!==callback)};doc.emit=(name,event={})=>{for(const fn of listeners[name]||[])fn({type:name,...event})};
   doc.createElement=element;doc.createElementNS=(_namespace,tag)=>element(tag);doc.documentElement=element('html');
   doc.querySelector=selector=>doc.documentElement.querySelector(selector);doc.getElementById=()=>null;
-  return {doc,win};
+  return {doc,win,timers};
 };

@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8');
-function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(source,scope);return scope;}
+function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(source,scope);return scope;}
 function message(key,id,folder='inbox',date=key){return {messageKey:key,messageId:id,dateInSeconds:date,folder:{URI:folder},mime2DecodedSubject:'Subject',mime2DecodedAuthor:'Sender',getStringProperty(name){return name==='keywords' && this.tagged?'work':''}}}
 test('conversation grouping deduplicates physical and logical copies, retains selected copy and sorts by date',()=>{
   const scope=context(),anchor=message(1,'same','inbox',20),sent=message(2,'other','sent',10);
@@ -30,7 +30,7 @@ test('index queries include Sent and cancel stale conversations; timeouts preser
   first.onQueryCompleted({items:[]});result=await query.promise;assert.equal(result.indexed,false);assert.equal(result.messages[0],anchor);
   query=scope.independentConversation(win,anchor,gloda);timer();result=await query.promise;assert.equal(result.messages.length,1);assert.equal(result.indexed,false);
 });
-function readerFixture({photo=null,tagged=false,verifyIndependentDkim}={}) {
+function readerFixture({photo=null,tagged=false,verifyIndependentDkim,snooze}={}) {
   function node(tag='div') {
     const attrs=new Map(),classes=new Set(),css=new Map();
     return {tag,children:[],events:{},style:{
@@ -63,7 +63,7 @@ function readerFixture({photo=null,tagged=false,verifyIndependentDkim}={}) {
       browser.replyButton=node('button');browser.pane=pane;browser.content=content;browsers.push(browser);return browser;
     }};
   const tags=[{key:'work',tag:'Work',color:'#336699'}];
-  const scope=context({verifyIndependentDkim,Services:{prefs:{getBoolPref:()=>false}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
+  const scope=context({thunderGSnooze:snooze,verifyIndependentDkim,Services:{prefs:{getBoolPref:()=>false}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
     MailServices:{headerParser:{parseDecodedHeader:name=>[{name,email:`${name.toLowerCase()}@example.org`}]},
       ab:{cardForEmailAddress:()=>photo?{photoURL:photo}:null},tags:{getAllTags:()=>tags},
       mfn:{addListener(fn){tagListener=fn},removeListener(fn){removedListener=fn}}},
@@ -78,7 +78,7 @@ function readerFixture({photo=null,tagged=false,verifyIndependentDkim}={}) {
     setTimeout(fn){timers.set(++seq,fn);return seq},clearTimeout:id=>timers.delete(id)};
   const reader=scope.installIndependentReader(win),anchor=message(1,'a');anchor.tagged=tagged;
   const prepare=header=>{header.folder.getUriForMsg=h=>`mailbox://${h.folder.URI}/${h.messageKey}`;return header};prepare(anchor);
-  const conversation=layout.children[0].shadow.children[1],cards=conversation.children[3],actions=conversation.children[4];
+  const conversation=layout.children[0].shadow.children[1],cards=conversation.children.find(node=>node.className==='cards'),actions=conversation.children.find(node=>node.className==='actions');
   const flush=()=>{const pending=[...animationFrames.values()];animationFrames.clear();for(const fn of pending)fn()};
   function loaded(browser=browsers.at(-1)){browser.emit('load',{target:browser.contentDocument});browser.emit('MsgLoaded');flush()}
   return {scope,win,reader,anchor,prepare,layout,browsers,loads,commands,removals,timers,animationFrames,resizes,mutations,conversation,cards,actions,flush,loaded,
@@ -86,7 +86,7 @@ function readerFixture({photo=null,tagged=false,verifyIndependentDkim}={}) {
 }
 test('reader keeps one footer after all cards, restores print, and delegates commands to native message',async()=>{
   const f=readerFixture();f.anchor.mime2DecodedSubject='<script>bad()</script>';await f.reader.open(f.anchor);
-  assert.equal(f.conversation.children[0].textContent,'<script>bad()</script>');
+  assert.equal(f.conversation.children.find(node=>node.tag==='h1').textContent,'<script>bad()</script>');
   assert.equal(f.layout.classList.contains('gm-independent-open'),true);
   assert.equal(f.browsers[0].getAttribute('src'),'about:message');assert.equal(f.browsers[0].getAttribute('disablesecurity'),undefined);
   f.loaded();assert.deepEqual(f.loads,['mailbox://inbox/1']);assert.equal(f.browsers[0].docShell.allowDNSPrefetch,false);assert.equal(f.timers.size,0);
@@ -116,7 +116,7 @@ test('opening a specific conversation message expands and reveals that message w
   const f=readerFixture();const middle=f.prepare(message(2,'b','sent',2)),latest=f.prepare(message(3,'c','sent',3));
   f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:3,getChildHdrAt:i=>[latest,f.anchor,middle][i]})};
   await f.reader.open(f.anchor,{focusMessage:true});f.flush();
-  assert.equal(f.cards.children.length,3);assert.equal(f.conversation.children[2].textContent,'3 messages');
+  assert.equal(f.cards.children.length,3);assert.equal(f.conversation.children.find(node=>node.className==='status').textContent,'3 messages');
   assert.equal(f.browsers.length,2,'the selected message and latest reply are available');
   assert.equal(f.cards.children[0].children[1].hidden,false);assert.equal(f.cards.children[1].children[1].hidden,true);
   assert.equal(f.cards.children[2].children[1].hidden,false);
@@ -136,7 +136,7 @@ test('title labels have an accessible X that removes the label across the conver
   const f=readerFixture({tagged:true});const sent=f.prepare(message(2,'reply','sent',2));sent.tagged=true;
   f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:2,getChildHdrAt:i=>[f.anchor,sent][i]})};
   await f.reader.open(f.anchor);
-  const tags=f.conversation.children[0].children[0],remove=tags.children[0].children[0];
+  const tags=f.conversation.children.find(node=>node.tag==='h1').children[0],remove=tags.children[0].children[0];
   assert.equal(remove.textContent,'×');assert.equal(remove.getAttribute('aria-label'),'Remove Work from this conversation');
   remove.emit('click',{preventDefault(){},stopPropagation(){}});
   assert.equal(f.removals.length,1);assert.equal(f.removals[0].headers.length,2);assert.equal(f.removals[0].key,'work');assert.equal(tags.children.length,0);
@@ -206,7 +206,7 @@ test('title aggregates labels across incoming and sent cards and stays synchroni
   const f=readerFixture({tagged:true}),sent=f.prepare(message(2,'sent','sent',2));
   f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:2,getChildHdrAt:i=>[f.anchor,sent][i]})};
   await f.reader.open(f.anchor);
-  const titleTags=f.conversation.children[0].children[0];
+  const titleTags=f.conversation.children.find(node=>node.tag==='h1').children[0];
   assert.equal(titleTags.className,'title-tags');assert.equal(titleTags.children.length,0,'message-only label is absent from title');
   const unrelated=message(999,'unrelated','other',3),beforeTags=titleTags.children;
   f.tagListener.msgPropertyChanged(unrelated,'keywords');assert.equal(titleTags.children,beforeTags,'unrelated notifications must not rebuild the visible title');
@@ -905,4 +905,14 @@ test('returning to the list paints before viewer disposal and reopening cancels 
   [...f.timers.values()].at(-1)();
   assert.equal(f.cards.children.length,0);
   f.reader.close();
+});
+
+test('open conversation shows its snooze deadline and updates after reschedule and unsnooze',async()=>{
+  let reminder={state:'sleeping',due:new Date(2026,10,10,9,10).getTime()},changed,unsubscribed=false;
+  const snooze={forHeaders:()=>reminder?[reminder]:[],subscribe(fn){changed=fn;return ()=>{unsubscribed=true}}};
+  const f=readerFixture({snooze});await f.reader.open(f.anchor);
+  const banner=f.conversation.children.find(node=>node.className==='snooze-notice');
+  assert.equal(banner.hidden,false);assert.match(banner.textContent,/Snoozed until/);assert.match(banner.textContent,/09:10|9:10/);
+  reminder={...reminder,due:new Date(2026,10,11,10,20).getTime()};changed();assert.match(banner.textContent,/10:20/);
+  reminder=null;changed();assert.equal(banner.hidden,true);f.reader.close();assert.equal(unsubscribed,true);
 });

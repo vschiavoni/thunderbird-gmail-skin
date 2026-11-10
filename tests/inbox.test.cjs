@@ -79,7 +79,7 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
       setAttribute(k,v){this[k]=v},append(...items){for(const item of items){item.parent=this;this.children.push(item)}},
       remove(){if(this.parent)this.parent.children=this.parent.children.filter(item=>item!==this)},
       addEventListener(name,fn){this.events[name]=fn},
-      querySelector(selector){if(selector==='.subject-line')return this.line;
+      querySelector(selector){if(selector==='.tree-view-row-select-checkbox')return this.checkbox;if(selector==='.subject-line')return this.line;
         if(selector.startsWith('.gm-'))return this.line?.children.find(item=>item.className===selector.slice(1))}};
   }
   class Row{static ROW_HEIGHT=22;fillRow(){
@@ -87,7 +87,7 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
       'native row filling must never encounter a surviving drag handle');
   }}
   let resets=0;
-  const row=Object.assign(new Row(),element());row.index=0;row.line=element();
+  const row=Object.assign(new Row(),element());row.index=0;row.line=element();row.checkbox=element();
   const native=Row.prototype.fillRow;let read=false,preview='';
   const tree={events:{},selectedIndices:[],querySelectorAll:()=>[row],reset(){resets++},addEventListener(name,fn){this.events[name]=fn},removeEventListener(name){delete this.events[name]}};
   const doc={head:element(),getElementById:()=>tree,createElement:()=>{const e=element();nodes.push(e);return e},
@@ -117,7 +117,9 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
   controller.setThreadGuides(true);assert.equal(row.dataset.gmThreadGuide,'start','setting applies without rebuilding rows');
   win.gViewWrapper.showGroupedBySort=true;row.fillRow();assert.equal(row.dataset.gmThreadGuide,undefined,'sort groups are not conversations');
   win.gViewWrapper.showGroupedBySort=false;row.dataset.properties='dummy';row.fillRow();assert.equal(row.line.children.length,0);
+  row.dataset.properties='';row.index=1;row.checkbox.setAttribute('data-gm-selection-checked','true');
   tree._gmSmartActionPending=true;tree.selectedIndices=[1];tree.events.select({stopImmediatePropagation(){}});
+  assert.equal(row.checkbox['data-gm-selection-checked'],'false','suppressed native select events still clear the visible checkmark');
   assert.equal(tree.selectedIndices.length,0,'native selection of the next row is suppressed after an action');
   tree.events.pointerdown();tree.selectedIndices=[2];tree.events.select({});
   assert.deepEqual(tree.selectedIndices,[2],'the next deliberate selection is preserved');
@@ -850,4 +852,13 @@ test('refresh completion waits for every URL, handles offline cancellation and i
  callbacks[1].OnStopRunningUrl(null,0x80004005);assert.equal(finished,1,'failed operations also finish feedback');
  scope.refreshInboxFolder({MailOfflineMgr:{isOnline:()=>false,getNewMail:()=>false}},root,()=>finished++);
  assert.equal(finished,2);assert.equal(callbacks.length,2,'cancelled offline prompt starts no requests');
+});
+
+test('recycled checkbox marks follow actual selection and clear after smart actions',()=>{
+  const attrs=new Map(),checkbox={setAttribute:(key,value)=>attrs.set(key,value)};
+  const row={index:1,dataset:{},querySelector:()=>checkbox};
+  scope.syncInboxRowCheckbox(row,new Set([1,2]));assert.equal(attrs.get('data-gm-selection-checked'),'true');
+  scope.syncInboxRowCheckbox(row,new Set());assert.equal(attrs.get('data-gm-selection-checked'),'false');
+  row.index=2;scope.syncInboxRowCheckbox(row,new Set([1]));assert.equal(attrs.get('data-gm-selection-checked'),'false');
+  row.dataset.properties='dummy';scope.syncInboxRowCheckbox(row,new Set([2]));assert.equal(attrs.get('data-gm-selection-checked'),'false');
 });

@@ -2211,5 +2211,14 @@
   },
   "settings_no_results": {
     "message": "Nessuna impostazione trovata. Prova un’altra ricerca."
+  },
+  "snooze_until_notice": {
+    "message": "Posticipata fino a $1"
+  },
+  "snooze_pending_notice": {
+    "message": "Posticipo in corso fino a $1"
+  },
+  "snooze_removed": {
+    "message": "Posticipo annullato"
   }
 }

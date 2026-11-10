@@ -56,6 +56,10 @@ test('single click opens the current-tab reader, back restores the list, and dou
     requestAnimationFrame:fn=>{frameQueue.push(fn);return frameQueue.length},
     cancelAnimationFrame(){},addEventListener(){},removeEventListener(){}};
   win.top={ZoomManager:{enlarge:browser=>zoomCalls.push(['enlarge',browser]),reduce:browser=>zoomCalls.push(['reduce',browser]),reset:browser=>zoomCalls.push(['reset',browser])}};
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/snooze-ui.js'),'utf8'),scope);
+  let moveAccepted;
+  scope.thunderGSnooze={};scope.testSnoozeFactory=(_win,_service,options)=>{moveAccepted=options.onMoveAccepted;return {close(){},choose(){}}};
+  vm.runInContext('installSnoozeUI=testSnoozeFactory',scope);
   const controller=scope.installReadingMode(win);
   assert.equal(controller.zoom('increaseSize'),false,'the inbox retains UI sizing');
   assert.equal(layout.messagePaneVisible,false,'startup must be list only');
@@ -160,7 +164,16 @@ test('single click opens the current-tab reader, back restores the list, and dou
   assert.equal(refreshes,beforeIndependent,'independent mode does not invoke native/Conversations selection display');
   assert.equal(layout.messagePaneVisible,false,'independent mode leaves the native preview collapsed');
   restarted.setIndependent(false);assert.equal(independentHides,1,'changing preference returns to list and cancels the custom reader');
+  tree.selectedIndices=[0,1];
+  const originalSelection=scope.captureSnoozeSelection(win);
+  restarted.openIndex(0);moveAccepted(originalSelection);
+  assert.equal(tree.selectedIndices.length,0,'durable Snooze acceptance clears the actual selection');
+  assert.equal(tree._gmSmartActionPending,true,'native successor selection is suppressed during moves');
+  assert.equal(layout.messagePaneVisible,false,'Snooze acceptance leaves the reader');
+  tree.selectedIndices=[2];moveAccepted(originalSelection);
+  assert.deepEqual(tree.selectedIndices,[2],'late acceptance cannot clear a new user selection');
   restarted.close();assert.equal(independentCloses,1);
+  vm.runInContext('thunderGSnooze=undefined',scope);
 });
 test('checkbox selection shows bulk toolbar and archives native selection without opening reader',()=>{
   const nodes=[];

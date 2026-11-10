@@ -228,3 +228,13 @@
 :root:not([data-gm-new-message-symbol]) #threadTree tr.table-layout[data-properties~="new"]:not([data-properties~="replied"]):not([data-properties~="forwarded"]):not([data-properties~="redirected"]) .subject-line > img {
   display: none !important;
 }
+
+/* Use the real row selection rather than a stale native ancestor state. */
+#threadTree .tree-view-row-select-checkbox[data-gm-selection-checked] {
+  -moz-context-properties: fill, fill-opacity, stroke, stroke-opacity !important;
+  stroke-opacity: 0 !important;
+  fill-opacity: 0 !important;
+}
+#threadTree .tree-view-row-select-checkbox[data-gm-selection-checked="true"] {
+  fill-opacity: 1 !important;
+}
