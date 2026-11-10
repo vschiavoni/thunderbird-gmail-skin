@@ -250,6 +250,7 @@ function independentAvatar(address) {
   catch (_) { return null; }
 }
 function independentTagKey(event) {
+  if(typeof gmailComposerTypingTarget==='function' && gmailComposerTypingTarget(event))return null;
   const target=event.composedPath?.()[0] || event.target;
   if(event.defaultPrevented || event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ||
     target?.isContentEditable || target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'))return null;

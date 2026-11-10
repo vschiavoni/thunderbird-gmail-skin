@@ -15,7 +15,7 @@ function readingMessageWasMoved(previous, move, messages) {
 
 // Bare L overrides Thunderbird's Ignore Subthread only in mail browsing UI.
 function isLabelShortcut(event) {
-  return event.key?.toLowerCase() === 'l' && !event.ctrlKey && !event.metaKey &&
+  return !(typeof gmailComposerTypingTarget==='function' && gmailComposerTypingTarget(event)) && event.key?.toLowerCase() === 'l' && !event.ctrlKey && !event.metaKey &&
     !event.altKey && !event.shiftKey && !event.repeat && !event.isComposing &&
     !event.defaultPrevented && !event.target?.isContentEditable &&
     !event.target?.ownerDocument?.documentURI?.includes('/messengercompose/') &&

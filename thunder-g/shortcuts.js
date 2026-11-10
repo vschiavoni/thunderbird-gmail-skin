@@ -1,8 +1,28 @@
 // Opt-in Gmail mappings. Native commands retain validation and sending policy.
 var gmailShortcutsEnabled=false;
+// Embedded compose keystrokes can be retargeted to a browser, document or
+// shadow host. Follow only the focus/document chain, not every open composer.
+function gmailComposerTypingTarget(event){
+  const pending=[event.target,event.originalTarget,event.currentTarget,event.view?.document,...(event.composedPath?.() || [])],seen=new Set();
+  while(pending.length && seen.size<64){
+    const node=pending.shift();if(!node || seen.has(node))continue;seen.add(node);
+    try{
+      const doc=node.nodeType===9 || node.documentURI!==undefined?node:node.ownerDocument;
+      if(String(doc?.designMode).toLowerCase()==='on' || doc?.documentURI?.includes('/messengercompose/') ||
+        node.closest?.('.gm-inline-compose'))return true;
+      // designMode editors are not reliably reported as contenteditable.
+      if(doc && !seen.has(doc))pending.push(doc);
+      if(doc?.defaultView?.frameElement)pending.push(doc.defaultView.frameElement);
+      if(node.activeElement)pending.push(node.activeElement);
+      if(node.shadowRoot?.activeElement)pending.push(node.shadowRoot.activeElement);
+      if(node.contentDocument)pending.push(node.contentDocument);
+    }catch(_){/* An inaccessible or closing frame is not a typing target. */}
+  }
+  return false;
+}
 function gmailTypingTarget(event){
   const target=event.target,doc=target?.ownerDocument;
-  return !!(target?.isContentEditable || doc?.designMode==='on' ||
+  return !!(gmailComposerTypingTarget(event) || target?.isContentEditable || doc?.designMode==='on' ||
     doc?.documentURI?.includes('/messengercompose/') ||
     target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, panel, menupopup, [role="dialog"], [role="menu"]'));
 }

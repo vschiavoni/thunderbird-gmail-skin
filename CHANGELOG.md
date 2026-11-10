@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ignore numeric label shortcuts and the L label picker while focus is inside an embedded composer, including nested and retargeted editor events.
+
 - Prefill the new-label name from the label picker’s search text.
 
 - Show uncolored sidebar labels in neutral gray instead of Thunderbird’s default pink, consistent with message chips.
