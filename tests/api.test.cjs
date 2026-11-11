@@ -286,3 +286,29 @@ test('New-message symbol defaults off and follow live local preference changes',
   changed({showNewMessageSymbol:{newValue:false}},'sync');assert.equal(calls.length,3);
  }
 });
+
+
+test('folder sizes default off across tabs and disabling restores the exact prior native setting',()=>{
+ const s=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>({ExtensionCommon:{ExtensionAPI:class{}}})}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),s);
+ for(const initial of [undefined,'true','false']){
+  let value=initial,writes=0,updates=0;
+  const store={hasValue:()=>value!==undefined,getValue:()=>value??'',setValue(uri,id,attribute,next){assert.equal(id,'folderPaneFolderSize');assert.equal(attribute,'visible');assert.equal(uri,'chrome://messenger/content/messenger.xhtml');writes++;value=next},removeValue(){value=undefined}};
+  const controller=s.createFolderSizeDefault(store),pane=()=>({folderPane:{toggleFolderSizes(){updates++}}});
+  const first=controller.attach(pane()),second=controller.attach(pane());
+  assert.equal(value,'false');assert.equal(writes,1,'apply once, independent of the number of tabs');assert.equal(updates,2);
+  first.close();assert.equal(value,'false','closing a tab does not restore sizes in other windows');
+  controller.close();assert.equal(value,initial,'restore previous visibility, including absence');assert.equal(updates,3);
+  second.close();controller.close();assert.equal(value,initial);
+ }
+});
+
+test('native folder-size menu remains usable and newly opened tabs do not override a user choice',()=>{
+ const s=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>({ExtensionCommon:{ExtensionAPI:class{}}})}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),s);
+ let value='false',writes=0;
+ const store={hasValue:()=>true,getValue:()=>value,setValue(_uri,_id,_attribute,next){writes++;value=next},removeValue(){assert.fail('must preserve user choice')}};
+ const controller=s.createFolderSizeDefault(store);controller.attach({folderPane:{toggleFolderSizes(){}}});
+ value='true';controller.attach({folderPane:{toggleFolderSizes(){}}});assert.equal(value,'true');assert.equal(writes,1);
+ controller.close();assert.equal(value,'true','disable preserves a manual change made while the skin was active');
+});

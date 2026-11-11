@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep label-picker popups anchored to the visible toolbar or fixed list header after archiving or deleting mail.
+
+- Default Thunderbird’s native Show Folder Size setting to off while Thunder-G is active, with restoration on disable.
+
 - Prevent stuck refresh notices by observing native folder completion, avoiding duplicate Inbox updates, and canceling stale feedback on navigation.
 
 - Ignore numeric label shortcuts and the L label picker while focus is inside an embedded composer, including nested and retargeted editor events.

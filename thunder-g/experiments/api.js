@@ -9,6 +9,34 @@ var { ExtensionCommon } = ChromeUtils.importESModule("resource://gre/modules/Ext
 var { ExtensionSupport } = ChromeUtils.importESModule("resource:///modules/ExtensionSupport.sys.mjs");
 var { MailServices } = ChromeUtils.importESModule("resource:///modules/MailServices.sys.mjs");
 
+// Apply the native folder-size default once per extension session, not once
+// per tab. Keep the native checkbox functional and restore the prior value
+// on disable unless the user has chosen a different value in the meantime.
+function createFolderSizeDefault(store) {
+  const uri='chrome://messenger/content/messenger.xhtml',id='folderPaneFolderSize',attribute='visible';
+  const panes=new Set();let applied=false,closed=false,hadValue=false,previous='';
+  function refresh(win){try{win.folderPane?.toggleFolderSizes?.();}catch(error){console.warn('Thunder-G folder sizes:',error);}}
+  return {
+    attach(win){
+      if(closed || !store)return {close(){}};
+      if(!applied){
+        hadValue=store.hasValue(uri,id,attribute);previous=store.getValue(uri,id,attribute);
+        store.setValue(uri,id,attribute,'false');applied=true;
+      }
+      panes.add(win);refresh(win);
+      return {close(){panes.delete(win);}};
+    },
+    close(){
+      if(closed)return;closed=true;
+      if(applied && store.getValue(uri,id,attribute)==='false'){
+        if(hadValue)store.setValue(uri,id,attribute,previous);else store.removeValue(uri,id,attribute);
+        for(const win of panes)refresh(win);
+      }
+      panes.clear();
+    }
+  };
+}
+
 function mailPaneReady(doc) {
   const win = doc.defaultView;
   return doc.readyState === 'complete' && !!win?.threadPane &&
@@ -133,6 +161,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     };
     let gmailImporter = null,labelBackupController=null,conversationLabelInheritance=null;
     const labelCommandDocuments=new Map();
+    const folderSizes=createFolderSizeDefault(typeof Services==='undefined'?null:Services.xulStore);
     const documents = new Map();
     const pendingDocuments = new Map();
     const windows = new Map(),tabWatchers=new Map(),startupWindows=new Map();
@@ -230,6 +259,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         return;
       }
       pendingDocuments.get(doc)?.close(); pendingDocuments.delete(doc);
+      const folderSize=folderSizes.attach(doc.defaultView);
       loadSkin(doc.defaultView);
       doc.documentElement.toggleAttribute("data-gm-hide-column-headers", !showColumnHeaders);
       const labels = installInlineLabels(doc.defaultView, MailServices, Services.prefs);
@@ -250,7 +280,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       doc.defaultView.addEventListener('unload',detach,{once:true});
       documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setPersonalIndicators:inbox.setPersonalIndicators, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
         doc.defaultView.removeEventListener('unload',detach);
-        searchStatus.close();
+        searchStatus.close();folderSize.close();
         readers.delete(doc);
         snoozeOrder?.close();
         pages.close(); pagedDocuments.delete(doc); zoom.close();
@@ -321,7 +351,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
     };
     context.callOnClose({ close() {
-      dockIcon?.close();dockIcon=null;
+      dockIcon?.close();dockIcon=null;folderSizes.close();
       thunderGSnooze?.close();thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
       labelBackupController?.close();labelBackupController=null;

@@ -279,11 +279,11 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     replaceChildren(...children){this.children=children},get childElementCount(){return this.children.length},
     addEventListener(k,f){(events[k]??=[]).push(f)},removeEventListener(){},remove(){},
     focus(){doc.activeElement=this},querySelectorAll(){return this.children.flatMap(x=>x.children.filter(y=>y.name==='input'))},
-    openPopup(){this.events.popupshown?.forEach(f=>f())},hidePopup(){this.events.popuphidden?.forEach(f=>f())}};
+    openPopup(anchor){this.anchor=anchor;this.events.popupshown?.forEach(f=>f())},hidePopup(){this.events.popuphidden?.forEach(f=>f())}};
     nodes.push(n);return n;}
-  const layout=el(),tree=el(),folderTree=el(),threadPane=el();
+  const layout=el(),tree=el(),folderTree=el(),threadPane=el(),listHeader=el();
   const keyEvents={};
-  const doc={activeElement:tree,querySelectorAll:()=>[],addEventListener:(name,fn)=>keyEvents[name]=fn,removeEventListener(){},getElementById:id=>({paneLayout:layout,threadTree:tree,folderTree,threadPane})[id],
+  const doc={activeElement:tree,querySelectorAll:()=>[],addEventListener:(name,fn)=>keyEvents[name]=fn,removeEventListener(){},getElementById:id=>({paneLayout:layout,threadTree:tree,folderTree,threadPane,threadPaneHeaderBar:listHeader})[id],
     createElement:el,createElementNS:(_ns,name)=>el(name),createXULElement:el,head:el(),documentElement:el()};
   const messages=[{messageKey:1,folder:{URI:'inbox'},getStringProperty:()=> 'one'},
     {messageKey:2,folder:{URI:'inbox'},getStringProperty:()=> ''}];let selected=messages;const calls=[];
@@ -357,6 +357,7 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.deepEqual(nativeCommands,['cmd_manageTags']);
   nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
   assert.ok(nodes.some(n=>n.textContent==='Label as:'),'a single native selection is labelled explicitly');
+  assert.equal(nodes.find(n=>n.name==='panel').anchor,listHeader,'the live popup is anchored to the fixed header in list view');
   assert.equal(nodes.find(n=>n.name==='panel').getAttribute('aria-label'),'Label as — 1 selected messages');
   selected=messages;nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
   search.value='  pippo  ';search.events.input[0]();
@@ -440,3 +441,16 @@ test('labels reach hidden physical Sent copies without matching subjects or scan
 });
 
 test('label shortcuts cannot escape a snooze dialog or time-picker popover',()=>{for(const container of ['dialog','[role="dialog"]','[role="menu"]']){const target={closest:selector=>selector.split(', ').includes(container)?{}:null};assert.equal(scope.isLabelShortcut({key:'l',target}),false);}});
+
+
+test('label popup remains anchored to the fixed header after archive hides or invalidates the toolbar',()=>{
+ const header={},list={getBoundingClientRect:()=>({top:-900,bottom:9000})},button={isConnected:true,getBoundingClientRect:()=>({width:28,height:28})};
+ const doc={getElementById:id=>id==='threadPaneHeaderBar'?header:null},toolbar={hidden:false};
+ assert.equal(scope.labelPickerAnchor(doc,toolbar,button,list),button,'visible conversation/bulk toolbar uses the label button');
+ toolbar.hidden=true;
+ assert.equal(scope.labelPickerAnchor(doc,toolbar,button,list),header,'archive then L must never use the scrolling list');
+ toolbar.hidden=false;button.getBoundingClientRect=()=>({width:0,height:0});
+ assert.equal(scope.labelPickerAnchor(doc,toolbar,button,list),header,'pending layout after row removal also uses the stable header');
+ button.isConnected=false;
+ assert.equal(scope.labelPickerAnchor(doc,toolbar,button,list),header,'detached toolbar buttons cannot be popup anchors');
+});

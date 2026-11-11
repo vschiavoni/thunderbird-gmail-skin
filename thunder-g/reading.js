@@ -21,6 +21,15 @@ function isLabelShortcut(event) {
     !event.target?.ownerDocument?.documentURI?.includes('/messengercompose/') &&
     !event.target?.closest?.('input:not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], search-textbox, dialog, [role="dialog"], [role="menu"]');
 }
+// Never anchor after_start to the entire scrolling message list: after a
+// move/delete its bottom can be far outside the viewport, clipping the panel.
+function labelPickerAnchor(doc,toolbar,button,fallback) {
+  if(!toolbar.hidden && button?.isConnected!==false){
+    const rect=button?.getBoundingClientRect?.();
+    if(!rect || (rect.width>0 && rect.height>0))return button;
+  }
+  return doc.getElementById('threadPaneHeaderBar') || fallback;
+}
 function labelMatchesQuery(name, query) {
   return name.normalize('NFKC').toLocaleLowerCase().includes(query.trim().normalize('NFKC').toLocaleLowerCase());
 }
@@ -559,6 +568,8 @@ function installReadingMode(win) {
     empty.hidden = tagList.childElementCount > 0;
   }
   function showLabels(anchor) {
+    if(!active)syncBulk();
+    anchor=labelPickerAnchor(doc,toolbar,labelsButton,anchor);
     const messages = win.gDBView?.getSelectedMsgHdrs() || [];
     if (!messages.length) return;
     pickerSelection = Array.from(messages);
@@ -609,7 +620,7 @@ function installReadingMode(win) {
     for(const entry of nestedLabelRows(MailServices.tags.getAllTags())){
       const option=doc.createElement('option');option.value=entry.path;option.textContent=entry.path;parent.append(option);
     }
-    validateNewLabel();createPopup.openPopup(apply?labelsButton:anchor,'after_start',0,0,false,false);
+    validateNewLabel();createPopup.openPopup(apply?labelPickerAnchor(doc,toolbar,labelsButton,anchor):anchor,'after_start',0,0,false,false);
   }
   newName.addEventListener('input',validateNewLabel);nest.addEventListener('change',validateNewLabel);parent.addEventListener('change',validateNewLabel);
   cancel.addEventListener('click',()=>createPopup.hidePopup());

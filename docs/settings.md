@@ -179,3 +179,12 @@ picker and native Thunderbird bindings remain available independently.
 Disabled by default. Enable this to skip a number of initial body lines and optionally remove a matching leading server banner, such as “E-MAIL EXTERNE ¦ Attention aux liens et pièces jointes”. Lines are skipped first, then the leading text is matched literally, ignoring differences in whitespace.
 
 This applies to snippets in the message list. Line skipping requires locally available body text with line breaks. Changes apply immediately to visible rows. The stored message body is preserved.
+
+
+## Folder sizes
+
+Thunder-G turns off Thunderbird’s native **Show Folder Size** option when it
+starts. The folder-pane menu remains usable if you want to show sizes during
+that session. Opening additional mail tabs preserves your choice. Disabling
+Thunder-G restores the previous native setting unless you changed it yourself
+while the extension was active.
