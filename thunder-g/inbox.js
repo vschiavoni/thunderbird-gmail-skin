@@ -414,50 +414,77 @@ function inboxSelectionState(view,selectedIndices,range=null){
   }
   return {checked:total>0 && count===total,indeterminate:count>0 && count<total};
 }
-// Follow GetFolderMessages/GetNewMsgs routing, retaining native error reporting,
-// but supply URL listeners so feedback tracks the operations we actually start.
-function refreshInboxFolder(main,folder,done) {
-  const offline=main.MailOfflineMgr;
-  if(offline && !offline.isOnline() && !offline.getNewMail()){done();return;}
-  const flags=(typeof Ci==='undefined'?null:Ci.nsMsgFolderFlags) || {Inbox:0x1000};
-  folder ||= main.GetDefaultAccountRootFolder?.();
-  if(!folder){done();return;}
-  let pending=1,finished=false;
-  function complete(){if(--pending===0 && !finished){finished=true;done();}}
-  function run(start){
-    pending++;
-    let stopped=false;
+// Refreshes can reuse an already-running IMAP URL, which does not necessarily
+// call a newly supplied URL listener. FolderLoaded is the native completion
+// signal for that path. Never overlap two updates of the same folder.
+function refreshInboxFolder(main,folder,done,services=typeof MailServices==='undefined'?null:MailServices) {
+  let closed=false,active=null;
+  const session=services?.mailSession || main.MailServices?.mailSession;
+  const interfaces=typeof Ci==='undefined'?null:Ci;
+  const flags=interfaces?.nsMsgFolderFlags || {Inbox:0x1000};
+  const jobs=[];
+  function close(){if(closed)return;closed=true;active?.();active=null;jobs.length=0;}
+  function finish(error){if(closed)return;close();done(error);}
+  function next(){
+    if(closed)return;
+    const job=jobs.shift();if(!job){finish();return;}
+    let stopped=false,registered=false;
+    function release(){
+      if(stopped)return;stopped=true;
+      if(registered)session.RemoveFolderListener(folderListener);
+    }
+    function stop(error){
+      if(stopped || closed)return;release();active=null;
+      if(error)finish(error);else next();
+    }
+    const folderListener={onFolderEvent(updated,event){
+      if(event==='FolderLoaded' && (updated===job.folder || (updated?.URI && updated.URI===job.folder.URI)))stop();
+    }};
     const errors=typeof main.TransportErrorUrlListener==='function'?new main.TransportErrorUrlListener():null;
     const listener={OnStartRunningUrl(){},OnStopRunningUrl(url,status){
-      if(stopped)return;stopped=true;
-      try{errors?.OnStopRunningUrl?.(url,status);}finally{complete();}
+      if(stopped || closed)return;
+      try{errors?.OnStopRunningUrl?.(url,status);}
+      finally{stop(status?new Error(gmText("Could not refresh mail.")):undefined);}
     }};
-    try{start(listener);}catch(error){if(!stopped){stopped=true;complete();}throw error;}
+    active=release;
+    try{
+      if(session && interfaces?.nsIFolderListener?.event!==undefined){
+        session.AddFolderListener(folderListener,interfaces.nsIFolderListener.event);registered=true;
+      }
+      job.start(listener);
+    }catch(error){stop(error);}
   }
   try{
+    const offline=main.MailOfflineMgr;
+    if(offline && !offline.isOnline() && !offline.getNewMail()){finish();return {close};}
+    folder ||= main.GetDefaultAccountRootFolder?.();
+    if(!folder){finish();return {close};}
     let target=folder,server=folder.server;
     if(server?.type==='none' && !server.isDeferredTo){target=main.GetDefaultAccountRootFolder?.();server=target?.server;}
-    if(target?.isServer && server?.type==='imap')target=server.rootMsgFolder.getFolderWithFlags(flags.Inbox) || server.rootFolder;
+    // IMAP's getNewMessages checks Inbox even when Sent/Archive was selected.
+    // Supply the listener on Inbox, not on the unrelated selected folder.
+    if(server?.type==='imap')target=server.rootMsgFolder?.getFolderWithFlags(flags.Inbox) || server.rootFolder || target;
     const targets=target?.isServer && server?.type==='nntp'?Array.from(server.rootFolder.subFolders):target?[target]:[];
-    for(const item of targets){
-      run(listener=>{
-        if(server.type==='nntp' && target.isServer)item.getNewMessages(main.msgWindow,listener);
-        else{
-          item.biffState=1; // nsMsgBiffState_NoMail, as in Thunderbird GetNewMsgs.
-          item.clearNewMessages();server.getNewMessages(item,main.msgWindow,listener);
-        }
-      });
+    for(const item of targets)jobs.push({folder:item,start(listener){
+      if(server.type==='nntp' && target.isServer)item.getNewMessages(main.msgWindow,listener);
+      else{item.biffState=1;item.clearNewMessages();server.getNewMessages(item,main.msgWindow,listener);}
+    }});
+    // Download already updates Inbox. Only refresh a different selected folder,
+    // and do so after the download, so listeners cannot overwrite each other.
+    if(!folder.isServer && !targets.some(item=>item===folder || (item.URI && item.URI===folder.URI))){
+      if(typeof folder.updateFolderWithListener==='function')jobs.push({folder,start:listener=>folder.updateFolderWithListener(main.msgWindow,listener)});
+      else folder.updateFolder?.(main.msgWindow);
     }
-    if(typeof folder.updateFolderWithListener==='function')run(listener=>folder.updateFolderWithListener(main.msgWindow,listener));
-    else folder.updateFolder?.(main.msgWindow);
-  }finally{complete();}
+    next();
+  }catch(error){finish(error);}
+  return {close};
 }
 
 function installInboxIdleActions(win,reader=null) {
   const doc=win.document,header=doc.getElementById('threadPaneHeaderBar');
   const host=header?.querySelector?.('.list-header-bar-container-start');
   if(!host)return {close(){}};
-  let closed=false,selectionFrame=null,refreshTimer=null,refreshing=false;
+  let closed=false,selectionFrame=null,refreshTimer=null,refreshing=false,refreshJob=null;
   const loading=doc.createElement('div');loading.className='gm-inbox-refresh-notice';loading.hidden=true;
   loading.setAttribute('role','status');loading.setAttribute('aria-live','polite');
   gmBindValue(loading,'textContent',()=>gmText("Loading…"));doc.documentElement.append(loading);
@@ -509,17 +536,19 @@ function installInboxIdleActions(win,reader=null) {
     refresh.setAttribute('data-gm-refresh-feedback','true');loading.hidden=false;
     refreshTimer=win.setTimeout(()=>{refreshTimer=null;refresh.removeAttribute('data-gm-refresh-feedback');},300);
     refreshing=true;
-    const finish=()=>{refreshing=false;if(!closed)loading.hidden=true;};
+    const finish=error=>{refreshing=false;refreshJob=null;if(error && refreshTimer!==null){win.clearTimeout(refreshTimer);refreshTimer=null;refresh.removeAttribute('data-gm-refresh-feedback');}if(!closed){loading.hidden=true;gmBindValue(refresh,'title',()=>error?.message || gmText("Refresh"));}};
     const main=win.browsingContext?.topChromeWindow;
     try{
       if(!main)throw new Error(gmText("Mail refresh is unavailable."));
-      refreshInboxFolder(main,win.gFolder,finish);
-      gmBindValue(refresh, "title", () => gmText("Refresh"));
+      const job=refreshInboxFolder(main,win.gFolder,finish);
+      if(refreshing)refreshJob=job;
     }catch(error){
       win.clearTimeout(refreshTimer);refreshTimer=null;finish();refresh.removeAttribute('data-gm-refresh-feedback');
       gmBindValue(refresh, "title", () => error.message || gmText("Could not refresh mail."));
     }
   });
+  const cancelRefresh=()=>{refreshJob?.close();refreshJob=null;refreshing=false;loading.hidden=true;};
+  win.addEventListener?.('folderURIChanged',cancelRefresh);
   const group=doc.createElement('div');group.className='gm-inbox-select-group';
   const dropdown=button('Select messages','M8 10l4 4 4-4');dropdown.className='gm-inbox-select-dropdown';
   dropdown.setAttribute('aria-haspopup','menu');dropdown.setAttribute('aria-expanded','false');
@@ -629,7 +658,7 @@ function installInboxIdleActions(win,reader=null) {
   alignmentTree?.addEventListener?.('viewchange',alignCheckbox);
   alignmentTree?.addEventListener?.('rowcountchange',alignCheckbox);
   alignCheckbox();
-  return {close(){closed=true;if(refreshTimer!==null)win.clearTimeout(refreshTimer);loading.remove();win.removeEventListener?.('gm-label-navigation',syncLabelBack);reader?.setSelectionControl?.(null);alignmentObserver?.disconnect();
+  return {close(){closed=true;cancelRefresh();win.removeEventListener?.('folderURIChanged',cancelRefresh);if(refreshTimer!==null)win.clearTimeout(refreshTimer);loading.remove();win.removeEventListener?.('gm-label-navigation',syncLabelBack);reader?.setSelectionControl?.(null);alignmentObserver?.disconnect();
     for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])alignmentTree?.removeEventListener?.(name,syncSelection);
     alignmentTree?.removeEventListener?.('viewchange',alignCheckbox);
     alignmentTree?.removeEventListener?.('rowcountchange',alignCheckbox);

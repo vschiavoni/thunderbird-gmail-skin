@@ -354,12 +354,12 @@ test('threaded views start collapsed, including async searches, and later manual
 
 test('idle toolbar delegates page selection, refreshes the current account and cleans up',()=>{
  function node(){return {children:[],events:{},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},append(...items){this.children.push(...items)},prepend(item){this.children.unshift(item)},addEventListener(name,fn){this.events[name]=fn},focus(){},openPopup(){this.open=true},hidePopup(){this.open=false},remove(){this.removed=true}}}
- const host=node(),head=node(),tree={selectedIndices:[],hasAttribute:()=>true,_gmPageSelectionBounds:()=>({rowStart:50,rowEnd:53})},selected=[],calls=[],frames=new Map(),timers=new Map();let id=0,nativeClicks=0;
+ const host=node(),head=node(),tree={selectedIndices:[],hasAttribute:()=>true,_gmPageSelectionBounds:()=>({rowStart:50,rowEnd:53})},selected=[],calls=[],frames=new Map(),timers=new Map(),winEvents={};let id=0,nativeClicks=0;
  const listeners=[];const folder={server:{type:'imap',getNewMessages(folder,window,listener){calls.push(['download',[folder]]);listeners.push(listener)}},clearNewMessages(){},updateFolderWithListener(window,listener){calls.push(['update',window]);listeners.push(listener)}},msgWindow={};
  const main={msgWindow,MsgGetMessage(folders){calls.push(['download',folders])}};
  const nativeSelect={click(){nativeClicks++;tree.selectedIndices=[50,51,52]}};
  const doc={head,documentElement:node(),createXULElement:node,getElementById:key=>({threadPaneHeaderBar:{querySelector:()=>host},threadTree:tree,selectColButton:nativeSelect})[key],createElement:node,createElementNS:node};
- const win={setTimeout(fn){timers.set(++id,fn);return id},clearTimeout(key){timers.delete(key)},document:doc,gDBView:{rowCount:100,getFlagsAt:()=>0},gFolder:folder,browsingContext:{topChromeWindow:main},requestAnimationFrame(fn){frames.set(++id,fn);return id},cancelAnimationFrame(key){frames.delete(key)}};
+ const win={addEventListener(name,fn){winEvents[name]=fn},removeEventListener(name){delete winEvents[name]},setTimeout(fn){timers.set(++id,fn);return id},clearTimeout(key){timers.delete(key)},document:doc,gDBView:{rowCount:100,getFlagsAt:()=>0},gFolder:folder,browsingContext:{topChromeWindow:main},requestAnimationFrame(fn){frames.set(++id,fn);return id},cancelAnimationFrame(key){frames.delete(key)}};
  const controller=scope.installInboxIdleActions(win,{selectIndices(indices){tree.selectedIndices=indices;selected.push(indices)}});
  const bar=host.children[0],[group,refresh,more]=bar.children,[checkbox,dropdown]=group.children;
  tree._gmSmartActionPending=true;
@@ -380,16 +380,18 @@ test('idle toolbar delegates page selection, refreshes the current account and c
   checkbox.checked=false;checkbox.events.change();assert.equal(tree.selectedIndices.length,0,'a full selection also clears');
  }
  tree.hasAttribute=()=>true;
- refresh.events.click();assert.equal(calls[0][0],'download');assert.equal(calls[0][1][0],folder);assert.deepEqual(calls[1],['update',msgWindow]);
+ refresh.events.click();assert.equal(calls[0][0],'download');assert.equal(calls[0][1][0],folder);assert.equal(calls.length,1,'Inbox download already performs the folder refresh');
  assert.equal(notice.hidden,false);assert.equal(refresh['data-gm-refresh-feedback'],'true');
- refresh.events.click();assert.equal(timers.size,1,'repeat clicks do not start overlapping downloads');assert.equal(listeners.length,2);
+ refresh.events.click();assert.equal(timers.size,1,'repeat clicks do not start overlapping downloads');assert.equal(listeners.length,1);
  const finish=timers.values().next().value;timers.clear();finish();
  assert.equal(notice.hidden,false,'animation timer must not dismiss ongoing refresh');assert.equal(refresh['data-gm-refresh-feedback'],undefined);
- listeners[1].OnStopRunningUrl(null,0);assert.equal(notice.hidden,false,'wait for download as well as folder update');
- listeners[0].OnStopRunningUrl(null,0);assert.equal(notice.hidden,true);
+ listeners[0].OnStopRunningUrl(null,0);assert.equal(notice.hidden,true,'native completion dismisses feedback');
  folder.server.getNewMessages=()=>{throw Error('offline')};refresh.events.click();
  assert.equal(notice.hidden,true);assert.equal(timers.size,0);assert.equal(refresh.title,'offline');
  folder.server.getNewMessages=(_folder,_window,listener)=>listeners.push(listener);refresh.events.click();
+ winEvents.folderURIChanged();assert.equal(notice.hidden,true,'leaving the folder cancels stale feedback');
+ refresh.events.click();assert.equal(notice.hidden,false,'refresh is available again after navigation');
+ listeners[1].OnStopRunningUrl(null,0);assert.equal(notice.hidden,false,'an old cancelled URL cannot hide the new notice');
  assert.equal(more.disabled,true);
  checkbox.events.change();controller.close();assert.equal(frames.size,0);
  assert.equal(timers.size,0);assert.equal(notice.removed,true);
@@ -845,9 +847,9 @@ test('refresh completion waits for every URL, handles offline cancellation and i
  const callbacks=[];let finished=0;
  const inbox={clearNewMessages(){},updateFolderWithListener(_window,listener){callbacks.push(listener)}};
  const server={type:'imap',rootMsgFolder:{getFolderWithFlags:()=>inbox},getNewMessages(folder,_window,listener){assert.equal(folder,inbox);callbacks.push(listener)}};
- const root={isServer:true,server,updateFolderWithListener:inbox.updateFolderWithListener};
+ const root={URI:'sent',server,updateFolderWithListener:inbox.updateFolderWithListener};
  scope.refreshInboxFolder({},root,()=>finished++);
- assert.equal(finished,0);callbacks[0].OnStopRunningUrl(null,0);assert.equal(finished,0);
+ assert.equal(finished,0);assert.equal(callbacks.length,1,'selected-folder refresh waits for download');callbacks[0].OnStopRunningUrl(null,0);assert.equal(finished,0);assert.equal(callbacks.length,2);
  callbacks[0].OnStopRunningUrl(null,0);assert.equal(finished,0);
  callbacks[1].OnStopRunningUrl(null,0x80004005);assert.equal(finished,1,'failed operations also finish feedback');
  scope.refreshInboxFolder({MailOfflineMgr:{isOnline:()=>false,getNewMail:()=>false}},root,()=>finished++);
@@ -861,4 +863,41 @@ test('recycled checkbox marks follow actual selection and clear after smart acti
   scope.syncInboxRowCheckbox(row,new Set());assert.equal(attrs.get('data-gm-selection-checked'),'false');
   row.index=2;scope.syncInboxRowCheckbox(row,new Set([1]));assert.equal(attrs.get('data-gm-selection-checked'),'false');
   row.dataset.properties='dummy';scope.syncInboxRowCheckbox(row,new Set([2]));assert.equal(attrs.get('data-gm-selection-checked'),'false');
+});
+
+test('refresh on an already-updating IMAP Inbox completes on FolderLoaded when no URL callback arrives',()=>{
+ const s=require('./localization-context.cjs').createContext({Ci:{nsMsgFolderFlags:{Inbox:0x1000},nsIFolderListener:{event:16}}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),s);
+ const subscribers=new Set();let finished=0,downloads=0,updates=0,urlListener;
+ const inbox={URI:'imap://account/INBOX',clearNewMessages(){},updateFolderWithListener(){updates++;}};
+ inbox.server={type:'imap',rootMsgFolder:{getFolderWithFlags:()=>inbox},getNewMessages(folder,_window,listener){assert.equal(folder,inbox);downloads++;urlListener=listener;}};
+ const session={AddFolderListener(listener,flags){assert.equal(flags,16);subscribers.add(listener)},RemoveFolderListener(listener){subscribers.delete(listener)}};
+ const job=s.refreshInboxFolder({},inbox,()=>finished++,{mailSession:session});
+ assert.equal(downloads,1);assert.equal(updates,0,'do not submit a second operation that can overwrite the completion listener');
+ assert.equal(finished,0);assert.equal(subscribers.size,1);
+ const listener=[...subscribers][0];listener.onFolderEvent({URI:'imap://other/INBOX'},'FolderLoaded');assert.equal(finished,0);
+ listener.onFolderEvent(inbox,'OtherEvent');assert.equal(finished,0);
+ listener.onFolderEvent({URI:inbox.URI},'FolderLoaded');assert.equal(finished,1);assert.equal(subscribers.size,0);
+ urlListener.OnStopRunningUrl(null,0);listener.onFolderEvent(inbox,'FolderLoaded');job.close();assert.equal(finished,1,'late/duplicate completion never dismisses a newer request');
+});
+
+test('refresh targets Inbox from Sent and serializes the selected-folder update, including synchronous no-op events',()=>{
+ const s=require('./localization-context.cjs').createContext({Ci:{nsMsgFolderFlags:{Inbox:0x1000},nsIFolderListener:{event:16}}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),s);
+ const subscribers=new Set(),urls=[];let finished=0,updates=0;
+ const inbox={URI:'inbox',clearNewMessages(){}};
+ const server={type:'imap',rootMsgFolder:{getFolderWithFlags:()=>inbox},getNewMessages(folder,_window,listener){assert.equal(folder,inbox);urls.push(listener)}};
+ const sent={URI:'sent',server,updateFolderWithListener(){updates++;for(const listener of [...subscribers])listener.onFolderEvent(sent,'FolderLoaded')}};
+ const services={mailSession:{AddFolderListener:listener=>subscribers.add(listener),RemoveFolderListener:listener=>subscribers.delete(listener)}};
+ s.refreshInboxFolder({},sent,()=>finished++,services);assert.equal(updates,0);assert.equal(finished,0);
+ urls[0].OnStopRunningUrl(null,0);assert.equal(updates,1);assert.equal(finished,1);assert.equal(subscribers.size,0);
+});
+
+test('closing a refresh removes folder listeners and ignores later native completion',()=>{
+ const s=require('./localization-context.cjs').createContext({Ci:{nsMsgFolderFlags:{Inbox:0x1000},nsIFolderListener:{event:16}}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),s);
+ const listeners=new Set();let finished=0,url;
+ const folder={URI:'inbox',server:{type:'imap',getNewMessages(_folder,_window,listener){url=listener}},clearNewMessages(){}};
+ const job=s.refreshInboxFolder({},folder,()=>finished++,{mailSession:{AddFolderListener:listener=>listeners.add(listener),RemoveFolderListener:listener=>listeners.delete(listener)}});
+ assert.equal(listeners.size,1);job.close();assert.equal(listeners.size,0);url.OnStopRunningUrl(null,0);assert.equal(finished,0);
 });

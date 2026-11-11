@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prevent stuck refresh notices by observing native folder completion, avoiding duplicate Inbox updates, and canceling stale feedback on navigation.
+
 - Ignore numeric label shortcuts and the L label picker while focus is inside an embedded composer, including nested and retargeted editor events.
 
 - Prefill the new-label name from the label picker’s search text.
