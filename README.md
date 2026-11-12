@@ -5,6 +5,7 @@
   <p>
     <a href="https://github.com/vschiavoni/thunderbird-gmail-skin/releases/latest"><img src="https://img.shields.io/github/v/release/vschiavoni/thunderbird-gmail-skin?style=for-the-badge&amp;color=3b82f6&amp;labelColor=172554&amp;logo=github&amp;logoColor=white" alt="Latest release"></a>
     <a href="https://github.com/vschiavoni/thunderbird-gmail-skin/releases"><img src="https://img.shields.io/github/downloads/vschiavoni/thunderbird-gmail-skin/total?style=for-the-badge&amp;color=f59e0b&amp;labelColor=451a03&amp;logo=github&amp;logoColor=white" alt="Total release downloads"></a>
+    <a href="https://vschiavoni.github.io/thunderbird-gmail-skin/"><img src="https://img.shields.io/badge/Docs-%E2%86%97-34a853?style=for-the-badge&amp;labelColor=173b25" alt="Documentation"></a>
   </p>
 </div>
 
@@ -12,8 +13,6 @@ A compact inbox, colored labels, conversation reading and optional in-window
 writing, with automatic light/dark styling. Works with your existing email
 provider; no Gmail account is required. Independently developed and unaffiliated
 with Google.
-
-[Read the documentation](https://vschiavoni.github.io/thunderbird-gmail-skin/documentation)
 
 ## Install
 
