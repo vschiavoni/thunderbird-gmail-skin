@@ -45,7 +45,11 @@ test('recycled dates and Fluent tooltip update; closing restores native renderer
 });
 
 test('scheduled return replaces the visible date and clears on unsnooze or row recycling',async()=>{
-  const local=require('./localization-context.cjs').createContext({console});
+  // Freeze today so the Nov 12 assertion does not become a time-only label
+  // when the suite itself runs on Nov 12.
+  const fixedNow=new Date(2026,10,9,12).getTime();
+  class FixedDate extends Date {constructor(...args){super(...(args.length?args:[fixedNow]));}static now(){return fixedNow;}}
+  const local=require('./localization-context.cjs').createContext({console,Date:FixedDate});
   let job={due:new Date(2026,10,10,9,10).getTime(),state:'sleeping'},changed;
   local.thunderGSnooze={forHeaders:()=>job?[job]:[],subscribe(fn){changed=fn;return ()=>{changed=null}}};
   vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),local);

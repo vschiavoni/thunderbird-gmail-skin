@@ -188,3 +188,11 @@ starts. The folder-pane menu remains usable if you want to show sizes during
 that session. Opening additional mail tabs preserves your choice. Disabling
 Thunder-G restores the previous native setting unless you changed it yourself
 while the extension was active.
+
+
+## Collapsed sidebar unread indicators
+
+When the sidebar is collapsed, a red dot beside a folder or label icon indicates
+unread mail. The dots follow Thunderbird’s existing folder unread counts and
+Thunder-G’s unread-conversation counts for labels. They disappear when the row
+has no unread messages or the sidebar is expanded.

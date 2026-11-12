@@ -901,3 +901,17 @@ test('closing a refresh removes folder listeners and ignores later native comple
  const job=s.refreshInboxFolder({},folder,()=>finished++,{mailSession:{AddFolderListener:listener=>listeners.add(listener),RemoveFolderListener:listener=>listeners.delete(listener)}});
  assert.equal(listeners.size,1);job.close();assert.equal(listeners.size,0);url.OnStopRunningUrl(null,0);assert.equal(finished,0);
 });
+
+
+test('compact sidebar unread dots follow native folder and label state without altering expanded rows',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../chrome/gmail-inspired.css'),'utf8');
+ const rules=[...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(rule=>rule[1].includes('.container::after') && rule[1].includes('li.unread'));
+ assert.equal(rules.length,1);
+ const [,selector,style]=rules[0];
+ assert.match(selector,/body\[data-gm-folder-pane-closed\]/,'expanded sidebar cannot draw the dot');
+ assert.match(selector,/#folderTree li\.unread > \.container::after/,'use the exact row unread flag for both labels and folders, not an unread ancestor');
+ assert.match(style,/background-color:\s*#c5221f/);assert.match(style,/border-radius:\s*50%/);
+ assert.match(style,/inline-size:\s*8px/);assert.match(style,/block-size:\s*8px/);
+ assert.match(style,/inset-inline-start:/,'placement supports either UI direction');
+ assert.match(style,/pointer-events:\s*none/,'the dot cannot intercept folder navigation');
+});

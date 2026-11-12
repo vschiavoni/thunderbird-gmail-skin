@@ -64,12 +64,19 @@ function sameLabelMessages(first, second) {
 }
 // Expand exact References/Message-ID links across local account summaries.
 // No subject matching, body reads, network searches or mailbox-wide header scan.
-function conversationLabelScope(messages,folders=null) {
+function conversationLabelScope(messages,folders=null,{requireReferences=false}={}) {
   if(folders===null){
     try{folders=Array.from(MailServices.accounts.allFolders);}catch(_){folders=[];}
   }
-  const found=new Map(),queue=[],lookedUp=new Set(),threads=new Set();
+  const found=new Map(),queue=[],lookedUp=new Set(),threads=new Set(),threadIndexes=new Map();
   const normalize=id=>String(id || '').trim().replace(/^<|>$/g,'');
+  function references(header){
+    const ids=new Set([normalize(header.messageId)]);
+    for(let i=0;i<(header.numReferences || 0);i++){
+      try{ids.add(normalize(header.getStringReference(i)));}catch(_){break;}
+    }
+    ids.delete('');return ids;
+  }
   const account=folder=>folder?.rootFolder?.URI || folder?.server?.key || folder?.server?.rootFolder?.URI || folder?.URI;
   function remember(header){
     if(!header?.folder?.URI || header.messageKey===undefined)return;
@@ -83,7 +90,24 @@ function conversationLabelScope(messages,folders=null) {
       const thread=header.folder.msgDatabase?.getThreadContainingMsgHdr(header);
       const key=JSON.stringify([header.folder.URI,thread?.threadKey ?? header.messageKey]);
       if(thread && !threads.has(key)){
-        threads.add(key);for(let i=0;i<thread.numChildren;i++)remember(thread.getChildHdrAt(i));
+        // Subject-based native grouping is useful for display, but must not
+        // authorize unattended writes to unrelated messages. Index a thread
+        // once so strict matching does not rescan it for every member.
+        if(requireReferences){
+          let index=threadIndexes.get(key);
+          if(!index){
+            index=new Map();threadIndexes.set(key,index);
+            for(let i=0;i<thread.numChildren;i++){
+              const candidate=thread.getChildHdrAt(i);
+              for(const id of references(candidate)){
+                if(!index.has(id))index.set(id,[]);index.get(id).push(candidate);
+              }
+            }
+          }
+          for(const id of references(header))for(const candidate of index.get(id) || [])remember(candidate);
+        }else{
+          threads.add(key);for(let i=0;i<thread.numChildren;i++)remember(thread.getChildHdrAt(i));
+        }
       }
     }catch(_){/* Missing summaries must not block the available messages. */}
     const ids=new Set([normalize(header.messageId)]);
@@ -95,7 +119,7 @@ function conversationLabelScope(messages,folders=null) {
       const key=JSON.stringify([owner,id]);if(lookedUp.has(key))continue;lookedUp.add(key);
       for(const folder of folders){
         if(folder.isServer || account(folder)!==owner)continue;
-        try{remember(folder.msgDatabase?.getMsgHdrForMessageID(id));}catch(_){/* Offline/unavailable summary. */}
+        try{const candidate=folder.msgDatabase?.getMsgHdrForMessageID(id);if(candidate && normalize(candidate.messageId)===id)remember(candidate);}catch(_){/* Offline/unavailable summary. */}
       }
     }
   }
@@ -130,7 +154,7 @@ function installConversationLabelInheritance(services=MailServices,clock={setTim
     const first=pending.entries().next();if(first.done)return;
     const [key,header]=first.value;pending.delete(key);
     try{
-      const messages=conversationPhysicalMessages(conversationLabelScope([header]));
+      const messages=conversationPhysicalMessages(conversationLabelScope([header],null,{requireReferences:true}));
       inheritConversationLabels(messages,services);
       for(const item of messages)pending.delete(JSON.stringify([item.folder.URI,item.messageKey]));
     }catch(error){console.warn('Thunder-G: could not inherit conversation labels.',error);}

@@ -79,3 +79,30 @@ test('native tag and remove-all commands target conversation scope and restore o
  win.commandController._removeAllMessageTags();assert.equal(applied[1].key,'team');assert.equal(applied[1].scope.length,2);assert.equal(applied[1].add,false);
  controller.close();assert.equal(win.commandController._toggleMessageTag,original);assert.equal(win.commandController._removeAllMessageTags,original);
 });
+
+
+test('automatic inheritance rejects unrelated native-thread members and never removes the existing project label',()=>{
+ const f=fixture(),inbox=f.folder('inbox'),sent=f.folder('sent');
+ const definitions=f.mail.tags.getAllTags();definitions.push({key:'unine-urbino',tag:'unine-urbino'},{key:'visiting-phd/fernando',tag:'visiting-phd/fernando'},{key:'circula',tag:'fns/circula'});
+ // Redacted header-only reproduction: one parent reference, as in the supplied email.
+ const rootId='project-announcement@university.test';
+ const incoming=f.message(inbox,'project-reply@example.test',[rootId],['circula']);
+ const root=f.message(sent,rootId,[],['circula']);
+ const unrelated=f.message(inbox,'unrelated-message',[],['unine-urbino','visiting-phd/fernando']);
+ incoming.thread=[incoming,unrelated];unrelated.thread=incoming.thread;
+ const controller=f.scope.installConversationLabelInheritance(f.mail,f.clock,f.scope.Ci),listener=[...f.listeners][0];
+ listener.msgAdded(incoming);f.flush();
+ assert.deepEqual([...incoming.keys],['circula']);assert.deepEqual([...root.keys],['circula']);
+ assert.deepEqual([...unrelated.keys],['unine-urbino','visiting-phd/fernando']);assert.equal(f.writes.length,0,'native grouping alone cannot cause automatic label writes');
+ controller.close();
+});
+
+test('strict inheritance retains valid cross-folder ancestors, siblings and descendants with exact reference links',()=>{
+ const f=fixture(),inbox=f.folder('inbox'),archive=f.folder('archive'),sent=f.folder('sent');
+ const root=f.message(archive,'root',[],['project']),sibling=f.message(archive,'sibling',['root'],['team']);root.thread=[root,sibling];sibling.thread=root.thread;
+ const outgoing=f.message(sent,'outgoing',['root']),incoming=f.message(inbox,'incoming',['root','outgoing']);
+ const members=f.scope.conversationLabelScope([incoming],null,{requireReferences:true});
+ assert.equal(members.length,4);for(const header of [root,sibling,outgoing,incoming])assert.ok(members.includes(header));
+ f.scope.inheritConversationLabels(members,f.mail);
+ for(const header of members){assert.ok(header.keys.has('project'));assert.ok(header.keys.has('team'));}
+});

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Show red unread dots beside folder and label icons when the sidebar is collapsed, using native unread state without extra scans.
+
+- Require exact Message-ID/References links before automatically inheriting labels from native-thread members, preserving existing assignments.
+
 - Keep label-picker popups anchored to the visible toolbar or fixed list header after archiving or deleting mail.
 
 - Default Thunderbird’s native Show Folder Size setting to off while Thunder-G is active, with restoration on disable.

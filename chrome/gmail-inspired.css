@@ -350,3 +350,20 @@
 /* Show the scheduled return date, without changing native message metadata. */
 #threadTree .datecol-column[data-gm-snoozed] { color:light-dark(#b45309,#ffb86b)!important; font-weight:600!important; }
 #threadTree .datecol-column[data-gm-snoozed="preparing"] { opacity:.8; }
+
+/* Gmail-like unread dots on the compact folder/label rail. Native unreadCount
+ * already maintains .unread, including the label conversation counters. */
+body[data-gm-folder-pane-closed] #folderTree li.unread > .container {
+  position: relative;
+}
+body[data-gm-folder-pane-closed] #folderTree li.unread > .container::after {
+  content: "";
+  position: absolute;
+  inline-size: 8px;
+  block-size: 8px;
+  inset-inline-start: calc(50% + 4px);
+  inset-block-start: calc(50% - 10px);
+  border-radius: 50%;
+  background-color: #c5221f;
+  pointer-events: none;
+}

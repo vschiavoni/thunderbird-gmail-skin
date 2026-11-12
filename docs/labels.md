@@ -12,7 +12,7 @@ In the list, changes apply to the conversations containing the selected messages
 
 When a new message arrives, it inherits the union of the conversation’s existing labels, including labels on incoming and sent messages. This adds missing assignments without removing existing ones, changing read/unread state, or copying internal flags such as junk status. Installation does not relabel the mailbox in bulk. Existing partial assignments are preserved until a conversation-wide action or a new-message inheritance event updates them.
 
-Conversation matching uses native threads and exact Message-ID/References links in available local account summaries. It does not fetch message bodies, search the server, or group messages by subject text. Unavailable local summaries can limit which messages are resolved.
+Automatic inheritance requires exact Message-ID/References links in available local account summaries; native subject-based thread grouping alone cannot authorize automatic label writes. Explicit conversation actions also use the native conversation scope. It does not fetch message bodies, search the server, or group messages by subject text. Unavailable local summaries can limit which messages are resolved.
 
 **Inbox** is a system chip derived from actual Inbox membership. It is not a user label. Messages received into the Inbox show it automatically; archived messages do not. Removing its **×** archives the conversation.
 
