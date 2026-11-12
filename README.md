@@ -71,3 +71,5 @@ on each client and platform.
 > This independent project is not affiliated with Google and requires no Gmail account. It works with your existing email provider. Cross-client synchronization of Exchange tags is not supported.
 
 Gmail-style operator queries are documented in [Search](docs/search.md).
+
+Folder sidebar display controls are available under **Thunder-G Settings → Inbox → Sidebar options**. This includes folder modes, counts, sizes, header visibility and section ordering. The sidebar ellipsis buttons are hidden; the Labels `+` still creates a label.

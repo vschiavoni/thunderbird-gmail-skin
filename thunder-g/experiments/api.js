@@ -1,3 +1,49 @@
+function findFolderSettingsDocument(windows) {
+  for (const win of windows) {
+    const tabmail = win.document.getElementById("tabmail");
+    for (const tab of tabmail?.tabInfo || []) {
+      const doc = tab.chromeBrowser?.contentDocument;
+      if (doc?.documentURI === "about:3pane" && doc.defaultView?.folderPane) return doc;
+    }
+  }
+  return null;
+}
+
+// Expose Thunderbird's native folder controls, including their localized labels.
+function nativeFolderSettings(doc, action = "", enabled = false) {
+  const pane = doc.defaultView.folderPane;
+  const ids = ["folderPaneMoreContextAllFolders", "folderPaneMoreContextUnifiedFolders",
+    "folderPaneMoreContextUnreadFolders", "folderPaneMoreContextFavoriteFolders",
+    "folderPaneMoreContextRecentFolders", "folderPaneMoreContextTags",
+    "folderPaneMoreContextCompactToggle", "folderPaneHeaderToggleGetMessages",
+    "folderPaneHeaderToggleNewMessage", "folderPaneHeaderToggleTotalCount",
+    "folderPaneHeaderToggleFolderSize", "folderPaneHeaderToggleFullPath",
+    "folderPaneHeaderToggleLocalFolders"];
+  if (action) {
+    if (action === "header") {
+      pane.toggleHeader(!enabled);
+    } else if (ids.includes(action)) {
+      const item = doc.getElementById(action);
+      if (!item || item.disabled || item.hasAttribute("disabled")) throw new Error("Option unavailable");
+      item.toggleAttribute("checked", enabled);
+      item.doCommand();
+    } else if (action.startsWith("up:") || action.startsWith("down:")) {
+      const [direction, mode] = action.split(":");
+      if (!pane.activeModes.includes(mode)) throw new Error("Unknown folder mode");
+      const previous = pane.mode;
+      try { pane.mode = mode; direction === "up" ? pane.moveFolderModeUp() : pane.moveFolderModeDown(); }
+      finally { pane.mode = previous; }
+    } else throw new Error("Unknown folder option");
+  }
+  pane.updateContextMenuCheckedItems();
+  pane.updateContextCheckedFolderMode();
+  return JSON.stringify({options: [{id: "header", label: "Show folder pane header", checked: !doc.getElementById("folderPaneHeaderBar")?.hidden, disabled: false}, ...ids.flatMap(id => {
+    const item = doc.getElementById(id);
+    return item ? [{id, label: item.label || item.getAttribute("label") || id,
+      checked: item.hasAttribute("checked"), disabled: item.disabled || item.hasAttribute("disabled")}] : [];
+  })], modes: [...pane.activeModes]});
+}
+
 var thunderGSnooze=null;
 var thunderGSnoozeOrder=null;
 var { setTimeout, clearTimeout } = ChromeUtils.importESModule("resource://gre/modules/Timer.sys.mjs");
@@ -389,6 +435,11 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       documents.clear(); windows.clear();
     }});
     return { inlineLabels: {
+      async folderPaneSettings(action = "", enabled = false) {
+        const doc = findFolderSettingsDocument(Services.wm.getEnumerator("mail:3pane"));
+        if (!doc) throw new Error("Open a mail tab to configure the sidebar.");
+        return nativeFolderSettings(doc, action, enabled);
+      },
       async labelBackup(action,data){
         try{
           if(closed)throw new Error(gmText('Extension has closed.'));

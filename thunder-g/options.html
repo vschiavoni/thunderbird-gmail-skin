@@ -72,6 +72,11 @@
         </section>
         <section id="inbox" aria-labelledby="inbox-title">
           <div class="section-heading"><h2 id="inbox-title"><span data-i18n="inbox_44caf74">Inbox</span></h2><p><span data-i18n="a_little_more_room_for_your_messages_c21d065">A little more room for your messages.</span></p></div>
+          <details id="sidebar-settings"><summary>Sidebar options</summary><div class="details-content">
+            <p>Folder modes, display controls and section order previously available from the sidebar menus.</p>
+            <div id="sidebar-options"></div><div id="sidebar-mode-order"></div>
+            <p id="sidebar-options-status" role="status"></p>
+          </div></details>
           <div class="setting-row">
             <div class="setting-copy"><label for="show-column-headers"><span data-i18n="show_column_headers_fc67495">Show column headers</span></label><p id="column-headers-help"><span data-i18n="hidden_by_default_for_a_gmail_style_list_show_header_ed5b98c">Hidden by default for a Gmail-style list. Show headers to sort, resize, or choose columns. Applies immediately.</span></p></div>
             <input class="switch" id="show-column-headers" type="checkbox" role="switch" aria-describedby="column-headers-help">
@@ -240,6 +245,7 @@
       </main>
     </div>
   </div>
+  <script src="folder-options.js"></script>
   <script src="preview-options.js"></script>
   <script src="stars.js"></script>
   <script src="star-options.js"></script>

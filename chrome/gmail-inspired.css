@@ -367,3 +367,11 @@ body[data-gm-folder-pane-closed] #folderTree li.unread > .container::after {
   background-color: #c5221f;
   pointer-events: none;
 }
+
+/* Native folder display controls are available in Thunder-G Settings > Inbox. */
+@-moz-document url("about:3pane") {
+  #folderPaneMoreButton,
+  #folderTree [data-mode]:not([data-mode="tags"]) .mode-button {
+    display: none !important;
+  }
+}
