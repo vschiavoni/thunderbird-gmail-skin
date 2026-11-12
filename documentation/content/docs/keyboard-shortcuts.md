@@ -4,7 +4,7 @@ description: "Enable and use Thunder-G keyboard shortcuts for navigation, messag
 
 # Keyboard shortcuts
 
-[Back to README](../../../README.md) · [Settings](settings.md) · [Labels](labels.md)
+[Back to README](../README.md) · [Settings](settings.md) · [Labels](labels.md)
 
 Thunder-G supports the following Gmail-style shortcuts starting with **0.23.0**.
 This page lists the implemented shortcuts, rather than every shortcut available in Gmail.

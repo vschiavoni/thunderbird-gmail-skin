@@ -4,12 +4,12 @@ description: "Review Thunder-G documentation coverage, the documented manifest v
 
 # Documentation coverage and validation
 
-These walkthroughs describe the current checkout (manifest version **{{THUNDER_G_VERSION}}**),
+These walkthroughs describe the current checkout (see the [manifest version](../README.md#extension-version)),
 including Unreleased changes and the modules bundled by `build.py`. Installed
 releases may differ: consult the changelog rather than assuming every checkout
 feature is already in the latest XPI. They are not a claim that every procedure
 has been manually tested on every client/platform. The
-[compatibility table](../../../README.md#compatibility) records the project's tested combinations.
+[compatibility table](../README.md#compatibility) records the project's tested combinations.
 
 ## User workflows
 
@@ -57,11 +57,12 @@ The homepage browser preview is a simulation, not the packaged extension.
 ## Source import and publication
 
 Reference manuals, walkthroughs and integration notes are authored under
-`documentation/pages/`. Only the repository overview and changelog are imported
-from outside that directory. `content/` is generated and must not be edited.
+`documentation/content/`. Only the repository overview and changelog are imported
+from outside that directory as `content/README.md` and `content/CHANGELOG.md`.
+Those two files are generated; edit all other guides directly in `content/`.
 Historical performance/legacy notes are retained under `documentation/archive/`,
 outside public navigation. Private local images stay under ignored `local-assets/`;
-only the allowlisted logo/SVG files are copied to the site.
+public logo/SVG illustrations live alongside the authored guides.
 
 Building the static site does not deploy it, install the extension or publish a
 release. See [website maintenance](website-and-hosting.md) and the separate

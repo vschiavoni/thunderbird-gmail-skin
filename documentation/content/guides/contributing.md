@@ -43,11 +43,12 @@ with every supported client. Do not use a real profile for destructive test case
 
 ## Keep documentation in the source location
 
-- References: edit `documentation/pages/docs/`; integration notes are in
-  `documentation/pages/integrations/README.md`.
-- Website walkthroughs: edit `documentation/pages/guides/`.
+- References: edit `documentation/content/docs/`; integration notes are in
+  `documentation/content/integrations/README.md`.
+- Website walkthroughs: edit `documentation/content/guides/`.
 - Navigation: edit `documentation/sidebars.js` and the documentation index.
-- Generated `documentation/content/`: do not edit; startup/build replaces it.
+- Generated `documentation/content/README.md` and `CHANGELOG.md`: edit their
+  repository-root sources instead. Other pages in `content/` are authored directly.
 
 Run `bun run build` inside `documentation/` after changing site content. It imports
 sources and checks internal routes/anchors. Keep examples synthetic and explain

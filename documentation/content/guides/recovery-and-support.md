@@ -11,7 +11,7 @@ is not a reason to delete a profile or recreate an account.
 ## Identify what changed
 
 Record the client/version, Thunder-G version, installation method and switches.
-Compare with the [compatibility table](../../../README.md#compatibility). Use System
+Compare with the [compatibility table](../README.md#compatibility). Use System
 theme, Classic layout and Table View for the intended baseline.
 
 | Symptom | First check | Avoid |

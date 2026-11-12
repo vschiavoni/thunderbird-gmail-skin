@@ -298,12 +298,12 @@
   is hidden; ordinary DKIM Verifier installations do not provide this bridge.
 - Opt-in BIMI domain logos with explicit disclosure of DNS lookups and logo
   downloads, bounded caching and fallback avatars. Only the advertised logo is
-  downloaded; no external logo lookup service is used. See documentation/pages/integrations/README.md
+  downloaded; no external logo lookup service is used. See documentation/content/integrations/README.md
   for provider requirements and validation limits.
 
 ### Changed
 
-- Move setting descriptions from the README to [the settings guide](documentation/pages/docs/settings.md),
+- Move setting descriptions from the README to [the settings guide](documentation/content/docs/settings.md),
   with defaults and short explanations for each option. Include the guide in source bundles.
 
 - Start the native message viewer while conversation-index and Sent lookups are

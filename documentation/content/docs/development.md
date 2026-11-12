@@ -4,7 +4,7 @@ description: "Build and test Thunder-G from source. Learn the extension structur
 
 # Development
 
-Use Python 3.9+, Node.js 18+ and a supported Thunderbird version listed in the [README](../../../README.md).
+Use Python 3.9+, Node.js 18+ and a supported Thunderbird version listed in the [README](../README.md).
 No dependency installation is needed; run the commands below from the repository root.
 
 ## Start from a checkout

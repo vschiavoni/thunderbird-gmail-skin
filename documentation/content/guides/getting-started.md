@@ -10,7 +10,7 @@ you do not need a Gmail account or a Google connection.
 
 ## Check your client and install
 
-1. Check the [compatibility table](../../../README.md#compatibility). It distinguishes
+1. Check the [compatibility table](../README.md#compatibility). It distinguishes
    the declared version range from client/platform combinations actually tested.
 2. Download the `.xpi` from the project's
    [latest release](https://github.com/vschiavoni/thunderbird-gmail-skin/releases/latest).

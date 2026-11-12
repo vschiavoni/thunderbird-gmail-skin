@@ -7,7 +7,7 @@ description: "Learn what Thunder-G stores locally, which optional features conta
 Thunder-G integrates with the mail client's interface and profile through a
 privileged Experiment API. The manifest declares extension storage access; the
 experiment provides broader native integration than an ordinary web page.
-The bundled code has no telemetry, as stated in the [project overview](../../../README.md).
+The bundled code has no telemetry, as stated in the [project overview](../README.md).
 Normal account connections and mail synchronization remain the client's responsibility.
 
 ## Data kept by the feature

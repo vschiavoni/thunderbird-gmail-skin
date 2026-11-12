@@ -12,9 +12,10 @@ for folder in ['chrome','thunder-g','scripts','tests','integrations']:
 # Public site sources only; generated output, archives and local assets stay private.
 files += [root/'documentation'/name for name in ['README.md','package.json','bun.lock','docusaurus.config.js','sidebars.js','.gitignore']]
 public_suffixes={'.md','.js','.jsx','.css','.json','.png','.svg','.ttf','.txt','.woff2','.py'}
-for folder in ['pages','src','static','scripts']:
+for folder in ['content','src','static','scripts']:
     files += [p for p in (root/'documentation'/folder).rglob('*')
               if p.is_file() and p.suffix in public_suffixes
+              and p not in [root/'documentation/content/README.md', root/'documentation/content/CHANGELOG.md']
               and not any(part.startswith('.') or part=='__pycache__' for part in p.relative_to(root/'documentation'/folder).parts)]
 files += [root/name for name in ['.github/workflows/release.yml', '.github/workflows/docs.yml']]
 

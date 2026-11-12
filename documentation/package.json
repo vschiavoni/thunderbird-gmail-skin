@@ -3,15 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "sync-docs": "python3 scripts/sync_docs.py",
-    "prestart": "python3 scripts/sync_docs.py",
-    "start": "bun --bun node_modules/@docusaurus/core/bin/docusaurus.mjs start",
-    "prebuild": "python3 scripts/sync_docs.py",
+    "start": "python3 scripts/dev.py",
+    "prebuild": "python3 scripts/generate_pages.py",
     "build": "bun --bun node_modules/@docusaurus/core/bin/docusaurus.mjs build",
     "serve": "bun --bun node_modules/@docusaurus/core/bin/docusaurus.mjs serve",
     "clear": "bun --bun node_modules/@docusaurus/core/bin/docusaurus.mjs clear",
-    "predev": "python3 scripts/sync_docs.py",
-    "dev": "bun --bun node_modules/@docusaurus/core/bin/docusaurus.mjs start"
+    "dev": "python3 scripts/dev.py"
   },
   "dependencies": {
     "@docusaurus/core": "3.9.2",

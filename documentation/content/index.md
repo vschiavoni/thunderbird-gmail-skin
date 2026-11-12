@@ -11,8 +11,8 @@ your existing accounts, with native labels, search and optional conversation
 reading and in-window writing. No Gmail account is required.
 
 These guides describe the current checkout, which can include Unreleased changes.
-Check the [changelog](../../CHANGELOG.md) and
-[compatibility notes](../../README.md#compatibility) for the package you installed.
+Check the [changelog](CHANGELOG.md) and
+[compatibility notes](README.md#compatibility) for the package you installed.
 
 ## What is Thunder-G?
 
@@ -33,7 +33,7 @@ See the [FAQ](guides/faq.md) for details and the
 
 ## Start here
 
-- [Overview and compatibility](../../README.md)
+- [Overview and compatibility](README.md)
 - [First-run walkthrough](guides/getting-started.md)
 - [Frequently asked questions](guides/faq.md)
 
@@ -64,6 +64,6 @@ See the [FAQ](guides/faq.md) for details and the
 - [Labels](docs/labels.md), [search operators](docs/search.md) and [label backup](docs/label-backup.md)
 - [Recovery and support](guides/recovery-and-support.md)
 - [Troubleshooting](docs/troubleshooting.md) and [updates/removal](docs/updates.md)
-- [Development](docs/development.md), [contributing](guides/contributing.md) and [changelog](../../CHANGELOG.md)
+- [Development](docs/development.md), [contributing](guides/contributing.md) and [changelog](CHANGELOG.md)
 - [Build and GitHub Pages](guides/website-and-hosting.md)
 - [Documentation coverage and validation limits](guides/documentation-status.md)

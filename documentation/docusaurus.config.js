@@ -26,6 +26,7 @@ module.exports = {
     hashed: true,
     language: 'en',
     docsRouteBasePath: '/',
+    docsDir: 'content',
     indexDocs: true,
     indexBlog: false,
     indexPages: false,

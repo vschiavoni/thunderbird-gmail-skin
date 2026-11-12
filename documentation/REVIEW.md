@@ -24,7 +24,7 @@ consistency review and packaging/site validation, not a new cross-platform clien
 
 ## Consolidation
 
-Canonical manuals and integration notes now live under `documentation/pages/`.
+Canonical manuals and integration notes now live under `documentation/content/`.
 The root `docs/` directory and `integrations/README.md` no longer exist. Website
 `/docs/...` routes remain stable; source file paths on GitHub have changed.
 Repository overview/history remain at root and are normalized during site import.

@@ -15,8 +15,11 @@ bun install
 bun start
 ```
 
-Bun runs the CLI directly; Python imports repository Markdown before startup/build.
-`bun start` and `bun run dev` provide hot reload. For a production preview:
+Bun runs Docusaurus; the Python launcher watches the repository README, changelog
+and manifest automatically. Edit Markdown directly in `content/` for hot reload.
+README/changelog changes update their site pages; manifest changes also restart
+Docusaurus to reload the version metadata. No manual sync is required. Ctrl+C
+stops both the watcher and development server. For a production preview:
 
 ```sh
 bun run build
@@ -30,17 +33,19 @@ does not by itself mean failure: check the command exit status and final result.
 
 | Content | Source |
 | --- | --- |
-| Reference manuals | documentation/pages/docs/ |
-| Integration notes | documentation/pages/integrations/README.md |
+| Reference manuals | documentation/content/docs/ |
+| Integration notes | documentation/content/integrations/README.md |
 | Overview and history | Repository README and changelog |
-| Walkthroughs and index | documentation/pages/ |
+| Walkthroughs and index | documentation/content/ |
 | Landing | documentation/src/pages/index.jsx |
 | Documentation footer | documentation/src/theme/Footer/ |
 | Shared navigation | documentation/sidebars.js and docusaurus.config.js |
 | Portable mail simulation | documentation/src/components/MailDemo/ |
 
-Do not edit generated `documentation/content/`; import recreates it from the sources.
-Only allowlisted documentation images are copied, not private screenshots or archives.
+Edit the authored pages and public illustrations directly in `documentation/content/`.
+Only `content/README.md` and `content/CHANGELOG.md` are generated and ignored;
+edit their repository-root sources instead. Private screenshots and archives stay
+outside the published content directory.
 
 ## GitHub Pages build
 
@@ -81,12 +86,12 @@ production deployment remains tied to stable releases or an explicit manual run.
 Enable Pages with GitHub Actions in the fork first. This path does not require
 the workflow to be on the default branch.
 
-Build imports `README.md` and `CHANGELOG.md` from the selected commit. The
-manifest-version placeholder in authored Markdown is replaced with the selected
-manifest version. Update the
+Build imports `README.md` and `CHANGELOG.md` from the selected commit and reads
+the manifest version for the overview and site metadata. Update the
 actual guides alongside feature changes before tagging; this workflow publishes
 those sources and does not generate feature descriptions from code or GitHub
-release notes. Generated `content/` and `build/` are never committed back.
+release notes. Only the two generated Markdown pages and `build/` are ignored;
+authored content is version controlled.
 
 A Pages failure leaves the previous deployment in place and does not roll back
 an already published extension release. Check both workflow jobs before announcing

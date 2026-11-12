@@ -5,7 +5,7 @@ description: "Diagnose Thunder-G layout, label, search, conversation, draft and 
 # Troubleshooting
 
 Start by checking your Thunderbird/Betterbird and Thunder-G versions against the
-[compatibility table](../../../README.md#compatibility). Use the built-in System
+[compatibility table](../README.md#compatibility). Use the built-in System
 theme, Classic layout and Table View. Menu names may differ with your client’s language.
 
 ## I cannot sort, resize or choose columns

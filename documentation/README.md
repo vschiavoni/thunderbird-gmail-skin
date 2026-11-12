@@ -1,6 +1,6 @@
 # Thunder-G documentation website
 
-Docusaurus 3.9.2 scaffold. Requirements: Bun 1.3+ and Python 3. Bun runs the CLI directly, without using the system Node.js installation.
+Docusaurus 3.9.2 website. Requirements: Bun 1.3+ and Python 3. Bun runs the CLI directly, without using the system Node.js installation.
 The extension's own development requirements remain documented separately.
 
 ## Run locally
@@ -18,8 +18,11 @@ bun run build
 bun run serve
 ```
 
-`bun start`, `bun run dev` and `bun run build` first import the repository Markdown. After editing
-an original source while the dev server is running, run `bun run sync-docs` again.
+Edit Markdown directly in `content/`; Docusaurus reloads it on save. `bun start`
+and `bun run dev` also watch the repository README, changelog and manifest. Changes
+to README/changelog regenerate only their two site pages. Manifest changes refresh
+the displayed version and restart Docusaurus to reload configuration metadata.
+No manual synchronization command is needed. Ctrl+C stops the watcher and server.
 
 The homepage is a custom landing page at `/`. The documentation index is at
 `/documentation`; individual guide URLs stay unchanged. The homepage contains a browser simulation with fictional mail at `/#demo`.
@@ -30,18 +33,18 @@ Changes stay in component memory and reset on reload.
 ## Where to edit
 
 - Overview and release history: edit the repository README and changelog.
-- Reference manuals: edit `pages/docs/`.
-- DKIM/BIMI integration notes: edit `pages/integrations/README.md`.
-- New guides and landing page: edit `pages/`.
+- Reference manuals: edit `content/docs/`.
+- DKIM/BIMI integration notes: edit `content/integrations/README.md`.
+- New guides and documentation index: edit `content/`.
 - Interactive demo: `src/components/MailDemo/`, embedded in the landing page.
 - Landing page: `src/pages/index.jsx` and `src/pages/index.module.css`.
 - Navigation: `sidebars.js`.
 - Appearance: `src/css/custom.css`.
-- Generated copies: `content/` (ignored; do not edit).
+- Generated pages: `content/README.md` and `content/CHANGELOG.md` (ignored; edit their repository-root sources).
 
-All authored guides and reference manuals live in `documentation/pages/`.
-The import normalizes repository-relative links and copies only the referenced logo
-and SVG illustrations. `archive/` contains historical notes, and `local-assets/`
+All authored guides and reference manuals live in `documentation/content/`.
+The two generated pages normalize repository-relative links. Authored guides and
+their public illustrations are read directly from `content/`. `archive/` contains historical notes, and `local-assets/`
 contains private local files; neither is published by the site or source packager. The repository README's HTML is supported through Markdown format
 detection. Markdown links are checked during production builds.
 
@@ -53,8 +56,7 @@ Set `SITE_URL` and `BASE_URL` for the chosen host. For project GitHub Pages, for
 SITE_URL=https://vschiavoni.github.io BASE_URL=/thunderbird-gmail-skin/ bun run build
 ```
 
-Deploy the resulting `build/` using your chosen hosting workflow. No deployment or
-remote changes are configured. Check walkthroughs against the target release and the recorded compatibility limits
+Deploy the resulting `build/` using your chosen hosting workflow. The included workflow deploys to GitHub Pages after repository setup. Check walkthroughs against the target release and the recorded compatibility limits
 before publishing. See the coverage page in the site.
 
 Docusaurus reference: https://docusaurus.io/docs/3.9.2/installation
@@ -87,9 +89,9 @@ The reusable `.github/workflows/docs.yml` can be run manually with a ref or call
 by `release.yml` after the latest stable release's assets are published. It checks
 out the release commit, imports the matching changelog and builds for the Pages
 destination. Set Pages to GitHub Actions once; see the
-[hosting guide](pages/guides/website-and-hosting.md#automatic-deployment).
-The sync script replaces `{{THUNDER_G_VERSION}}` in authored Markdown with the
-version in `thunder-g/manifest.json`, so the coverage page follows the release.
+[hosting guide](content/guides/website-and-hosting.md#automatic-deployment).
+The overview reports the version from `thunder-g/manifest.json`; the same manifest
+version is used by site metadata. Both follow the selected release commit.
 
 ## Metadata validation
 

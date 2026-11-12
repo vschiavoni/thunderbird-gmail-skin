@@ -1,4 +1,5 @@
 node_modules/
 build/
 .docusaurus/
-/content/
+/content/README.md
+/content/CHANGELOG.md
