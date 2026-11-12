@@ -1,0 +1,22 @@
+{
+  "name": "@thunder-g/mail-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.jsx",
+    "./model": "./model.js"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "files": [
+    "index.jsx",
+    "DemoComposer.jsx",
+    "DemoIcon.jsx",
+    "model.js",
+    "styles.module.css",
+    "assets",
+    "README.md"
+  ]
+}

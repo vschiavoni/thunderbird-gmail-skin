@@ -20,6 +20,8 @@ concurrency:
 jobs:
   release-assets:
     if: github.repository == 'vschiavoni/thunderbird-gmail-skin' && (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease)
+    outputs:
+      docs_ref: ${{ steps.docs.outputs.ref }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -72,3 +74,27 @@ jobs:
           if [ "$draft" = true ]; then
             gh release edit "$RELEASE_TAG" --draft=false --latest
           fi
+      - name: Select documentation for the latest stable release
+        id: docs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          latest=$(gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name')
+          if [ "$latest" = "$RELEASE_TAG" ]; then
+            echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping site deployment: this is not the latest stable release."
+          fi
+
+  documentation:
+    needs: release-assets
+    if: needs.release-assets.outputs.docs_ref != ''
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      ref: ${{ needs.release-assets.outputs.docs_ref }}

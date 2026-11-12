@@ -1,7 +1,12 @@
+---
+title: Labels
+description: "Use native Thunderbird tags as nested labels in Thunder-G. Understand conversation scope, visibility, renaming, label chips and synchronization limits."
+---
+
 # Labels  ![](resources/microelements/labels.svg)
 
 To move labels and their email assignments to another Thunderbird setup, use
-**Preferences → Labels → Export labels and assignments**. After downloading the
+**Preferences → Import/Export → Export labels and assignments**. After downloading the
 same mail on the new computer, preview and restore the saved file. See the
 [label backup guide](label-backup.md) for matching rules and missing messages.
 
@@ -22,7 +27,7 @@ A mixed checkbox means only some messages have the label; wait for conversation 
 
 ## Nested labels
 
-Native tags named with `/` paths are displayed as expandable nested labels in the Labels sidebar. The `L` label picker uses a flat list of full paths. For example, `Work`, `Work/PhD` and `Work/PhD/Project` form a three-level tree. Enable the native Tags folder-pane mode to see this sidebar. Existing tag keys and message assignments are preserved, and message chips show the full path. Searching the picker matches full paths, independently of collapsed sidebar branches.
+Native tags named with `/` paths are displayed as expandable nested labels in the Labels sidebar. The `L` label picker uses a flat list of full paths. For example, `Work`, `Work/Projects` and `Work/Projects/Website` form a three-level tree. Enable the native Tags folder-pane mode to see this sidebar. Existing tag keys and message assignments are preserved, and message chips show the full path. Searching the picker matches full paths, independently of collapsed sidebar branches.
 
 Select messages, press `L`, choose **Create new**, enter a name, enable **Nest label under**, and choose an existing parent. Creating a label applies it to the current selection or resolved conversation, including sent replies. Parent and child assignments are independent.
 

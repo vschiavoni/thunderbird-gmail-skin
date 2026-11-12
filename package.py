@@ -9,8 +9,15 @@ version = json.loads((root/'thunder-g/manifest.json').read_text())['version']
 files = [root/name for name in ['README.md','CHANGELOG.md','LICENSE','.gitignore','install.py','build.py','package.py','publish.py','release_assets.py']]
 for folder in ['chrome','thunder-g','scripts','tests','integrations']:
     files += [p for p in (root/folder).rglob('*') if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc']
-# Only approved documentation and assets; never include local screenshots.
-files += [root/name for name in ['docs/search.md','docs/settings.md','docs/keyboard-shortcuts.md','docs/gmail-import.md','docs/updates.md','docs/labels.md','docs/label-backup.md','docs/performance.md','docs/development.md','docs/troubleshooting.md','docs/resources/logo.png','docs/resources/microelements/labels.svg','docs/resources/microelements/label_menu.svg','docs/resources/microelements/label_options.svg','.github/workflows/release.yml']]
+# Public site sources only; generated output, archives and local assets stay private.
+files += [root/'documentation'/name for name in ['README.md','package.json','bun.lock','docusaurus.config.js','sidebars.js','.gitignore']]
+public_suffixes={'.md','.js','.jsx','.css','.json','.png','.svg','.ttf','.txt','.woff2','.py'}
+for folder in ['pages','src','static','scripts']:
+    files += [p for p in (root/'documentation'/folder).rglob('*')
+              if p.is_file() and p.suffix in public_suffixes
+              and not any(part.startswith('.') or part=='__pycache__' for part in p.relative_to(root/'documentation'/folder).parts)]
+files += [root/name for name in ['.github/workflows/release.yml', '.github/workflows/docs.yml']]
+
 output = root/f'thunder-g-{version}-source.zip'
 with ZipFile(output,'w',ZIP_DEFLATED) as archive:
     for path in sorted(files):
