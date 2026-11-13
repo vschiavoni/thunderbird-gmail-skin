@@ -7,7 +7,7 @@
     "gecko": {
       "id": "thunder-g@vschiavoni",
       "strict_min_version": "153.0",
-      "strict_max_version": "159.*",
+      "strict_max_version": "160.*",
       "update_url": "https://github.com/vschiavoni/thunderbird-gmail-skin/releases/latest/download/updates.json"
     }
   },

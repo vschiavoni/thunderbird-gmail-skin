@@ -185,7 +185,7 @@ export default function Home() {
             </details>
             <details>
               <summary>{"Does it work with Thunderbird and Betterbird?"}</summary>
-              <p>{" Yes. The extension declares Thunderbird 153–159.x support. Betterbird 153.5.0esr-bb11 has also been tested on macOS. See the platform details and testing limits in the"}{" "}
+              <p>{" Yes. See the supported Thunderbird and Betterbird versions, platform details and testing limits in the"}{" "}
                 <Link to="/overview#compatibility">{"compatibility table"}</Link>.
               </p>
             </details>

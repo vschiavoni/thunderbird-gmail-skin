@@ -54,15 +54,23 @@ Exchange cross-client tag synchronization is unsupported.
 
 ## Compatibility
 
-The extension declares support for Thunderbird **153–159.x**. The following
-combinations have been tested. Thunderbird 159 is admitted by the version range;
-full feature testing on 159 is still pending:
+The extension declares support for Thunderbird **153–160.x**. The following
+combinations have been tested:
 
 | Client | Version | macOS | Windows | Linux |
 | --- | --- | --- | --- | --- |
-| Thunderbird | 158.0.1 | ✅ Tested (aarch64) | ✅ Tested | Not tested |
+| Thunderbird | 160.0 | ✅ Tested (aarch64) | Not tested | Not tested |
+| Thunderbird | 159.x | ✅ Tested (aarch64) | ✅ Tested | ✅ Tested |
+| Thunderbird | 158.x | ✅ Tested (aarch64) | ✅ Tested | ✅ Tested |
 | Thunderbird | 153 | ✅ Tested | Not tested | Not tested |
 | Betterbird | 153.5.0esr-bb11 | ✅ Tested (aarch64) | Not tested | Not tested |
+
+The Thunderbird 160.0 macOS check used a separate offline profile with fictional
+mail: inbox labels and selection, label changes, snooze/unsnooze, conversation
+reading, in-window composition/replies and draft autosave. The same patched XPI
+was also checked on Thunderbird 159.0 for inbox labels, conversation reading,
+in-window replies and draft autosave. Thunderbird 153–158 were not rerun for this
+patch; the minimum remains 153.0 and extension runtime code is unchanged.
 
 Testing these combinations does not imply that every feature has been verified
 on each client and platform.
