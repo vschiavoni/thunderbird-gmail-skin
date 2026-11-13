@@ -27,10 +27,15 @@ function createNativeSnooze({onTiming=null}={}) {
   }
   const returning=new Map();
   const returnKey=message=>JSON.stringify([message.account,message.id,message.date]);
+  let orderRevision=0;
+  function markReturned(header,time){
+    header.setStringProperty('thunderGSnoozeReturned',String(time));
+    orderRevision++;
+  }
   function stampReturned(header){
     const key=JSON.stringify([accountId(header.folder.server),messageId(header),header.date]);
     const entry=returning.get(key);
-    if(entry){header.setStringProperty('thunderGSnoozeReturned',String(entry));returning.delete(key);}
+    if(entry){markReturned(header,entry);returning.delete(key);}
   }
   function unique(folder,message){const found=matches(folder,message);if(found.length>1)throw new Error('Ambiguous snoozed message.');return found[0]||null;}
   const storageRequests=new Map();
@@ -187,6 +192,12 @@ function createNativeSnooze({onTiming=null}={}) {
       if(!header){await Promise.all([refresh(source),refresh(destination)]);if(unique(destination,message))return;header=unique(source,message);}
       if(!header){await arrived(destination,message);return;}
       await copy(header,destination,!message.keepSource);
+      // Refresh the IMAP summary for the offline unified view, including cached
+      // headers whose flags or search membership changed in another client.
+      // This refresh must never hold up acceptance or the serialized move queue.
+      Promise.resolve().then(()=>{
+        if(!closed)return refresh(destination);
+      }).catch(error=>{if(!closed)adapter.report(error);});
       // onStopCopy is Thunderbird's completion contract. Waiting for an IMAP
       // SELECT and newly indexed summary headers here can add 30 seconds even
       // though the server move already completed.
@@ -197,7 +208,7 @@ function createNativeSnooze({onTiming=null}={}) {
       const server=serverFor(message),inbox=server.rootFolder.getFolderWithFlags(folderFlags.Inbox);
       if(!inbox)throw new Error('This account has no Inbox.');
       if(message.storage===pendingFolder&&!server.rootFolder.containsChildNamed(folderName)){
-        const existing=unique(inbox,message);if(existing){existing.setStringProperty('thunderGSnoozeReturned',String(Math.floor(Date.now()/1000)));return;}
+        const existing=unique(inbox,message);if(existing){markReturned(existing,Math.floor(Date.now()/1000));return;}
       }
       const storage=folderFor(message,message.storage);
       let header=unique(storage,message),existing=matches(inbox,message)[0]||null,fresh=null;
@@ -206,7 +217,7 @@ function createNativeSnooze({onTiming=null}={}) {
         header=unique(storage,message);existing=matches(inbox,message)[0]||null;
       }
       if(!header){
-        if(existing){existing.setStringProperty('thunderGSnoozeReturned',String(message.returned||Math.floor(Date.now()/1000)));return;}
+        if(existing){markReturned(existing,message.returned||Math.floor(Date.now()/1000));return;}
         // A user moving/deleting a snoozed message cancels that reminder rather
         // than resurrecting another copy from Sent or another folder.
         if(fresh?.every(Boolean)){message.cancelled=true;return;}
@@ -217,7 +228,7 @@ function createNativeSnooze({onTiming=null}={}) {
         // logical copy (e.g. a Gmail message with both labels). Do not delete
         // either copy manually: Thunderbird/server owns move semantics.
         await copy(header,inbox,true);
-        existing.setStringProperty('thunderGSnoozeReturned',String(message.returned||Math.floor(Date.now()/1000)));
+        markReturned(existing,message.returned||Math.floor(Date.now()/1000));
         return;
       }
       message.returned ||= Math.floor(Date.now()/1000);
@@ -295,6 +306,7 @@ function createNativeSnooze({onTiming=null}={}) {
     adapter[kind+'Many']=async(job,checkpoint)=>{const failures=await moveJobs(kind,[job],checkpoint);if(failures.has(job))throw failures.get(job);};
   }
   const service=createSnoozeService(adapter);
+  Object.defineProperty(service,'orderRevision',{get:()=>orderRevision});
   let unifiedProvider=null;
   service.unifiedFolder=()=>{
     if(!unifiedProvider){

@@ -148,8 +148,8 @@ test('native move completion does not wait for delayed IMAP summary headers',asy
   const f=fixture({delayedArrival:true}),a=f.header('delayed');
   await f.service.snooze([a],Date.now()+100000);
   const held=f.folders.find(folder=>folder.name==='Thunder-G Snoozed');
-  assert.equal(f.saved[0].state,'sleeping');assert.equal(held.messages.length,0);
-  assert.equal(held.pending.length,1);assert.equal(held.refreshes,0,'no preflight refresh or post-move polling for a new move');
+  assert.equal(f.saved[0].state,'sleeping');assert.equal(held.messages.length,1);
+  assert.equal(held.pending.length,0);assert.equal(held.refreshes,1,'one background refresh populates the Snoozed view without polling');
   await f.service.cancel(f.saved[0].id);
   assert.equal(f.saved.length,0);assert.equal(f.inbox.pending.length,1);
   f.inbox.QueryInterface().updateFolderWithListener(null,{OnStopRunningUrl(){}});
@@ -184,7 +184,7 @@ test('failed bulk Unsnooze retains reminders and a later retry clears them',asyn
 test('optional timing distinguishes queue, refresh, native copy and durable writes',async()=>{
   const events=[],f=fixture({onTiming:event=>events.push(event)});
   await f.service.snooze([f.header('timed')],Date.now()+100000);
-  assert.equal(events.some(event=>event.phase==='folder-refresh'),false);
+  assert.equal(events.some(event=>event.phase==='folder-refresh'),true);
   f.folders.find(folder=>folder.name==='Thunder-G Snoozed').messages=[];
   await f.service.cancel(f.saved[0].id);
   for(const phase of ['queue-wait','folder-refresh','native-copy','journal-write'])assert.ok(events.some(event=>event.phase===phase),phase);
@@ -195,11 +195,11 @@ test('optional timing distinguishes queue, refresh, native copy and durable writ
   assert.equal(broken.saved[0].state,'sleeping');
 });
 
-test('fresh Snooze and Unsnooze need no folder refresh when headers are indexed',async()=>{
+test('indexed Snooze headers refresh the offline view while Unsnooze keeps cached Inbox fast',async()=>{
   const f=fixture();await f.service.snooze([f.header('fast')],Date.now()+100000);
   const held=f.folders.find(folder=>folder.name==='Thunder-G Snoozed');
   await f.service.cancel(f.saved[0].id);
-  assert.equal(f.inbox.refreshes,0);assert.equal(held.refreshes,0);
+  assert.equal(f.inbox.refreshes,0);assert.equal(held.refreshes,1);
   assert.equal(f.saved.length,0);assert.equal(f.inbox.messages.length,1);
 });
 
@@ -208,12 +208,21 @@ test('restart recovery refreshes even cached headers before accepting an interru
   const held=f.folders.find(folder=>folder.name==='Thunder-G Snoozed');
   f.rewriteJournal(jobs=>{jobs[0].state='preparing';delete jobs[0].messages[0].hidden;return jobs});
   const next=f.restart();await next.check();
-  assert.equal(f.saved[0].state,'sleeping');assert.equal(held.refreshes,1);
+  assert.equal(f.saved[0].state,'sleeping');assert.equal(held.refreshes,2);
   assert.equal(f.copyCount,1,'a recovered successful move is not repeated');
-  await next.cancel(f.saved[0].id);assert.equal(held.refreshes,1,'normal Unsnooze is fast again after recovery');next.close();
+  await next.cancel(f.saved[0].id);assert.equal(held.refreshes,2,'normal Unsnooze is fast again after recovery');next.close();
 });
 test('retry after a native move error still refreshes the destination',async()=>{
   const f=fixture();f.failSource='Inbox';await assert.rejects(f.service.snooze([f.header('retry-fast')],Date.now()+100000),/retried/);
   const held=f.folders.find(folder=>folder.name==='Thunder-G Snoozed');assert.equal(held.refreshes,0);
   f.failSource=null;await f.service.check();assert.ok(held.refreshes>0);assert.equal(f.saved[0].state,'sleeping');
+});
+
+test('a stalled background Snoozed refresh does not delay or duplicate accepted moves',{timeout:1000},async()=>{
+  const f=fixture({delayedArrival:true,stalledRefresh:true});
+  await f.service.snooze(Array.from({length:5},(_,i)=>f.header('background-'+i)),Date.now()+100000);
+  const held=f.folders.find(folder=>folder.name==='Thunder-G Snoozed');
+  assert.equal(f.saved.length,5);assert.ok(f.saved.every(job=>job.state==='sleeping'));
+  assert.equal(f.copyCount,1);assert.equal(held.refreshes,1,'one refresh per destination batch');
+  assert.equal(held.messages.length,5);f.service.close();
 });

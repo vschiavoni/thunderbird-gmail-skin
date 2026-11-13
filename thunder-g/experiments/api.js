@@ -40,7 +40,7 @@ function nativeFolderSettings(doc, action = "", enabled = false) {
   const pane = doc.defaultView.folderPane;
   const ids = ["folderPaneMoreContextAllFolders", "folderPaneMoreContextUnifiedFolders",
     "folderPaneMoreContextUnreadFolders", "folderPaneMoreContextFavoriteFolders",
-    "folderPaneMoreContextRecentFolders", "folderPaneMoreContextTags",
+    "folderPaneMoreContextRecentFolders", "folderPaneMoreContextTags", "gm-snoozed-folder-mode",
     "folderPaneMoreContextCompactToggle", "folderPaneHeaderToggleGetMessages",
     "folderPaneHeaderToggleNewMessage", "folderPaneHeaderToggleTotalCount",
     "folderPaneHeaderToggleFolderSize", "folderPaneHeaderToggleFullPath",
@@ -233,6 +233,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     };
     let gmailImporter = null,labelBackupController=null,conversationLabelInheritance=null;
     const labelCommandDocuments=new Map();
+    let snoozeRuntime=null,snoozeOrdering=null;
     const folderSizes=createFolderSizeDefault(typeof Services==='undefined'?null:Services.xulStore);
     const documents = new Map();
     const pendingDocuments = new Map();
@@ -423,8 +424,13 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
     };
     context.callOnClose({ close() {
+      if (closed) return;
+      closed = true;
       dockIcon?.close();dockIcon=null;folderSizes.close();
-      thunderGSnooze?.close();thunderGSnooze=null;
+      // Close only this context's runtime. Settings contexts own none, and an
+      // old background may shut down after its replacement has already started.
+      snoozeRuntime?.close();
+      if (thunderGSnooze === snoozeRuntime) thunderGSnooze=null;
       gmailImporter?.close(); gmailImporter=null;
       labelBackupController?.close();labelBackupController=null;
       conversationLabelInheritance?.close();conversationLabelInheritance=null;
@@ -432,7 +438,6 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       for(const close of [...dkimPopups])close();openIndependentDkimPopup=null;
       verifyIndependentDkim=null;
       for(const pending of dkimRequests.values()){clearTimeout(pending.timer);pending.reject(new Error(gmText("Reader closed")));}dkimRequests.clear();
-      closed = true;
       for(const controller of nativeComposeAutosaves.values())controller.close();nativeComposeAutosaves.clear();
       for(const controller of [...sentReplyLabelTrackers])controller.close();
       try { autosaveController?.close(); } catch (_) { console.warn('Thunder-G: could not restore draft autosave settings.'); }
@@ -449,7 +454,8 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       for (const controller of pendingDocuments.values()) controller.close();
       pendingDocuments.clear();
       for (const controller of documents.values()){try{controller.close();}catch(error){console.warn('Thunder-G closed mail pane:',error);}}
-      thunderGSnoozeOrder?.close();thunderGSnoozeOrder=null;
+      snoozeOrdering?.close();
+      if (thunderGSnoozeOrder === snoozeOrdering) thunderGSnoozeOrder=null;
       for (const controller of conversationDocuments.values()) controller.close();
       conversationDocuments.clear();
       for (const zoom of zoomWindows.values()) zoom.close(); zoomWindows.clear();
@@ -553,7 +559,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         autosaveController = createComposeAutosave(Services.prefs);
         autosaveController.set(composeAutosave,composeAutosaveMinutes);
       } catch (_) { console.warn('Thunder-G: could not configure draft autosave settings.'); }
-      try{thunderGSnooze=createNativeSnooze();thunderGSnoozeOrder=createSnoozeOrder();}
+      try{snoozeRuntime=createNativeSnooze();thunderGSnooze=snoozeRuntime;snoozeOrdering=createSnoozeOrder();thunderGSnoozeOrder=snoozeOrdering;}
       catch(error){console.error('Thunder-G snooze initialization:',error);}
       conversationLabelInheritance=installConversationLabelInheritance();
       started = true;

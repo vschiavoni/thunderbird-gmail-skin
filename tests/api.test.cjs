@@ -312,3 +312,51 @@ test('native folder-size menu remains usable and newly opened tabs do not overri
  value='true';controller.attach({folderPane:{toggleFolderSizes(){}}});assert.equal(value,'true');assert.equal(writes,1);
  controller.close();assert.equal(value,'true','disable preserves a manual change made while the skin was active');
 });
+
+test('closing a settings API context leaves the background snooze runtime alive',async()=>{
+  const cleanups=[];let stops=0,started=0;
+  const service={closed:false,close(){this.closed=true;stops++},snooze(){if(this.closed)throw Error('Snooze closed');return 'accepted'}};
+  const scope=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>({
+    ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},
+    ExtensionSupport:{registerWindowListener(){},unregisterWindowListener(){}},
+    MailServices:{mfn:{addListener(){},removeListener(){}}}})},
+    Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    createNativeSnooze(){started++;return service},createSnoozeOrder:()=>({close(){}}),
+    installConversationLabelInheritance:()=>({close(){}}),createComposeAutosave:()=>({set(){},close(){}})});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),scope);
+  const experiment=new scope.inlineLabels();
+  const context=()=>({extension:{id:'test'},callOnClose(value){cleanups.push(value)}});
+  const background=experiment.getAPI(context());await background.inlineLabels.start();
+  experiment.getAPI(context());cleanups[1].close();
+  assert.equal(stops,0,'closing settings must not close the shared service');
+  assert.equal(scope.thunderGSnooze,service);
+  assert.equal(service.snooze(),'accepted');
+  assert.equal(started,1,'settings must not restart or replace the service');
+  cleanups[0].close();assert.equal(stops,1,'background shutdown still closes the service');
+  cleanups[0].close();assert.equal(stops,1,'cleanup is idempotent');
+});
+
+test('a late shutdown of an old background cannot close its replacement snooze service',async()=>{
+  const cleanups=[],services=[],orders=[];
+  const scope=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>({
+    ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},
+    ExtensionSupport:{registerWindowListener(){},unregisterWindowListener(){}},
+    MailServices:{mfn:{addListener(){},removeListener(){}}}})},
+    Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    createNativeSnooze(){const value={closed:0,close(){this.closed++}};services.push(value);return value},
+    createSnoozeOrder(){const value={closed:0,close(){this.closed++}};orders.push(value);return value},
+    installConversationLabelInheritance:()=>({close(){}}),createComposeAutosave:()=>({set(){},close(){}})});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),scope);
+  const experiment=new scope.inlineLabels();
+  const context=()=>({extension:{id:'test'},callOnClose(value){cleanups.push(value)}});
+  await experiment.getAPI(context()).inlineLabels.start();await experiment.getAPI(context()).inlineLabels.start();
+  cleanups[0].close();
+  assert.equal(services[0].closed,1);assert.equal(services[1].closed,0);
+  assert.equal(orders[0].closed,1);assert.equal(orders[1].closed,0);
+  assert.equal(scope.thunderGSnooze,services[1]);assert.equal(scope.thunderGSnoozeOrder,orders[1]);
+  cleanups[1].close();assert.equal(services[1].closed,1);assert.equal(orders[1].closed,1);
+});

@@ -22,3 +22,12 @@ test('settings find an existing mail tab independently of background API registr
  assert.equal(scope.findFolderSettingsDocument(windows),mail);
  assert.equal(scope.findFolderSettingsDocument([{document:{getElementById:()=>null}}]),null);
 });
+
+test('settings expose and toggle the custom Snoozed folder mode through its native command',()=>{
+ const s=setup(),original=s.doc.getElementById;let changes=0;
+ const item={label:'Snoozed',checked:false,hasAttribute(key){return key==='checked'&&this.checked},toggleAttribute(key,on){if(key==='checked')this.checked=on},doCommand(){changes++;s.pane.activeModes=this.checked?['all','tags','gmSnoozed']:['all','tags']}};
+ s.doc.getElementById=id=>id==='gm-snoozed-folder-mode'?item:original(id);
+ let state=JSON.parse(s.run(s.doc));assert.equal(state.options.find(x=>x.id==='gm-snoozed-folder-mode')?.label,'Snoozed');
+ state=JSON.parse(s.run(s.doc,'gm-snoozed-folder-mode',true));assert.equal(changes,1);assert.equal(state.options.find(x=>x.id==='gm-snoozed-folder-mode').checked,true);assert.ok(state.modes.includes('gmSnoozed'));
+ state=JSON.parse(s.run(s.doc,'gm-snoozed-folder-mode',false));assert.equal(changes,2);assert.equal(state.options.find(x=>x.id==='gm-snoozed-folder-mode').checked,false);assert.ok(!state.modes.includes('gmSnoozed'));
+});
