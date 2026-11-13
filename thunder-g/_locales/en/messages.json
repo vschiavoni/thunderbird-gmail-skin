@@ -2241,5 +2241,8 @@
   },
   "read_timing_never": {
     "message": "Never"
+  },
+  "minimized_drafts": {
+    "message": "Minimized drafts"
   }
 }

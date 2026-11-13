@@ -571,7 +571,7 @@ function installIndependentReader(win) {
   function runCommand(command,target=actionHeader) {
     if(typeof inlineReplyEnabled!=='undefined' && inlineReplyEnabled && ['cmd_replySender','cmd_replyall','cmd_forwardInline'].includes(command)) {
       let composer=inlineComposeControllers.get(win);
-      if(!composer){composer=createInlineCompose(win);inlineComposeControllers.set(win,composer);}
+      if(!composer){composer=createInlineComposeDeck(win);inlineComposeControllers.set(win,composer);}
       const token=ticket,labelHeaders=currentHeaders.slice();
       composer.open(target,command,{container:conversation,scrollHost:host,isCurrent:()=>token===ticket,
         labelMessages:()=>token===ticket?currentHeaders:labelHeaders,onSendState:state=>sendFeedback(state,token)});return;
@@ -1138,7 +1138,7 @@ function installIndependentReader(win) {
     },
     async open(header,options={}){
       const {focusMessage=false}=options || {},draft=options?.folder?options:options?.draft || null;
-      if(closed)return;if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();const token=++ticket;query?.cancel();
+      if(closed)return;if(typeof inlineComposeControllers!=='undefined'){const composer=inlineComposeControllers.get(win);if(composer?.park)composer.park();else composer?.float();}const token=++ticket;query?.cancel();
       historyExpanded=false;resolving=true;host.hidden=false;layout.classList.add('gm-independent-open');host.scrollTop=0;
       gmBindValue(title, "textContent", () => header.mime2DecodedSubject || gmText("(No subject)"));title.append(titleTags);status.hidden=false;gmBindValue(status, "textContent", () => gmText("Loading conversation…"));
       // Start the native viewer immediately. Index/Sent lookups enrich the

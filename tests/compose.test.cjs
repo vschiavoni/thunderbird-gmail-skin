@@ -426,7 +426,7 @@ test('resuming a draft loads parameters directly without creating a native windo
   const context=vm.createContext({});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/compose.js'),'utf8'),context);
   let received,focused=false;
-  const composer={active:false,open(header,command,placement){received={header,command,placement}},returnInline(){focused=true}};
+  const composer={active:false,open(header,command,placement){received={header,command,placement};this.target=header;this.command=command},restore(){focused=true},returnInline(){focused=true}};
   context.createInlineCompose=()=>composer;
   const win={},header={},container={},params={composeFields:{body:'Saved answer',draftId:'draft://42'}};
   await context.resumeInlineDraft(win,header,{container,isCurrent:()=>true},async()=>params);

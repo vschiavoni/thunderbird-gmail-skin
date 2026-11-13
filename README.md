@@ -75,3 +75,5 @@ Gmail-style operator queries are documented in [Search](docs/search.md).
 Folder sidebar display controls are available under **Thunder-G Settings → Inbox → Sidebar options**. This includes folder modes, counts, sizes, header visibility and section ordering. The sidebar ellipsis buttons are hidden; the Labels `+` still creates a label.
 
 **Settings → Conversations → Mark messages as read** exposes Thunderbird’s native automatic-read timing: immediately, after 1/3/20 seconds, or never. Existing native timing is preserved until changed. The choice persists in Thunderbird and also affects its native reader; pending read timers are canceled when changing it.
+
+Multiple embedded composers can stay open in the same mail tab. Opening another draft, starting another message, or opening a conversation minimizes the current composer into a bottom dock. Select its title to restore it; other composers minimize automatically. Text, attachments, undo history and native autosave remain intact. Closing a minimized draft saves it using the same draft workflow as the expanded composer.

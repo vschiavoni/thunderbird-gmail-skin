@@ -130,6 +130,82 @@ function installNativeChangeAutosave(native) {
 var inlineReplyEnabled=false;
 var inlineNewMessageEnabled=false;
 var inlineComposeControllers=new WeakMap();
+// Keep each native editor alive while switching between minimized drafts.
+function sameInlineDraft(left, right) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.folder?.URI && left.folder.URI === right.folder?.URI &&
+    left.messageKey !== undefined && left.messageKey === right.messageKey;
+}
+function createInlineComposeDeck(win, create = createInlineCompose) {
+  const sessions = new Set();
+  let current = null, dock = null, closed = false;
+  function renderDock() {
+    if (closed || !win.document?.createElement) return;
+    const parked = [...sessions].filter(session => session.active && session.minimized);
+    if (!parked.length) { dock?.remove(); dock = null; return; }
+    if (!dock) {
+      dock = win.document.createElement('div'); dock.className = 'gm-compose-dock';
+      dock.setAttribute('aria-label', gmText("Minimized drafts"));
+      dock.style.cssText = 'position:fixed;z-index:1001;inset:auto 16px 12px 16px;display:flex;justify-content:flex-end;gap:8px;overflow-x:auto;pointer-events:none;padding:6px;';
+      win.document.documentElement.append(dock);
+    }
+    dock.hidden = !!(current?.active && !current.minimized && current.presentation === 'full');
+    dock.style.display = dock.hidden ? 'none' : 'flex';
+    dock.style.right = `${current?.active && !current.minimized && current.presentation === 'floating' ? (current.width || 600) + 32 : 16}px`;
+    dock.replaceChildren();
+    for (const session of parked) {
+      session.setDocked?.();
+      const pill = win.document.createElement('div');
+      pill.style.cssText = 'display:flex;align-items:center;flex:0 0 280px;min-width:0;border-radius:20px;background:light-dark(#f2f6fc,#292a2d);color:light-dark(#16345c,#e8eaed);box-shadow:0 2px 10px #0003;pointer-events:auto;overflow:hidden;';
+      const restore = win.document.createElement('button');restore.type='button';restore.textContent=session.title || gmText("New Message");restore.title=restore.textContent;
+      restore.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;color:inherit;text-align:start;padding:12px;cursor:pointer;font:500 13px sans-serif;';
+      restore.addEventListener('click',()=>activate(session));
+      const close=win.document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label',gmText("Close message"));
+      close.style.cssText='border:0;background:transparent;color:inherit;padding:10px;cursor:pointer;font:20px sans-serif;';
+      close.addEventListener('click',()=>session.saveAndClose?.());pill.append(restore,close);dock.append(pill);
+    }
+  }
+  function parkOthers(session) {
+    for (const other of sessions) if (other !== session && other.active && !other.minimized) other.minimize();
+  }
+  function activate(session) {
+    if (!sessions.has(session) || !session.active) return;
+    parkOthers(session);current=session;session.restore?.();renderDock();
+  }
+  function findDraft(header) {
+    return [...sessions].find(session => session.active && ((session.command === 'cmd_editDraft' && sameInlineDraft(session.target,header)) || (session.draftURI && session.draftURI === header?.folder?.getUriForMsg?.(header))));
+  }
+  function unload(){closed=true;dock?.remove();dock=null;sessions.clear();}
+  win.addEventListener?.('unload',unload,{once:true});
+  return {
+    open(header, command, placement = {}) {
+      const matching = command === 'cmd_editDraft' ? findDraft(header) :
+        command === 'cmd_newMessage' ? null : [...sessions].find(session => session.active && session.command === command && sameInlineDraft(session.target,header));
+      if (matching) { activate(matching); return; }
+      parkOthers(null);
+      let session;
+      session=create(win,{
+        changed(){renderDock();},
+        opened(){if(current!==session && session.active && !session.minimized)session.minimize();renderDock();},
+        restoring(){parkOthers(session);current=session;},
+        disposed(){sessions.delete(session);if(current===session)current=null;session.close();renderDock();}
+      });
+      sessions.add(session);current=session;
+      try {session.open(header,command,placement);} catch(error) {sessions.delete(session);current=null;session.close();renderDock();throw error;}
+      renderDock();
+    },
+    findDraft,
+    park(){if(current?.active && !current.minimized)current.minimize();renderDock();},
+    restoreDraft(header){const session=findDraft(header);if(!session)return false;activate(session);return true;},
+    float(){if(current?.active && !current.minimized)current.float();},
+    returnInline(){if(current){activate(current);current.returnInline();}},
+    minimize(){current?.minimize();renderDock();},
+    close(){for(const session of [...sessions])if(!session.close())return false;unload();win.removeEventListener?.('unload',unload);return true;},
+    get active(){return [...sessions].some(session=>session.active);},
+    get target(){return current?.target;},get command(){return current?.command;}
+  };
+}
 function inlineReplyParams(header,command,services=MailServices,interfaces=Ci,classes=Cc,utils=null) {
   const types={cmd_replySender:interfaces.nsIMsgCompType.ReplyToSender,cmd_replyall:interfaces.nsIMsgCompType.ReplyAll,cmd_forwardInline:interfaces.nsIMsgCompType.ForwardInline};
   if(!(command in types))throw new Error(gmText("Unsupported inline compose action"));
@@ -149,7 +225,7 @@ function inlineNewMessageParams(folder,interfaces=Ci,classes=Cc,utils=null) {
   params.composeFields=classes['@mozilla.org/messengercompose/composefields;1'].createInstance(interfaces.nsIMsgCompFields);
   return params;
 }
-function installInlineNewMessage(win,create=createInlineCompose) {
+function installInlineNewMessage(win,create=createInlineComposeDeck) {
   const controller=win.commandController,original=controller?.doCommand;
   if(typeof original!=='function')return {close(){}};
   function doCommand(command,...args){
@@ -673,15 +749,17 @@ async function inlineDraftParams(header,services=MailServices,interfaces=Ci,clas
 var pendingInlineDrafts=new WeakMap();
 async function resumeInlineDraft(win,header,placement,load=inlineDraftParams) {
   const existing=inlineComposeControllers.get(win);
-  if(existing?.active){existing.returnInline();return;}
+  if(existing?.restoreDraft?.(header))return;
+  if(existing?.active && !existing.restoreDraft){existing.returnInline();return;}
   const token={};pendingInlineDrafts.set(win,token);
   try {
     const params=await load(header);
     if(pendingInlineDrafts.get(win)!==token || (placement.isCurrent && !placement.isCurrent()))return;
     // Another reply may have been started while the draft was loading.
     const current=inlineComposeControllers.get(win);
-    if(current?.active){current.returnInline();return;}
-    const composer=current || createInlineCompose(win);inlineComposeControllers.set(win,composer);
+    if(current?.restoreDraft?.(header))return;
+    if(current?.active && !current.restoreDraft){current.returnInline();return;}
+    const composer=current || createInlineComposeDeck(win);inlineComposeControllers.set(win,composer);
     composer.open(header,'cmd_editDraft',{...placement,params});
   }finally{if(pendingInlineDrafts.get(win)===token)pendingInlineDrafts.delete(win)}
 }
@@ -721,7 +799,8 @@ function revealInlineDraft(win,panel,isCurrent) {
   }
   schedule();
 }
-function createInlineCompose(win) {
+function createInlineCompose(win,hooks={}) {
+  let api;
   const doc=win.document;let browser=null,panel=null,originalHeader=null,originalCommand=null,ready=false,observer=null;
   let restoreChrome=null,loadingTimer=null,inlineContainer=null,scrollHost=null,presentation='inline',bar=null,title=null,floatButton=null,windowButton=null,transferBusy=false,attachmentPicker=null,draftStatus=null,floatingResize=null,sendStatus=null;
   let sendNotice=null,noticeTimer=null,scrim=null,minimized=false,minimizeButton=null,bodyReadyWatcher=null,bodySheet=null,composeContentBridge=null;
@@ -740,6 +819,7 @@ function createInlineCompose(win) {
     stopObserver();if(loadingTimer!==null)win.clearTimeout(loadingTimer);loadingTimer=null;
     restoreChrome?.();restoreChrome=null;
     browser?.remove();composeContentBridge?.close();composeContentBridge=null;panel?.remove();scrim?.remove();scrim=null;minimized=false;browser=panel=originalHeader=originalCommand=null;ready=false;
+    hooks.disposed?.();
   }
   function requestClose(){
     if(!browser)return true;
@@ -775,12 +855,13 @@ function createInlineCompose(win) {
   }
   function minimize(){
     if(!panel)return;
-    if(minimized){minimized=false;panel.style.transform='';labelControl(minimizeButton,'minimize',gmText("Minimize"));browser?.focus();return;}
+    if(minimized){hooks.restoring?.();minimized=false;panel.style.transform='';labelControl(minimizeButton,'minimize',gmText("Minimize"));browser?.focus();hooks.changed?.();return;}
     float();minimized=true;
     // Translate the intact panel below the viewport, retaining editor layout,
     // signature, undo history and attachment state. Never display:none it.
     panel.style.transform='translateY(calc(100% - 40px))';
     labelControl(minimizeButton,'maximize',gmText("Restore composer"));
+    hooks.changed?.();
   }
   function parentClose(event){if(browser && !requestClose())event.preventDefault();}
   main.addEventListener('close',parentClose,true);
@@ -845,6 +926,7 @@ function createInlineCompose(win) {
     floatButton.style.display=floatButton.hidden?'none':'inline-flex';
     if(minimizeButton){labelControl(minimizeButton,'minimize',gmText("Minimize"));minimizeButton.style.order='-1';}
     fitComposeToContent();
+    hooks.changed?.();
   }
   function float(){
     if(!panel)return;
@@ -920,10 +1002,10 @@ function createInlineCompose(win) {
     control.style.cssText='display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;box-sizing:border-box;min-width:0;min-height:0;min-inline-size:0;min-block-size:0;margin:0;width:28px;height:28px;border:0;border-radius:4px;background:transparent;color:inherit;padding:5px;cursor:pointer;';
   }
   function button(label,handler){const node=doc.createElement('button');node.type='button';gmBindAction(node,'textContent',label);node.addEventListener('click',handler);return node;}
-  return {
+  return api = {
     open(header,command,placement={}){
       if(browser){
-        // Never replace another unsent message when navigating or pressing Reply again.
+        if(minimized)minimize();
         panel.hidden=false;browser.focus();return;
       }
       if(command==='cmd_forwardInline' && !placement.params){
@@ -1083,8 +1165,15 @@ function createInlineCompose(win) {
       panel.append(frame);inlineContainer.append(panel);
       if(placement.container)panel.scrollIntoView?.({block:'nearest',behavior:'instant'});
       frame.loadURI(Services.io.newURI('chrome://messenger/content/messengercompose/messengercompose.xhtml'),{triggeringPrincipal:Services.scriptSecurityManager.getSystemPrincipal()});
+      hooks.opened?.();
     },
-    float,returnInline,separateWindow,minimize,discard,
+    float,returnInline,separateWindow,minimize,discard,saveAndClose,
+    restore(){if(minimized)minimize();else browser?.focus();},
+    setDocked(){if(minimized && panel)panel.style.transform='translateY(calc(100% + 32px))';},
+    get width(){return panel?.getBoundingClientRect?.().width || 600;},
+    get minimized(){return minimized;},
+    get draftURI(){return browser?.contentWindow?.gMsgCompose?.compFields?.draftId || '';},
+    get title(){return browser?.contentDocument?.getElementById('msgSubject')?.value || title?.textContent || '';},
     get presentation(){return presentation;},
     close(){
       if(!requestClose())return false;
