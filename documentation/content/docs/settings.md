@@ -223,3 +223,11 @@ When the sidebar is collapsed, a red dot beside a folder or label icon indicates
 unread mail. The dots follow Thunderbird’s existing folder unread counts and
 Thunder-G’s unread-conversation counts for labels. They disappear when the row
 has no unread messages or the sidebar is expanded.
+
+## Sidebar options
+
+Under **Inbox → Sidebar options**, configure folder modes, native display controls and section order. These replace the ellipsis menus previously shown beside Compose and folder headings. The Labels **+** button still creates a label.
+
+## Mark messages as read
+
+Under **Conversations → Mark messages as read**, choose Immediately, After 1/3/20 seconds, or Never. This changes Thunderbird’s native preference. Existing timing remains unchanged until you select a new value. Pending read timers are canceled on a setting change and when leaving an open conversation.

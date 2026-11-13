@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.30.0
+
+- Extend the compatibility range to Thunderbird 160.x while preserving the 153.0 minimum; add update-feed regression coverage (#43, fixes #42).
+- Support multiple embedded composers: opening another draft or conversation minimizes the current editor into a bottom dock while preserving text, attachments and undo history.
+- Add configurable automatic read timing: immediately, after 1/3/20 seconds, or never; cancel pending read timers immediately when leaving the conversation.
+- Move sidebar display and section-order controls into Settings and remove the native sidebar ellipsis buttons.
+- Add the documentation website, searchable guides and interactive demo, with publication from the matching stable release (#41).
+- Redesign keyboard shortcut help with a Gmail-style translucent overlay.
+- Improve snooze recovery, batching, cancellation and unsnooze safety; display deadlines and integrate cross-account Snoozed views.
+
 - Show red unread dots beside folder and label icons when the sidebar is collapsed, using native unread state without extra scans.
 
 - Require exact Message-ID/References links before automatically inheriting labels from native-thread members, preserving existing assignments.

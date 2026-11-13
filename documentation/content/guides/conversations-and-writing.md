@@ -105,3 +105,11 @@ portion and **Hide quoted text** collapses it again. Folding is presentation onl
 it does not remove text from the stored message or from the native forwarding path.
 If a short preview seems incomplete, expand the message and its quoted text before
 concluding that content is missing.
+
+## Multiple minimized drafts
+
+You can keep multiple embedded composers open in the same mail tab. Opening a different draft, composing another message or opening another conversation minimizes the current composer into a bottom bar. Select its title to restore it; other open composers minimize automatically. Text, attachments, undo history and native autosave remain intact. Closing a minimized message saves it through the usual draft workflow.
+
+## Automatic read timing
+
+Under **Settings → Conversations → Mark messages as read**, choose Immediately, After 1 second, After 3 seconds, After 20 seconds or Never. The existing native Thunderbird preference is preserved until you change it. Leaving the conversation before the delay expires cancels its read timer, keeping the message unread. The setting uses Thunderbird’s native read policy and persists across restarts.
