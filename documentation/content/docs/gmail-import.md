@@ -1,6 +1,10 @@
+---
+description: "Set up the optional Gmail label-name importer in Thunder-G. Learn OAuth prerequisites, dry-run previews, import scope and disconnection limits."
+---
+
 # Optional Gmail label import
 
-Open **Add-ons Manager → Thunder-G → Preferences → Labels**. This feature is
+Open **Add-ons Manager → Thunder-G → Preferences → Import/Export**. This feature is
 optional: opening settings does not contact Google, read Thunderbird account
 credentials, or create local tags. No Gmail messages, assignments or colors are
 imported. It is a one-time copy of custom label names and hierarchy, not sync.
@@ -31,7 +35,7 @@ loopback callback through Thunderbird's native OAuth2 module. The default native
 external-browser OAuth setting must remain enabled; Thunder-G refuses to fall
 back to an embedded login and does not change the setting itself. Sign-in times
 out after three minutes; API reads time out after thirty seconds. Thunderbird
-153–158.x is the declared compatibility range; future changes to its native
+153–159.x is the declared compatibility range; future changes to its native
 OAuth2 module may require an update.
 
 Client fields and Google access tokens are never saved in extension storage or

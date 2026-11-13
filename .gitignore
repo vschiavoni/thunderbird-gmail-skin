@@ -10,7 +10,7 @@ recovery/
 
 # Local screenshots and recovery archives are not source artifacts.
 *.xpi.bak
-docs/resources/thunder-g-*.png
+documentation/local-assets/
 
 # Generated GitHub release update feed.
 /updates.json

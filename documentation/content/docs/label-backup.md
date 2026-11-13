@@ -1,3 +1,7 @@
+---
+description: "Export and restore native labels and message assignments in Thunder-G. Review account matching, conflicts, skipped messages and backup limitations."
+---
+
 # Back up labels and message assignments
 
 Open **Add-ons Manager → Thunder-G → Preferences → Import/Export**. **Export labels and

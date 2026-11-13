@@ -1,10 +1,11 @@
 <div align="center">
-  <img src="docs/resources/logo.png" height="100" alt="Thunder-G logo">
+  <img src="documentation/content/docs/resources/logo.png" height="100" alt="Thunder-G logo">
   <h3>Thunder-G</h3>
   <p><i>A Gmail-inspired interface for Thunderbird.</i></p>
   <p>
     <a href="https://github.com/vschiavoni/thunderbird-gmail-skin/releases/latest"><img src="https://img.shields.io/github/v/release/vschiavoni/thunderbird-gmail-skin?style=for-the-badge&amp;color=3b82f6&amp;labelColor=172554&amp;logo=github&amp;logoColor=white" alt="Latest release"></a>
     <a href="https://github.com/vschiavoni/thunderbird-gmail-skin/releases"><img src="https://img.shields.io/github/downloads/vschiavoni/thunderbird-gmail-skin/total?style=for-the-badge&amp;color=f59e0b&amp;labelColor=451a03&amp;logo=github&amp;logoColor=white" alt="Total release downloads"></a>
+    <a href="https://vschiavoni.github.io/thunderbird-gmail-skin/"><img src="https://img.shields.io/badge/Docs-%E2%86%97-34a853?style=for-the-badge&amp;labelColor=173b25" alt="Documentation"></a>
   </p>
 </div>
 
@@ -26,28 +27,28 @@ This is optional: Thunder-G falls back to an available system font. The font is
 not bundled or downloaded by the extension.
 
 No Python, Node.js or profile CSS is needed. Coming from the old Python installer
-or `inline-labels` extension? Read the [migration guide](docs/updates.md#migrating-an-older-installer-managed-profile) first.
+or `inline-labels` extension? Read the [migration guide](documentation/content/docs/updates.md#migrating-an-older-installer-managed-profile) first.
 
 ## Quick tips
 
 - Press **L** to apply labels; click a label chip to find matching mail.
 - All accounts and mail folders use the same message-list columns: selection, star, sender, labels/subject, attachment, and date. Saved native layouts return when the add-on is disabled.
 - Enable **Show column headers** in Preferences → Inbox to sort or resize columns.
-- Conversation reading and in-window writing are experimental and off by default. See [settings](docs/settings.md) for setup and add-on compatibility.
+- Conversation reading and in-window writing are experimental and off by default. See [settings](documentation/content/docs/settings.md) for setup and add-on compatibility.
 - Snooze conversations until a chosen time, with early return on a new reply. Thunderbird processes reminders while running and catches up when reopened. Gmail label import and BIMI logos need separate setup. See the guides below.
 
 ## Guides
 
 | For users | For developers |
 | --- | --- |
-| [Settings and optional features](docs/settings.md) | [Setup, architecture and testing](docs/development.md) |
-| [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [Performance review](docs/performance.md) |
-| [Labels](docs/labels.md) | [Release publishing](docs/updates.md#publishing-a-release) |
-| [Troubleshooting and reporting issues](docs/troubleshooting.md) | [DKIM/BIMI integration](integrations/README.md) |
-| [Updates, removal and migration](docs/updates.md) | [Changelog](CHANGELOG.md) |
+| [Settings and optional features](documentation/content/docs/settings.md) | [Setup, architecture and testing](documentation/content/docs/development.md) |
+| [Keyboard shortcuts](documentation/content/docs/keyboard-shortcuts.md) | [Contributing](documentation/content/guides/contributing.md) |
+| [Labels](documentation/content/docs/labels.md) | [Release publishing](documentation/content/guides/releasing.md) |
+| [Troubleshooting and reporting issues](documentation/content/docs/troubleshooting.md) | [DKIM/BIMI integration](documentation/content/integrations/README.md) |
+| [Updates, removal and migration](documentation/content/docs/updates.md) | [Changelog](CHANGELOG.md) |
 
 Thunder-G has privileged access to Thunderbird’s UI and profile. The bundled code
-has no telemetry; optional [BIMI logos](docs/settings.md#sender-logos) download
+has no telemetry; optional [BIMI logos](documentation/content/docs/settings.md#sender-logos) download
 remote images. Label synchronization depends on your provider and other clients;
 Exchange cross-client tag synchronization is unsupported.
 
@@ -70,7 +71,7 @@ on each client and platform.
 > [!NOTE]
 > This independent project is not affiliated with Google and requires no Gmail account. It works with your existing email provider. Cross-client synchronization of Exchange tags is not supported.
 
-Gmail-style operator queries are documented in [Search](docs/search.md).
+Gmail-style operator queries are documented in [Search](documentation/content/docs/search.md).
 
 Folder sidebar display controls are available under **Thunder-G Settings → Inbox → Sidebar options**. This includes folder modes, counts, sizes, header visibility and section ordering. The sidebar ellipsis buttons are hidden; the Labels `+` still creates a label.
 

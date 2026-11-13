@@ -1,3 +1,7 @@
+---
+description: "Build and test Thunder-G from source. Learn the extension structure, development prerequisites, packaging and safe local verification workflow."
+---
+
 # Development
 
 Use Python 3.9+, Node.js 18+ and a supported Thunderbird version listed in the [README](../README.md).

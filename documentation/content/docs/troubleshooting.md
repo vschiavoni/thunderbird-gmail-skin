@@ -1,3 +1,7 @@
+---
+description: "Diagnose Thunder-G layout, label, search, conversation, draft and snooze problems. Find checks to run before changing stored mail or profile data."
+---
+
 # Troubleshooting
 
 Start by checking your Thunderbird/Betterbird and Thunder-G versions against the
@@ -10,10 +14,8 @@ Column headers are hidden by default. Enable **Show column headers** in
 **Add-ons Manager → Thunder-G → Preferences → Inbox**. This restores the headers
 and column picker without changing the saved sort order or widths.
 
-Thunderbird stores widths globally. The native **Copy columns** command remains
-available; Thunder-G’s **Copy view** also invokes native column copying with the
-selected descendant scope. For the optional layout scripts and their separate
-rollback, see [column scripts](updates.md#rollback-and-column-scripts).
+Column widths use the native client settings. Use the column picker rather than
+legacy Error Console layout scripts for current installations.
 
 ## The conversation reader or inline replies do not appear
 
@@ -29,14 +31,15 @@ accounts that do not save a Sent copy cannot provide that update.
 
 ## Label changes affect a different scope than expected
 
-In the list, **L** acts on the native selection. In Thunder-G’s conversation
+In the list, **L** updates the conversations containing the selected messages. In Thunder-G’s conversation
 reader, it acts on the complete resolved conversation, including sent replies.
 Wait for conversation loading to finish; retry unresolved conversations. A mixed
 checkbox means only some messages have that label. Cross-folder writes may
 partially succeed: inspect the reported failures before retrying.
 
-Clicking a chip opens matching mail; its **×** removes that tag only from that
-message. Numeric tag shortcuts act on the active message. See [labels](labels.md).
+Clicking a chip opens matching mail; its **×** removes that tag from the resolved
+conversation. Numeric shortcuts use the active message to determine the toggle
+state and apply the update conversation-wide. See [labels](labels.md).
 
 ## Nested labels or chips are missing
 

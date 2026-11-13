@@ -1,0 +1,5 @@
+node_modules/
+build/
+.docusaurus/
+/content/README.md
+/content/CHANGELOG.md

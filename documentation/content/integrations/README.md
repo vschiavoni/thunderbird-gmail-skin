@@ -1,3 +1,7 @@
+---
+description: "Understand the local Thunder-G compatibility bridge for DKIM Verifier, including its required patch, verification boundaries and optional BIMI downloads."
+---
+
 # DKIM Verifier compatibility bridge (local prototype)
 
 **This is not automatic compatibility with an unmodified DKIM Verifier installation.** DKIM Verifier 6.4.0 has no public external API for another reader to verify an exact message and supply its context to the original popup. The local prototype requires an explicitly patched provider. Thunder-G never silently patches another extension at startup. Provider updates may replace this patch.

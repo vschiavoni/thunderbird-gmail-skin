@@ -1,3 +1,7 @@
+---
+description: "Enable and use Thunder-G keyboard shortcuts for navigation, message selection, labels, snooze and writing in Thunderbird or Betterbird."
+---
+
 # Keyboard shortcuts
 
 [Back to README](../README.md) · [Settings](settings.md) · [Labels](labels.md)
@@ -137,7 +141,8 @@ unconfigured Sent folder cannot be opened by a folder jump. If a letter shortcut
 seems inactive, click the message list or conversation outside writing fields.
 
 Thunder-G does not currently reproduce Gmail’s chat, Keep, Tasks, importance,
-superstars, custom shortcut editor, or all Gmail formatting shortcuts. Unlisted
+the full Gmail superstars behavior, a custom shortcut editor, or all Gmail formatting shortcuts.
+Optional colored markers are supported separately under Inbox → Colored stars. Unlisted
 keys retain their native Thunderbird behavior.
 
 For the original Gmail reference, see [Google’s desktop keyboard shortcuts](https://support.google.com/mail/answer/6594?hl=en).

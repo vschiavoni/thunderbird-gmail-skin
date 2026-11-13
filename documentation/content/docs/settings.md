@@ -1,3 +1,7 @@
+---
+description: "Configure Thunder-G inbox appearance, conversation reading, in-window writing, keyboard shortcuts, label tools and optional sender logos."
+---
+
 # Settings
 
 Open **Add-ons Manager → Thunder-G → Preferences**. Changes save automatically
@@ -22,7 +26,7 @@ message subjects and message bodies are never translated.
 
 **Apply recommended** applies a single preset: Thunder-G’s conversation reader,
 in-window replies and new messages, thread guides,
-list-style search results, draft autosave every minute, and 50 messages per page.
+list-style search results, draft autosave in Auto mode (after 1.5 seconds without edits), and 50 messages per page.
 It hides Today Pane and column headers. Language, Gmail connection and BIMI
 preferences are preserved. The switches update together; open a conversation to
 try the reader and reply settings. Disable Thunderbird Conversations first, as
@@ -64,6 +68,24 @@ and reduced-motion preference.
 - **Show thread connection lines** *(on by default)* — Draw a subtle line between
   messages in expanded threads, so replies are easier to follow. Applies immediately.
 
+### List markers and previews
+
+- **Colored stars** (off by default): choose active markers and cycle order under
+  **In use** / **Not in use**. Drag or click markers to move them; Left/Right
+  reorders a focused active marker. Presets offer 1, 4 or all 12 markers.
+  In the list, an empty star applies the first marker; successive clicks on the
+  same message within 1.5 seconds cycle. A later click removes the flag. The native
+  starred flag and the extra Thunder-G marker property are separate; another
+  client may show only the flag.
+- **Show new-message symbol** (off): show the client's golden new-mail indicator.
+- **Use Gmail-style label icons** (off): filled shapes using native label colors.
+- **Personal level indicators** (off): `›` for mail addressed to you and others,
+  `»` for mail addressed only to you, based on configured identities and To/Cc headers; List-ID mailing-list messages
+  are excluded.
+- **Show thread expand arrows** (off): expose thread expansion controls.
+
+These are independent of label visibility and the optional conversation reader.
+
 ## Snooze
 
 Use the clock in the message toolbar (or `b` with Gmail shortcuts enabled) to
@@ -95,9 +117,14 @@ until it is reopened and online. This does not activate Gmail's native snooze.
 
 - **Use Thunder-G’s conversation reader** *(experimental, off by default)* — Read
   related messages together, including locally available sent replies. The newest
-  message opens expanded; click earlier messages to read them. A slim marker shows
-  which message receives numeric tag shortcuts. **L** labels the whole conversation;
+  message opens expanded; click earlier messages to read them. A slim marker identifies the active message used to determine numeric tag
+  toggles; updates apply to the resolved conversation. **L** labels the whole conversation;
   includes sent replies.
+
+- **Compact long conversations** (on by default) — For six or more messages,
+  retain the first, last two, selected and unread messages. A counter reveals
+  hidden middle messages. This does not delete mail; it applies when reopening
+  a conversation in Thunder-G's reader.
 
 Disable **Thunderbird Conversations** before enabling this reader or **Reply in
 this window**: Thunder-G handles the conversation itself. After switching readers,
@@ -150,7 +177,7 @@ are kept; missing or ambiguous messages are skipped. No message text, attachment
 or credentials are exported. See the [label backup guide](label-backup.md).
 
 The **Label as** picker lists every label at the same level using its full path
-(for example, `Research/Projects/Example`). Search matches that full path. The
+(for example, `Work/Projects/Example`). Search matches that full path. The
 sidebar continues to display expandable nested labels.
 
 **Import labels from Gmail** is optional and starts with a dry run. Connect using

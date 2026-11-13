@@ -1,3 +1,7 @@
+---
+description: "Find mail with Thunder-G search operators for senders, labels, dates, attachments and folders. Includes query examples and local-content limitations."
+---
+
 # Gmail-style searches
 
 Type an operator query in Thunderbird's top search box and press Enter. Thunder-G opens the results directly as a styled message list. Searches cover all configured mail accounts using local folders and downloaded messages. Download mail for offline use for complete body and attachment-name searches.
@@ -6,10 +10,10 @@ Plain text searches continue to use Thunderbird's indexed search. Operators, quo
 
 | Operator | Example |
 | --- | --- |
-| Sender | from:alice@example.com, from:me |
-| Recipients | to:me, cc:alice, bcc:bob |
+| Sender | from:team@example.invalid, from:me |
+| Recipients | to:me, cc:team, bcc:support |
 | Subject | subject:"meeting notes" |
-| Native labels and nested paths | label:teaching/os26 |
+| Native labels and nested paths | label:work/projects |
 | Folder | in:inbox, in:sent, in:drafts, in:archive, in:snoozed |
 | Spam, Trash, all locations | in:spam, in:trash, in:anywhere |
 | Status | is:read, is:unread, is:starred |
@@ -27,9 +31,9 @@ Sizes use bytes or binary K/M/G units. size: means at least that many bytes. Dat
 
 Spaces and AND require all terms to match the same message. OR and braces match alternatives. Use parentheses to group expressions and a leading minus sign to exclude a term or group.
 
-    from:me label:teaching has:attachment newer_than:6m -subject:cancelled
-    {from:alice from:bob} subject:(meeting -cancelled)
-    (from:alice OR from:bob) filename:pdf larger:1M
+    from:me label:work has:attachment newer_than:6m -subject:cancelled
+    {from:team from:support} subject:(meeting -cancelled)
+    (from:team OR from:support) filename:pdf larger:1M
     in:anywhere "exact phrase" -is:starred
 
 Quoted phrases are searched as text. Unqualified words in an operator query search sender, recipients, subject and locally available body text. Results retain native message actions, label assignment and conversation opening.

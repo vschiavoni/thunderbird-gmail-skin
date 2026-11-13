@@ -1,0 +1,77 @@
+name: Deploy documentation
+
+on:
+  # Bootstrap a fork preview without putting this workflow on its default branch.
+  push:
+    branches: [feat/docs]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to publish (empty uses the default branch)
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact release commit to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize manual and release deployments; do not interrupt a Pages deployment.
+concurrency:
+  group: documentation-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name != 'push' || github.event.repository.fork
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || (github.event_name == 'push' && github.sha) || github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.12'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read GitHub Pages destination
+        id: pages
+        uses: actions/configure-pages@v5
+      - name: Install documentation dependencies
+        working-directory: documentation
+        run: bun install --frozen-lockfile
+      - name: Build site and import changelog
+        working-directory: documentation
+        env:
+          SITE_URL: ${{ steps.pages.outputs.origin }}
+          BASE_URL: ${{ steps.pages.outputs.base_path }}/
+          DOCS_NOINDEX: ${{ github.event.repository.fork }}
+        run: |
+          bun run build
+          python3 scripts/check_seo.py build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: documentation/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4
