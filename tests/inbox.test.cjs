@@ -797,6 +797,37 @@ test('unread thread sender names skip read messages and deduplicate by address',
   assert.equal(scope.unreadThreadSenderNames(thread,parser).length,0);
 });
 
+test('recycled sender cells retain the native first span after an unread summary',()=>{
+  const children=[];
+  function span(text=''){
+    const classes=new Set();
+    return {textContent:text,classList:{add:c=>classes.add(c),remove:c=>classes.delete(c)},
+      remove(){children.splice(children.indexOf(this),1)},
+      hasClass:c=>classes.has(c)};
+  }
+  const native=span('Original sender');children.push(native);
+  const cell={querySelector(selector){
+    if(selector==='span')return children[0];
+    return children.find(c=>c.className===selector.slice(1)||c.hasClass(selector.slice(1)));
+  },append:child=>children.push(child)};
+  let collapsed=true;
+  const row={index:0,matches:()=>collapsed,querySelector(selector){
+    return selector.startsWith('.sendercol')?cell:cell.querySelector(selector);
+  }};
+  const thread={numChildren:2,getChildHdrAt:i=>({isRead:false,author:String(i)})};
+  const win={gDBView:{getThreadContainingIndex:()=>thread},document:{createElement:()=>span()}};
+  const parser={parseDecodedHeader:i=>[{name:`Sender ${i}`,email:`${i}@example.org`}]};
+  scope.renderUnreadThreadSenders(win,row,parser);
+  assert.equal(children[0],native,'native fillRow must still find its own span first');
+  assert.equal(children[1].textContent,'0, 1');
+  // Simulate native fillRow recycling the cell for a single-message thread.
+  cell.querySelector('span').textContent='Next sender';collapsed=false;
+  scope.renderUnreadThreadSenders(win,row,parser);
+  assert.deepEqual(children,[native]);
+  assert.equal(native.textContent,'Next sender');
+  assert.equal(native.hasClass('gm-native-thread-sender'),false);
+});
+
 test('empty and colored stars share vector geometry instead of font-dependent glyph sizes',()=>{
   const svg=id=>decodeURIComponent(scope.gmStarImage(id).split(',')[1].slice(0,-2));
   const empty=svg();

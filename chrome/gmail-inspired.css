@@ -221,7 +221,7 @@
     font-weight: 700;
   }
 
-  #threadTree .gm-unread-thread-senders + .gm-native-thread-sender {
+  #threadTree .gm-native-thread-sender {
     display: none;
   }
 

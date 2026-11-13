@@ -32,6 +32,7 @@ function unreadThreadSenderNames(thread,parser) {
 
 function renderUnreadThreadSenders(win,row,parser=globalThis.MailServices?.headerParser) {
   row.querySelector('.gm-unread-thread-senders')?.remove();
+  row.querySelector('.gm-native-thread-sender')?.classList.remove('gm-native-thread-sender');
   const view=win.gDBView;
   if(!parser || !row.matches('.children.collapsed[data-properties~="hasUnread"]:not([data-properties~="dummy"])'))return;
   const cell=row.querySelector('.sendercol-column, .correspondentcol-column');
@@ -44,14 +45,12 @@ function renderUnreadThreadSenders(win,row,parser=globalThis.MailServices?.heade
     const summary=win.document.createElement('span');
     summary.className='gm-unread-thread-senders';
     summary.textContent=summary.title=names.join(', ');
-    const native=win.document.createElement('span');
-    native.className='gm-native-thread-sender';
-    // Keep the native text available when this row is reused.
-    if(!cell.querySelector('.gm-native-thread-sender')){
-      native.append(...cell.childNodes);
-      cell.append(native);
-    }
-    cell.prepend(summary);
+    // Native fillRow updates the first span in the cell. Keep that original
+    // span first, otherwise a recycled row writes into our disposable summary.
+    const native=cell.querySelector('span');
+    if(!native)return;
+    native.classList.add('gm-native-thread-sender');
+    cell.append(summary);
   }catch(_){/* The native thread may be unavailable during a folder change. */}
 }
 
@@ -1390,7 +1389,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     stars.render(row);
     row.querySelector('.gm-unread-thread-senders')?.remove();
     const nativeSender=row.querySelector('.gm-native-thread-sender');
-    if(nativeSender)nativeSender.replaceWith(...nativeSender.childNodes);
+    nativeSender?.classList.remove('gm-native-thread-sender');
     drafts.render(row);
     renderUnreadThreadSenders(win,row);
     conversationCounts.render(row);
