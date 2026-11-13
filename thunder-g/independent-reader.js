@@ -1,3 +1,10 @@
+function stopConversationReadTimers(frames) {
+  for (const frame of frames.values()) {
+    try { frame.contentWindow?.ClearPendingReadTimer?.(); }
+    catch (error) { console.warn('Thunder-G: could not cancel message read timer', error); }
+  }
+}
+
 /* Independent conversation chrome; MIME, remote-content policy and attachments
  * remain in Thunderbird's about:message, never in privileged innerHTML. */
 function independentMessageKey(message) {
@@ -813,6 +820,7 @@ function installIndependentReader(win) {
       ChromeUtils.importESModule('resource:///modules/MailUtils.sys.mjs').MailUtils.openMessageInNewWindow(header);
     });error.append(fallback);
     function release(){
+      try { browser?.contentWindow?.ClearPendingReadTimer?.(); } catch (_) {}
       if(timeout!==null)win.clearTimeout(timeout);timeout=null;
       bodyResize?.disconnect();bodyResize=null;
       contentChanges?.disconnect();contentChanges=null;
@@ -1161,6 +1169,7 @@ function installIndependentReader(win) {
     hide(immediate=true){
       if(typeof inlineComposeControllers!=='undefined')inlineComposeControllers.get(win)?.float();
       ++ticket;query?.cancel();query=null;resolving=false;
+      stopConversationReadTimers(frames);
       host.hidden=true;layout.classList.remove('gm-independent-open');
       cancelHideCleanup();
       if(immediate){clearCards();return;}

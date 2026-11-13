@@ -2220,5 +2220,26 @@
   },
   "snooze_removed": {
     "message": "Posticipo annullato"
+  },
+  "read_timing_title": {
+    "message": "Segna i messaggi come letti"
+  },
+  "read_timing_help": {
+    "message": "Scegli quando i messaggi visualizzati diventano letti. Usa l’impostazione nativa di Thunderbird e si applica ai messaggi aperti successivamente. Mai li mantiene non letti finché non li segni manualmente."
+  },
+  "read_timing_immediate": {
+    "message": "Immediatamente"
+  },
+  "read_timing_one": {
+    "message": "Dopo 1 secondo"
+  },
+  "read_timing_three": {
+    "message": "Dopo 3 secondi"
+  },
+  "read_timing_twenty": {
+    "message": "Dopo 20 secondi"
+  },
+  "read_timing_never": {
+    "message": "Mai"
   }
 }

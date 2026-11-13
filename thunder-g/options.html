@@ -140,6 +140,17 @@
 
         <section id="conversations" aria-labelledby="conversations-title">
           <div class="section-heading"><div class="heading-line"><h2 id="conversations-title"><span data-i18n="conversations_07c59b4">Conversations</span></h2><span class="badge"><span data-i18n="experimental_b718f8c">Experimental</span></span></div><p><span data-i18n="read_the_conversation_together_including_your_sent_r_f74cc40">Read the conversation together, including your sent replies.</span></p></div>
+          <div class="setting-row">
+            <div class="setting-copy"><label for="read-timing" data-i18n="read_timing_title">Mark messages as read</label><p id="read-timing-help" data-i18n="read_timing_help">Choose when displayed messages become read. Uses Thunderbird’s native setting; applies to messages opened afterward. Never keeps them unread until you mark them manually.</p></div>
+            <select id="read-timing" aria-describedby="read-timing-help" disabled>
+              <option value="0" data-i18n="read_timing_immediate">Immediately</option>
+              <option value="1" data-i18n="read_timing_one">After 1 second</option>
+              <option value="3" data-i18n="read_timing_three">After 3 seconds</option>
+              <option value="20" data-i18n="read_timing_twenty">After 20 seconds</option>
+              <option value="-1" data-i18n="read_timing_never">Never</option>
+            </select>
+          </div>
+          <p id="read-timing-status" role="status"></p>
           <p class="notice"><strong><span data-i18n="using_thunderbird_conversations_00a360c">Using Thunderbird Conversations?</span></strong> <span data-i18n="disable_that_add_on_before_enabling_thunder_g_s_conv_b28942f">Disable that add-on before enabling Thunder-G’s conversation reader or in-window replies. Thunder-G provides its own conversation handling.</span></p>
           <div class="setting-row">
             <div class="setting-copy"><label for="independent-reader"><span data-i18n="use_thunder_g_s_conversation_reader_b0bea38">Use Thunder-G’s conversation reader</span></label><p id="reader-help"><span data-i18n="expandable_message_cards_attachments_and_reply_actio_7fb60d4">Expandable message cards, attachments and reply actions in one view. Off by default.</span></p></div>
@@ -245,6 +256,7 @@
       </main>
     </div>
   </div>
+  <script src="read-timing-options.js"></script>
   <script src="folder-options.js"></script>
   <script src="preview-options.js"></script>
   <script src="stars.js"></script>

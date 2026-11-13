@@ -1,3 +1,29 @@
+// Use the native read timer so navigation and message unload cancel it normally.
+function nativeReadTiming(prefs, seconds) {
+  const root = "mailnews.mark_message_read.";
+  if (seconds !== undefined) {
+    if (![0, 1, 3, 20, -1].includes(seconds)) throw new Error("Invalid read timing");
+    prefs.setBoolPref(root + "auto", seconds !== -1);
+    prefs.setBoolPref(root + "delay", seconds > 0);
+    if (seconds > 0) prefs.setIntPref(root + "delay.interval", seconds);
+  }
+  if (!prefs.getBoolPref(root + "auto")) return -1;
+  return prefs.getBoolPref(root + "delay") ? prefs.getIntPref(root + "delay.interval") : 0;
+}
+
+function cancelNativeReadTimers(windows) {
+  const seen = new Set();
+  function visit(win) {
+    if (!win || seen.has(win)) return;
+    seen.add(win);
+    win.ClearPendingReadTimer?.();
+    for (const frame of win.document?.querySelectorAll("browser, iframe") || []) {
+      try { visit(frame.contentWindow); } catch (_) { /* A remote frame has no native mail timer. */ }
+    }
+  }
+  for (const win of windows) visit(win);
+}
+
 function findFolderSettingsDocument(windows) {
   for (const win of windows) {
     const tabmail = win.document.getElementById("tabmail");
@@ -435,6 +461,13 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       documents.clear(); windows.clear();
     }});
     return { inlineLabels: {
+      async readTiming(seconds) {
+        // Optional experiment arguments arrive as null when omitted.
+        if (seconds === null) seconds = undefined;
+        const result = nativeReadTiming(Services.prefs, seconds);
+        if (seconds !== undefined) cancelNativeReadTimers(Services.wm.getEnumerator(null));
+        return result;
+      },
       async folderPaneSettings(action = "", enabled = false) {
         const doc = findFolderSettingsDocument(Services.wm.getEnumerator("mail:3pane"));
         if (!doc) throw new Error("Open a mail tab to configure the sidebar.");
