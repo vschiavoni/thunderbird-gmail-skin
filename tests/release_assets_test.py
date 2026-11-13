@@ -29,13 +29,14 @@ class ReleaseAssetsTests(unittest.TestCase):
             self.assertEqual(json.loads((root/'updates.json').read_text()),result)
             self.assertTrue(xpi.with_suffix('.xpi.sha256').exists())
 
-    def test_159_update_preserves_the_153_minimum(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder)
-            self.fixture(root,maximum='159.*')
-            result=release.generate(root,'v0.12.1')
-            limits=result['addons'][release.ADDON_ID]['updates'][0]['applications']['gecko']
-            self.assertEqual(limits,{'strict_min_version':'153.0','strict_max_version':'159.*'})
+    def test_supported_update_ranges_preserve_the_153_minimum(self):
+        for maximum in ['158.*', '159.*', '160.*']:
+            with self.subTest(maximum=maximum), tempfile.TemporaryDirectory() as folder:
+                root=Path(folder)
+                self.fixture(root,maximum=maximum)
+                result=release.generate(root,'v0.12.1')
+                limits=result['addons'][release.ADDON_ID]['updates'][0]['applications']['gecko']
+                self.assertEqual(limits,{'strict_min_version':'153.0','strict_max_version':maximum})
 
     def test_wrong_tag_or_stale_build_cannot_publish_a_mislabelled_update(self):
         with tempfile.TemporaryDirectory() as folder:

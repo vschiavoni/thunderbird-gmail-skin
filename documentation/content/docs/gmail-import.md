@@ -34,9 +34,9 @@ Google's Desktop authorization flow uses PKCE, state validation and a temporary
 loopback callback through Thunderbird's native OAuth2 module. The default native
 external-browser OAuth setting must remain enabled; Thunder-G refuses to fall
 back to an embedded login and does not change the setting itself. Sign-in times
-out after three minutes; API reads time out after thirty seconds. Thunderbird
-153–159.x is the declared compatibility range; future changes to its native
-OAuth2 module may require an update.
+out after three minutes; API reads time out after thirty seconds. See the
+[compatibility table](../README.md#compatibility) for the declared Thunderbird
+range. Future changes to its native OAuth2 module may require an update.
 
 Client fields and Google access tokens are never saved in extension storage or
 in Thunderbird's password manager. Access tokens are used only while fetching

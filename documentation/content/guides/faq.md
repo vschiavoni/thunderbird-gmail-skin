@@ -13,9 +13,9 @@ for labels, local search, the reader or snooze.
 ## Which clients and platforms work?
 
 Use the [compatibility table](../README.md#compatibility) for the declared version
-range and combinations actually tested. The current manifest admits Thunderbird
-153–159.x; admitting a version is not evidence that every feature has been tested
-there. Betterbird has its own recorded version/platform checks.
+range and combinations actually tested. Admitting a version is not evidence that
+every feature has been tested there. Betterbird has its own recorded
+version/platform checks.
 
 ## Do I need Python, Node.js or Bun?
 
