@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Experimental branch: opt-in same-tab search with progressive results, Back to mail, cancellation on navigation, and local performance counters.
+
 ## 0.30.0
 
 - Extend the compatibility range to Thunderbird 160.x while preserving the 153.0 minimum; add update-feed regression coverage (#43, fixes #42).

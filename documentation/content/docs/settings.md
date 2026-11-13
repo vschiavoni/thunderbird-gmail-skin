@@ -231,3 +231,11 @@ Under **Inbox → Sidebar options**, configure folder modes, native display cont
 ## Mark messages as read
 
 Under **Conversations → Mark messages as read**, choose Immediately, After 1/3/20 seconds, or Never. This changes Thunderbird’s native preference. Existing timing remains unchanged until you select a new value. Pending read timers are canceled on a setting change and when leaving an open conversation.
+
+## Experimental in-place search (development branch)
+
+On `codex/in-place-search`, **Inbox → Search in the current mail tab (experimental)** replaces the current message list instead of opening a search tab. It is off by default. Matches arrive progressively through the existing native local search engine. **Back to mail** restores the original folder, selection and scroll position. Selecting a folder or disabling the setting cancels the active search. Closing the tab or disabling the extension removes the temporary controls and listeners.
+
+Advanced queries use the same search implementation as separate search tabs. Plain-text queries also use this local engine while the experiment is enabled, rather than Thunderbird’s global index; large mailboxes or bodies missing from the offline cache may produce slower or incomplete results. Turning the option off restores the existing indexed plain-text search behavior.
+
+For profiling, the mail pane’s `_gmSearchMetrics` object exposes only `firstResultMs`, `elapsedMs`, `matches` and completion `status`. It records no query text or message contents, persists nothing, and sends nothing. Compare the same warm/cold queries, account set and offline-cache state when collecting native Thunderbird profiler traces. Unit timing checks verify one search execution and unchanged hit order, but cannot establish real mailbox performance.
