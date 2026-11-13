@@ -186,3 +186,15 @@ test('a mixed selection reschedules existing reminders and snoozes only new mess
   f.doc.querySelector('.gm-snooze-menu').querySelector('button').click();await new Promise(setImmediate);
   assert.deepEqual(calls,[['reschedule','job'],['snooze',['new']]]);ui.close();
 });
+
+test('returned notice persists for already-read mail until explicitly opened without changing dates or return ordering',()=>{
+  const properties=new Map([['thunderGSnoozeReturned','1000']]);
+  const header={dateInSeconds:100,isRead:true,getStringProperty:key=>properties.get(key)||'',setStringProperty:(key,value)=>properties.set(key,value)};
+  assert.equal(scope.snoozeReturnedNotice([header],1000*1000).text,'Snoozed < 1 hour ago');
+  assert.equal(scope.snoozeReturnedNotice([header],(1000+3600)*1000).text,'Snoozed 1 hour ago');
+  assert.equal(scope.snoozeReturnedNotice([header],(1000+7200)*1000).text,'Snoozed 2 hours ago');
+  scope.acknowledgeSnoozeReturn([header]);
+  assert.equal(scope.snoozeReturnedNotice([header],1000*1000),null);
+  assert.equal(properties.get('thunderGSnoozeReturned'),'1000');assert.equal(header.dateInSeconds,100);assert.equal(header.isRead,true);
+  properties.set('thunderGSnoozeReturned','2000');assert.ok(scope.snoozeReturnedNotice([header],2000*1000),'a later snooze produces a new notice');
+});

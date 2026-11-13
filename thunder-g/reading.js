@@ -1012,6 +1012,13 @@ function installReadingMode(win) {
       leave(false);
       return;
     }
+    if(typeof acknowledgeSnoozeReturn==='function'){
+      const opened=[header];
+      if(win.gDBView.viewFlags&Ci.nsMsgViewFlagsType?.kThreadedDisplay){
+        try{const thread=win.gDBView.getThreadContainingMsgHdr(header);for(let i=0;i<thread.numChildren;i++)opened.push(thread.getChildHdrAt(i));}catch(_){}
+      }
+      acknowledgeSnoozeReturn(opened);
+    }
     previous = {
       index:row.index,
       message:{key:header.messageKey, folderURI:header.folder?.URI},

@@ -25,7 +25,17 @@ function installCompactDates(win) {
   const formatters = new Map();
   const snooze=typeof thunderGSnooze!=='undefined'?thunderGSnooze:null;
   let locale = gmLocale() || win.Services?.locale?.appLocalesAsBCP47 || win.navigator.languages;
+  function returnedNotice(row,notice){
+    const existing=row.querySelector('.gm-snooze-returned');
+    if(!notice){existing?.remove?.();return;}
+    const line=row.querySelector('.subject-line');
+    if(!line?.append)return;
+    const node=existing||doc.createElement('span');node.className='gm-snooze-returned';
+    node.textContent=node.title=notice.text;
+    if(!existing){const actions=line.querySelector('.gm-row-actions');if(actions)line.insertBefore(node,actions);else line.append(node);}
+  }
   function render(row, nativeFill = false) {
+    returnedNotice(row,null);
     const cell = row.querySelector('.datecol-column');
     if (!cell) return;
     if (nativeFill || !saved.has(cell)) saved.set(cell, {
@@ -52,6 +62,8 @@ function installCompactDates(win) {
       }
       const reminder=typeof snoozeDisplayReminder==='function'?snoozeDisplayReminder(snooze,headers):null;
       if(reminder)cell.setAttribute('data-gm-snoozed',reminder.state);else cell.removeAttribute('data-gm-snoozed');
+      const returned=!reminder&&win.gFolder&&typeof Ci!=='undefined'&&(win.gFolder.flags&Ci.nsMsgFolderFlags.Inbox)&&typeof snoozeReturnedNotice==='function'?snoozeReturnedNotice(headers):null;
+      returnedNotice(row,returned);
       const timestamp = reminder?.due || (hdr.dateInSeconds ? hdr.dateInSeconds * 1000 : hdr.date / 1000);
       const formatted = compactMessageDate(timestamp, new Date(), locale, formatters);
       if (!formatted){clearDate();return;}
@@ -70,7 +82,7 @@ function installCompactDates(win) {
     // Pick up locale or system timezone changes after returning to the app.
     locale=gmLocale() || win.Services?.locale?.appLocalesAsBCP47 || win.navigator.languages;
     formatters.clear();
-    for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) render(row);
+    for (const row of doc.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout')) render(row);
   }
   function midnight() {
     const now = new Date();
@@ -90,16 +102,19 @@ function installCompactDates(win) {
     refresh(); midnight();
   });
   const stopSnooze=snooze?.subscribe(refresh);
+  const returnedTimer=win.setInterval?.(refresh,60000);
   win.addEventListener('focus', refresh);
   function close() {
     if (closed) return;
     closed = true;
     stopSnooze?.();
+    if(returnedTimer!==undefined)win.clearInterval(returnedTimer);
     win.clearTimeout(timer);
     win.removeEventListener('focus', refresh);
     win.removeEventListener('unload', close);
     if (prototype?.fillRow === wrapped) prototype.fillRow = original;
-    for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) {
+    for (const row of doc.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout')) {
+      returnedNotice(row,null);
       const cell=row.querySelector('.datecol-column'),state=saved.get(cell);
       if(!state)continue;
       cell.textContent = state.text;

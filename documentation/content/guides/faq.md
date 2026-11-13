@@ -67,6 +67,13 @@ The scheduler runs locally. Overdue reminders wait until the client is reopened
 and online. This is not Gmail's native snooze, and a label backup does not migrate
 scheduled reminders. See [snooze](snooze.md).
 
+## Does snooze sync with Gmail or another client?
+
+No. Thunder-G reminders, return-time ordering and the **Snoozed … ago** notice
+belong to the profile that created them. IMAP folder moves can sync, but Gmail's
+native snooze deadline and status do not. Connecting Google for label import does
+not enable snooze synchronization. See [Gmail and other clients](snooze.md#gmail-and-other-clients).
+
 ## Why does a search miss an attachment or body phrase?
 
 Operator searches do not download entire mailboxes. The necessary body/MIME content

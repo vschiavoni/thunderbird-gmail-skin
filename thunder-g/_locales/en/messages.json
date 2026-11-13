@@ -2244,5 +2244,23 @@
   },
   "minimized_drafts": {
     "message": "Minimized drafts"
+  },
+  "snooze_return_recent": {
+    "message": "Snoozed < 1 hour ago"
+  },
+  "snooze_return_hour": {
+    "message": "Snoozed 1 hour ago"
+  },
+  "snooze_return_hours": {
+    "message": "Snoozed $1 hours ago"
+  },
+  "snooze_return_day": {
+    "message": "Snoozed 1 day ago"
+  },
+  "snooze_return_days": {
+    "message": "Snoozed $1 days ago"
+  },
+  "snooze_sync_note": {
+    "message": "Reminders stay in this profile. Gmail snooze and other clients do not sync."
   }
 }

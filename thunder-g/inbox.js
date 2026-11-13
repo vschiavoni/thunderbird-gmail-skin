@@ -1419,7 +1419,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       snippet.textContent = '— ' + text;
       snippet.title = text;
       line.classList.add('gm-has-snippet');
-      const actions = line.querySelector('.gm-row-actions');
+      const actions = line.querySelector('.gm-snooze-returned, .gm-row-actions');
       if (actions) line.insertBefore(snippet, actions);
       else line.append(snippet);
     }

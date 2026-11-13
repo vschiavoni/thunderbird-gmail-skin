@@ -2244,5 +2244,23 @@
   },
   "minimized_drafts": {
     "message": "Bozze ridotte a icona"
+  },
+  "snooze_return_recent": {
+    "message": "Posticipata meno di 1 ora fa"
+  },
+  "snooze_return_hour": {
+    "message": "Posticipata 1 ora fa"
+  },
+  "snooze_return_hours": {
+    "message": "Posticipata $1 ore fa"
+  },
+  "snooze_return_day": {
+    "message": "Posticipata 1 giorno fa"
+  },
+  "snooze_return_days": {
+    "message": "Posticipata $1 giorni fa"
+  },
+  "snooze_sync_note": {
+    "message": "I promemoria restano in questo profilo. Lo snooze di Gmail e degli altri client non si sincronizza."
   }
 }

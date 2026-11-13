@@ -375,3 +375,14 @@ body[data-gm-folder-pane-closed] #folderTree li.unread > .container::after {
     display: none !important;
   }
 }
+
+/* A returned reminder shares the subject's trailing action slot, not its date. */
+#threadTree .gm-snooze-returned {
+  flex:0 0 auto; margin-inline-start:auto; padding-inline-start:12px;
+  color:light-dark(#b45309,#ffb86b); font-size:.86em; font-weight:600;
+  white-space:nowrap;
+}
+#threadTree tr:is(:hover,:has(.gm-row-actions button:focus-visible)) .gm-snooze-returned {
+  display:none !important;
+}
+@media (hover:none) { #threadTree .gm-snooze-returned { display:none; } }

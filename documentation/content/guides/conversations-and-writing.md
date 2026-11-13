@@ -113,3 +113,16 @@ You can keep multiple embedded composers open in the same mail tab. Opening a di
 ## Automatic read timing
 
 Under **Settings → Conversations → Mark messages as read**, choose Immediately, After 1 second, After 3 seconds, After 20 seconds or Never. The existing native Thunderbird preference is preserved until you change it. Leaving the conversation before the delay expires cancels its read timer, keeping the message unread. The setting uses Thunderbird’s native read policy and persists across restarts.
+
+## Manually regroup messages in Betterbird
+
+Betterbird provides native [rethreading](https://betterbird.eu/expert-tips/#rethreading):
+you can attach a message to another conversation or detach it. Enable the native
+threaded view first, and work with one message at a time. Expand a collapsed
+conversation to select an individual message. In a unified Inbox, both messages
+must still belong to the same underlying account folder; Betterbird cannot join
+messages across accounts this way.
+
+Thunder-G defers its snooze ordering while a native mouse drag or keyboard
+rethreading operation is active. It does not change Betterbird's rethreading
+permissions or rewrite message dates.

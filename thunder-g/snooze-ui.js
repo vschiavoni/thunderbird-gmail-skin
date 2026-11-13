@@ -1,3 +1,22 @@
+function snoozeReturnedNotice(headers,now=Date.now()){
+  let latest=0;
+  for(const header of headers){
+    const returned=Number(header.getStringProperty?.('thunderGSnoozeReturned'))||0;
+    const seen=Number(header.getStringProperty?.('thunderGSnoozeSeen'))||0;
+    if(returned>seen)latest=Math.max(latest,returned);
+  }
+  if(!latest)return null;
+  const hours=Math.max(0,Math.floor((now-latest*1000)/3600000));
+  const text=hours<1?gmText('Snoozed < 1 hour ago'):hours===1?gmText('Snoozed 1 hour ago'):hours<24?gmText('Snoozed $1 hours ago',hours):hours<48?gmText('Snoozed 1 day ago'):gmText('Snoozed $1 days ago',Math.floor(hours/24));
+  return {text,returned:latest};
+}
+function acknowledgeSnoozeReturn(headers){
+  for(const header of headers){
+    const returned=header.getStringProperty?.('thunderGSnoozeReturned');
+    if(Number(returned)>0&&header.getStringProperty('thunderGSnoozeSeen')!==returned)header.setStringProperty('thunderGSnoozeSeen',returned);
+  }
+}
+
 function snoozeFormatDate(date,locale){
   return new Intl.DateTimeFormat(locale,{year:'numeric',month:'short',day:'numeric'}).format(date);
 }
@@ -87,6 +106,7 @@ function createSnoozeTimePicker(doc,panel,date,locale,onChange=()=>{}){
 var SNOOZE_PICKER_CSS=`
 .gm-snooze-menu,.gm-snooze-calendar-dialog{font:14px/20px Arial,sans-serif;color:#202124;background:#fff;border:0;box-sizing:border-box}
 .gm-snooze-menu{position:fixed;inset:auto;margin:0;width:264px;padding:8px 0 0;border-radius:4px;box-shadow:0 8px 10px 1px #00000024,0 3px 14px 2px #0000001f,0 5px 5px -3px #0003;max-height:calc(100vh - 16px);overflow:auto}
+.gm-snooze-sync-note{margin:8px 24px 4px;padding-top:8px;border-top:1px solid #8884;color:var(--layout-color,CanvasText);font-size:11px;line-height:16px;white-space:normal;max-width:260px;opacity:.8}
 .gm-snooze-menu-heading{height:32px;box-sizing:border-box;padding:8px 24px 4px;color:#5f6368;font-weight:500}
 .gm-snooze-menu .gm-snooze-option{display:flex;align-items:center;justify-content:space-between;gap:12px;appearance:none;width:100%;height:32px;border:0;border-radius:0;margin:0;padding:0 24px;background:transparent;color:inherit;font:inherit;text-align:start;white-space:nowrap;cursor:pointer}
 .gm-snooze-menu .gm-snooze-option:hover,.gm-snooze-menu .gm-snooze-option:focus-visible{background:#f1f3f4;outline:none}
@@ -363,6 +383,7 @@ function installSnoozeUI(win,service,{onMoveAccepted=()=>{}}={}) {
       if(event.key==='Home'||event.key==='End'){event.preventDefault();options[event.key==='Home'?0:options.length-1].focus();}
     });
     menu.addEventListener('toggle',event=>{if(event.newState==='closed'&&dialog===menu){dialog=null;menu.remove();}});
+    const syncNote=doc.createElement('p');syncNote.className='gm-snooze-sync-note';syncNote.textContent=gmText('Reminders stay in this profile. Gmail snooze and other clients do not sync.');menu.append(syncNote);
     doc.documentElement.append(menu);menu.showPopover();
     const width=menu.getBoundingClientRect().width,height=menu.getBoundingClientRect().height;
     menu.style.left=Math.max(8,Math.min(bounds?.left??(win.innerWidth-width)/2,win.innerWidth-width-8))+'px';

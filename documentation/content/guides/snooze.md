@@ -39,12 +39,11 @@ Review the displayed date rather than relying on a preset's name alone.
 
 ## Browse or return postponed mail
 
-Enable **Folder Modes → Snoozed** in the folder pane. Its visibility is remembered.
-Expand the account row to inspect postponed messages in that account's holding folder.
+Open **Thunder-G settings → Inbox → Sidebar options** and enable **Snoozed**.
+This view combines the account-specific holding folders; its visibility is remembered.
 
-To bring mail back immediately, move it from **Thunder-G Snoozed** to the **same
-account's Inbox** using the client's move command. Check the destination after
-the move completes. Do not delete the holding folder or clear profile preferences
+To bring mail back immediately, open the conversation, choose the clock and select
+**Unsnooze**. Check the same account's Inbox after the move completes. Do not delete the holding folder or clear profile preferences
 as a way to cancel a reminder.
 
 To postpone it to a different time using the documented folder workflow, return
@@ -60,12 +59,37 @@ creating more reminders for the same mail.
 - Sent originals remain in Sent.
 - Returned mail rises by its return time in date-sorted Inbox views. Its original
   message date is unchanged; other sort modes retain native ordering.
+- A returned conversation shows an orange **Snoozed … ago** notice until you open
+  it. It appears before the date and gives way to the row actions on hover.
+  Opening clears the notice, not the return-time ordering. The original date
+  stays visible in the date column and remains unchanged in the message.
 - While the client is closed or offline, delivery back to the Inbox waits. Overdue
   reminders are processed after reopening and going online.
 
 A reminder is account-scoped. For example, postponing mail in a work account
 uses that account's holding folder and Inbox; it does not move the message to a
 personal account merely because both appear under Unified Folders.
+
+## Gmail and other clients
+
+**Thunder-G snooze does not sync with Gmail's native snooze or with another
+Thunderbird/Betterbird profile.** Connecting Gmail for label import does not change
+this limitation.
+
+| Action | What another client can see |
+| --- | --- |
+| Snooze in Thunder-G | The ordinary IMAP folder move, after synchronization. The reminder time and returned-message indicator stay in the originating profile. |
+| Snooze in Gmail web or mobile | Inbox membership changes can sync. Thunder-G cannot read the native snooze deadline or reliably identify the later return as a snooze. |
+| Open a returned message | The returned-message indicator is dismissed in the current profile. This indicator's acknowledgement is not shared with Gmail or other profiles. |
+
+Google's documented [Gmail API](https://developers.google.com/workspace/gmail/api/reference/rest)
+and [IMAP extensions](https://developers.google.com/workspace/gmail/imap/imap-extensions)
+do not expose a supported snooze scheduling interface that Thunder-G can use for
+this synchronization. A message appearing in Inbox is not enough to infer that it
+was snoozed: it could also be newly delivered or manually moved.
+
+Keep the originating client running and online for timely returns. Do not create
+a second reminder in another profile to try to synchronize the first one.
 
 ## Reminder and message movement
 
