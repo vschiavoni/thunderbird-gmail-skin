@@ -1127,7 +1127,7 @@ function installReadingMode(win) {
     win.removeEventListener('unload', close);
   }
   win.addEventListener('unload', close, {once:true});
-  return {close,zoom:zoomReading,
+  return {close,zoom:zoomReading,showList(){leave(false);},
     setSelectionControl(control,home=null){
       if(selectionControl && selectionControlHome)selectionControlHome.prepend(selectionControl);
       selectionControl=control;selectionControlHome=home;

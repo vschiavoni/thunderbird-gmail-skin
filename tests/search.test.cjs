@@ -166,3 +166,67 @@ test('search status is initially visible, hides on completion, and unsubscribes 
   assert.equal(appended,true);assert.equal(status.textContent,'Searching…');assert.equal(status.hidden,false);
   notify(false);assert.equal(status.hidden,true);ui.close();assert.equal(unsubscribed,true);assert.equal(removed,true);
 });
+
+test('label search matches exact leaf names across parents and exact full paths',()=>{
+ const context={tags:[{key:'a',tag:'test/subtest'},{key:'b',tag:'other/subtest'},{key:'c',tag:'subtest'},{key:'d',tag:'test/subtesting'},{key:'e',tag:'test/branch/subtest'}]};
+ const match=(query,key)=>scope.gmailMetadataMatch(atoms(query)[0],{getStringProperty:()=>key},context);
+ for(const key of ['a','b','c','e'])assert.equal(match('label:subtest',key),true);
+ assert.equal(match('label:SUBTEST','a'),true);assert.equal(match('label:subtest','d'),false);
+ assert.equal(match('label:test/subtest','a'),true);for(const key of ['b','c','d','e'])assert.equal(match('label:test/subtest',key),false);
+ assert.equal(match('label:test','a'),false,'a parent is not implicitly assigned to its child');
+});
+test('compiled label matcher resolves definitions once and honors legacy labels',()=>{
+ let definitionsRead=0;const context={tags:[{key:'$label1',get tag(){definitionsRead++;return 'test/subtest'}}]};
+ const match=scope.compileGmailMetadataMatch(parse('label:subtest'),context);
+ for(let i=0;i<10000;i++)assert.equal(match({label:1,getStringProperty:()=>''}),true);
+ assert.equal(definitionsRead,1);assert.equal(match({label:0,getStringProperty:()=>'$label1'}),true);assert.equal(match({getStringProperty:()=>''}),false);
+});
+test('compiled metadata booleans preserve nested negation and same-message conjunction',()=>{
+ const context={tags:[{key:'tag',tag:'test/subtest'}]};
+ const match=scope.compileGmailMetadataMatch(parse('(label:subtest OR subject:meeting) -is:read'),context);
+ assert.equal(match({isRead:false,mime2DecodedSubject:'other',getStringProperty:()=> 'tag'}),true);
+ assert.equal(match({isRead:true,mime2DecodedSubject:'meeting',getStringProperty:()=> ''}),false);
+ assert.equal(match({isRead:false,mime2DecodedSubject:'other',getStringProperty:()=> ''}),false);
+});
+test('metadata-only queries stream through one native scan without per-atom or universe scans',async()=>{
+ let scans=0,done=0,progress=[];const hits=[],header={messageId:'one',folder:{URI:'mailbox://Inbox'},messageKey:1};
+ const view=scope.createGmailSearchView('label:subtest -is:read',parse('label:subtest -is:read'),{
+  AbortController,folders:[],sort:[],yieldControl:async()=>{},searchCombined:async(ast,folders,signal,onHit)=>{scans++;onHit(header);return [header]},
+  searchAtom(){throw Error('redundant atom scan')},searchAll(){throw Error('redundant universe scan')},reportError(error){throw error}
+ });
+ view.subscribeProgress(value=>progress.push(value));view.search({onNewSearch(){},onSearchHit:h=>hits.push(h),onSearchDone(){done++}});
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(scans,1);assert.deepEqual(hits,[header]);assert.equal(done,1);assert.equal(progress.at(-1),false);
+});
+test('canceling a combined scan suppresses late results',async()=>{
+ let publish,resolve;const hits=[];
+ const view=scope.createGmailSearchView('label:subtest',parse('label:subtest'),{AbortController,folders:[],sort:[],searchCombined:(_ast,_folders,signal,onHit)=>new Promise(done=>{publish=onHit;resolve=done}),yieldControl:async()=>{},reportError(){}});
+ view.search({onNewSearch(){},onSearchHit:h=>hits.push(h),onSearchDone(){}});view.abortSearch();publish({messageId:'late',folder:{URI:'mailbox://Inbox'},messageKey:1});resolve([]);await new Promise(resolve=>setImmediate(resolve));assert.equal(hits.length,0);
+});
+
+test('label wildcards match anchored leaf names and full paths without changing exact matching',()=>{
+ const tags=[['a','bcca25'],['b','confs/bcca26'],['c','other/BCCA27'],['d','confs/branch/bcca28'],['e','my-bcca26'],['f','bcca'],['g','confs/bcca26/child']].map(([key,tag])=>({key,tag}));
+ const keys=value=>Array.from(scope.gmailLabelKeys(value,tags));
+ assert.deepEqual(keys('bcca*'),['a','b','c','d','f']);
+ assert.deepEqual(keys('confs/bcca*'),['b','g']);
+ assert.deepEqual(keys('confs/*/bcca*'),['d']);
+ assert.deepEqual(keys('*bcca*'),['a','b','c','d','e','f']);
+ assert.deepEqual(keys('bcca**2*'),['a','b','c','d']);
+ assert.deepEqual(keys('*'),tags.map(t=>t.key));
+ assert.deepEqual(keys('bcca26'),['b']);assert.deepEqual(keys('BCCA*'),keys('bcca*'));
+ assert.deepEqual(keys('missing*'),[]);assert.deepEqual(keys('bcca*bcca'),[]);
+});
+test('label glob punctuation remains literal, including quoted spaces and regex characters',()=>{
+ const context={tags:[{key:'one',tag:'conference papers/bcca[2]?.25'},{key:'two',tag:'conference papers/bcca22x25'}]};
+ const ast=parse('label:"conference papers/bcca[2]?.*"');
+ const matches=scope.compileGmailMetadataMatch(ast,context);
+ assert.equal(matches({getStringProperty:()=> 'one'}),true);assert.equal(matches({getStringProperty:()=> 'two'}),false);
+ assert.equal(atoms('bcca*')[0].field,'text');
+});
+test('wildcard expansion is cached per compiled predicate and honors Boolean exclusions and legacy tags',()=>{
+ let reads=0;const context={tags:[{key:'$label1',get tag(){reads++;return 'confs/bcca25'}},{key:'two',get tag(){reads++;return 'bcca26'}}]};
+ const matches=scope.compileGmailMetadataMatch(parse('label:bcca* -is:read'),context);
+ for(let i=0;i<1000;i++)assert.equal(matches({isRead:false,label:1,getStringProperty:()=> ''}),true);
+ assert.equal(reads,2);assert.equal(matches({isRead:true,getStringProperty:()=> 'two'}),false);
+ const excluded=scope.compileGmailMetadataMatch(parse('-label:bcca*'),context);
+ assert.equal(excluded({getStringProperty:()=> 'two'}),false);assert.equal(excluded({getStringProperty:()=> 'unrelated'}),true);
+});
