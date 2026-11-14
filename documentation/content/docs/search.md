@@ -45,3 +45,9 @@ Spam and Trash are excluded unless the query explicitly uses in:anywhere, in:spa
 This version supports the operators above. Gmail-specific categories, importance, Drive searches, proximity (AROUND), exact-word (+), mailing-list and custom-header operators are outside this version. Unsupported operators produce an error.
 
 Thunder-G does not download entire mailboxes to execute a query. Body and attachment-name results depend on the messages available locally. A folder or MIME read failure is reported as an error. A search can be cancelled by closing its results tab.
+
+## Nested label names
+
+Use `label:subtest` to match a label whose final path component is `subtest`, including `test/subtest`. If different parents contain a label with that same leaf name, the short form matches all of them. Use `label:test/subtest` to restrict the search to that exact full path. Matching is case-insensitive and exact: `subtest` does not match `subtesting`, and assigning a child label does not implicitly assign its parent. Ordinary text such as `subtest` without `label:` remains a message-text search.
+
+Metadata-only queries (labels, addresses, subjects, dates, sizes, folder and read/star/attachment flags) evaluate their Boolean expression in one native local scan. Label keys are compiled once per scan. Searches requiring body text or attachment filenames retain the progressive multi-condition path. This reduces repeated scans but does not establish real-mailbox latency; cached/offline availability and mailbox size still matter.

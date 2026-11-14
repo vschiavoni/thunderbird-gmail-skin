@@ -10,6 +10,30 @@ function gmailFolderMatches(folder,value,flags) {
   return path===value || folder.name.toLowerCase()===value;
 }
 
+function gmailLabelKeys(value, tags) {
+  const needle=value.toLowerCase(),fullPath=needle.includes('/');
+  return new Set(tags.filter(tag=>{
+    const path=tag.tag.toLowerCase();
+    return (fullPath ? path : path.split('/').at(-1)) === needle;
+  }).map(tag=>tag.key));
+}
+
+function compileGmailMetadataMatch(ast, context) {
+  if (ast.type === 'not') {const child=compileGmailMetadataMatch(ast.child,context);return header=>!child(header);}
+  if (ast.type === 'and' || ast.type === 'or') {
+    const children=ast.children.map(child=>compileGmailMetadataMatch(child,context));
+    return ast.type === 'and' ? header=>children.every(match=>match(header)) : header=>children.some(match=>match(header));
+  }
+  if (ast.field === 'label') {
+    const keys=gmailLabelKeys(ast.value,context.tags);
+    return header=>{
+      if(header.label && keys.has('$label'+header.label))return true;
+      return (header.getStringProperty('keywords') || '').split(/\s+/).some(key=>keys.has(key));
+    };
+  }
+  return header=>gmailMetadataMatch(ast,header,context);
+}
+
 function gmailMetadataMatch(atom,header,context) {
   const {field,value}=atom,needle=value.toLowerCase();
   const contains=text=>String(text || '').toLowerCase().includes(needle);
@@ -22,9 +46,9 @@ function gmailMetadataMatch(atom,header,context) {
   }
   if(field==='subject')return contains(header.mime2DecodedSubject);
   if(field==='label'){
-    const keys=header.getStringProperty('keywords').split(' ');
-    return context.tags.some(tag=>tag.tag.toLowerCase()===needle &&
-      (keys.includes(tag.key) || (header.label && tag.key==='$label'+header.label)));
+    const keys=gmailLabelKeys(value,context.tags);
+    return (header.label && keys.has('$label'+header.label)) ||
+      (header.getStringProperty('keywords') || '').split(/\s+/).some(key=>keys.has(key));
   }
   if(field==='is')return needle==='starred'?header.isFlagged:needle==='read'?header.isRead:!header.isRead;
   if(field==='in')return gmailFolderMatches(header.folder,needle,context.flags);
@@ -71,7 +95,19 @@ function createGmailSearchView(query,ast,environment) {
       target.onNewSearch();progress(true);
       const current=()=>revision===generation && !signal.aborted;
       (async()=>{
-        const atoms=gmailSearchAtoms(ast),matches=new Map(atoms.map(atom=>[atom,new Map()]));
+        const atoms=gmailSearchAtoms(ast);
+        if (environment.searchCombined && atoms.every(atom=>!['text','filename'].includes(atom.field))) {
+          const publish=header=>{
+            if(!current())return;
+            const key=gmailSearchKey(header);if(headers.has(key))return;
+            headers.set(key,header);listener.onSearchHit(header,header.folder);
+          };
+          const hits=await environment.searchCombined(ast,folders,signal,publish);
+          if(!current())return;
+          let batch=0;for(const header of hits || []){publish(header);if(++batch%200===0)await yieldControl();}
+          if(current())finish();return;
+        }
+        const matches=new Map(atoms.map(atom=>[atom,new Map()]));
         const completed=new Set(),candidates=new Map();
         // Unknown is distinct from false: never publish a message until every
         // condition needed to prove its match (including exclusions) is known.
@@ -252,7 +288,7 @@ function installGmailSearch(win,mail,interfaces=Ci,components=Cc,modules=ChromeU
           const value=item.value;value.attrib=item.attrib;value.status=interfaces.nsMsgMessageFlags.Attachment;item.value=value;
           session.appendTerm(item);
         }else{
-          matchers.set(id,header=>!atom || gmailMetadataMatch(atom,header,metadata));registered=true;
+          matchers.set(id,atom?compileGmailMetadataMatch(atom,metadata):()=>true);registered=true;
           const item=session.createTerm();item.attrib=interfaces.nsMsgSearchAttrib.Custom;
           item.customId=customId;item.op=interfaces.nsMsgSearchOp.Is;item.booleanAnd=true;
           const value=item.value;value.attrib=item.attrib;value.str=id;item.value=value;
@@ -292,7 +328,7 @@ function installGmailSearch(win,mail,interfaces=Ci,components=Cc,modules=ChromeU
     if(!tabmail)throw new Error('Open a Thunderbird mail window first.');
     if(!folders.length)throw new Error('No searchable mail folders are available.');
     const view=createGmailSearchView(source,ast,{
-      AbortController:win.AbortController,folders,searchAtom:nativeSearch,searchAll:(items,signal,onHit)=>nativeSearch(null,items,signal,onHit),
+      AbortController:win.AbortController,folders,searchCombined:nativeSearch,searchAtom:nativeSearch,searchAll:(items,signal,onHit)=>nativeSearch(null,items,signal,onHit),
       attachmentNames,yieldControl:()=>new Promise(resolve=>win.setTimeout(resolve,0)),
       sort:[[interfaces.nsMsgViewSortType.byDate,interfaces.nsMsgViewSortOrder.descending]],
       reportError:report,failureCode:0x80004005,

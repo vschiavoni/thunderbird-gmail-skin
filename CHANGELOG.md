@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Match nested labels by exact leaf name (`label:subtest`) or full path (`label:test/subtest`).
+- Execute metadata-only search expressions in one native scan and resolve label keys once per search.
+
 - Experimental branch: opt-in same-tab search with progressive results, Back to mail, cancellation on navigation, and local performance counters.
 
 ## 0.30.0
