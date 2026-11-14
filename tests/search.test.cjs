@@ -202,3 +202,31 @@ test('canceling a combined scan suppresses late results',async()=>{
  const view=scope.createGmailSearchView('label:subtest',parse('label:subtest'),{AbortController,folders:[],sort:[],searchCombined:(_ast,_folders,signal,onHit)=>new Promise(done=>{publish=onHit;resolve=done}),yieldControl:async()=>{},reportError(){}});
  view.search({onNewSearch(){},onSearchHit:h=>hits.push(h),onSearchDone(){}});view.abortSearch();publish({messageId:'late',folder:{URI:'mailbox://Inbox'},messageKey:1});resolve([]);await new Promise(resolve=>setImmediate(resolve));assert.equal(hits.length,0);
 });
+
+test('label wildcards match anchored leaf names and full paths without changing exact matching',()=>{
+ const tags=[['a','bcca25'],['b','confs/bcca26'],['c','other/BCCA27'],['d','confs/branch/bcca28'],['e','my-bcca26'],['f','bcca'],['g','confs/bcca26/child']].map(([key,tag])=>({key,tag}));
+ const keys=value=>Array.from(scope.gmailLabelKeys(value,tags));
+ assert.deepEqual(keys('bcca*'),['a','b','c','d','f']);
+ assert.deepEqual(keys('confs/bcca*'),['b','g']);
+ assert.deepEqual(keys('confs/*/bcca*'),['d']);
+ assert.deepEqual(keys('*bcca*'),['a','b','c','d','e','f']);
+ assert.deepEqual(keys('bcca**2*'),['a','b','c','d']);
+ assert.deepEqual(keys('*'),tags.map(t=>t.key));
+ assert.deepEqual(keys('bcca26'),['b']);assert.deepEqual(keys('BCCA*'),keys('bcca*'));
+ assert.deepEqual(keys('missing*'),[]);assert.deepEqual(keys('bcca*bcca'),[]);
+});
+test('label glob punctuation remains literal, including quoted spaces and regex characters',()=>{
+ const context={tags:[{key:'one',tag:'conference papers/bcca[2]?.25'},{key:'two',tag:'conference papers/bcca22x25'}]};
+ const ast=parse('label:"conference papers/bcca[2]?.*"');
+ const matches=scope.compileGmailMetadataMatch(ast,context);
+ assert.equal(matches({getStringProperty:()=> 'one'}),true);assert.equal(matches({getStringProperty:()=> 'two'}),false);
+ assert.equal(atoms('bcca*')[0].field,'text');
+});
+test('wildcard expansion is cached per compiled predicate and honors Boolean exclusions and legacy tags',()=>{
+ let reads=0;const context={tags:[{key:'$label1',get tag(){reads++;return 'confs/bcca25'}},{key:'two',get tag(){reads++;return 'bcca26'}}]};
+ const matches=scope.compileGmailMetadataMatch(parse('label:bcca* -is:read'),context);
+ for(let i=0;i<1000;i++)assert.equal(matches({isRead:false,label:1,getStringProperty:()=> ''}),true);
+ assert.equal(reads,2);assert.equal(matches({isRead:true,getStringProperty:()=> 'two'}),false);
+ const excluded=scope.compileGmailMetadataMatch(parse('-label:bcca*'),context);
+ assert.equal(excluded({getStringProperty:()=> 'two'}),false);assert.equal(excluded({getStringProperty:()=> 'unrelated'}),true);
+});

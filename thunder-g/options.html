@@ -136,7 +136,7 @@
             <input class="switch" id="search-results-as-list" type="checkbox" role="switch" aria-describedby="search-list-help">
           </div>
           <div class="setting-row">
-            <div class="setting-copy"><label for="in-place-search">Search in the current mail tab (experimental)</label><p id="in-place-search-help">Replace the message list with progressive local search results. Back to mail restores the previous folder. Off by default. Plain-text searches use local mail search rather than Thunderbird’s global index and may be slower on large mailboxes.</p></div>
+            <div class="setting-copy"><label for="in-place-search">Search in the current mail tab (experimental)</label><p id="in-place-search-help">Replace the message list with progressive local search results. Back to mail restores the previous folder. Off by default. Plain text uses Thunderbird’s index when available, with Load more for additional results. Advanced queries use live local metadata. A notice identifies disabled-index fallback and possible indexing gaps.</p></div>
             <input class="switch" id="in-place-search" type="checkbox" role="switch" aria-describedby="in-place-search-help">
           </div>
           <p id="in-place-search-status" role="status"></p>

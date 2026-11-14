@@ -12,9 +12,23 @@ function gmailFolderMatches(folder,value,flags) {
 
 function gmailLabelKeys(value, tags) {
   const needle=value.toLowerCase(),fullPath=needle.includes('/');
+  // Resolve the glob once against label definitions, never against message bodies.
+  // Only * is special; punctuation is literal and matching is anchored at both ends.
+  const parts=needle.split('*'),first=parts[0],last=parts.at(-1);
+  const matches=parts.length===1 ? name=>name===needle : name=>{
+    if(!name.startsWith(first) || !name.endsWith(last))return false;
+    let position=first.length;
+    const end=name.length-last.length;
+    for(let i=1;i<parts.length-1;i++){
+      const found=name.indexOf(parts[i],position);
+      if(found<0 || found+parts[i].length>end)return false;
+      position=found+parts[i].length;
+    }
+    return position<=end;
+  };
   return new Set(tags.filter(tag=>{
     const path=tag.tag.toLowerCase();
-    return (fullPath ? path : path.split('/').at(-1)) === needle;
+    return matches(fullPath ? path : path.split('/').at(-1));
   }).map(tag=>tag.key));
 }
 
@@ -228,7 +242,7 @@ function installInPlaceSearch(pane, beforeSearch = () => {}, onUnload = () => {}
 function instrumentInPlaceSearch(view, pane, now = () => pane.performance.now()) {
   const original = view.search;
   view.search = function(listener, done) {
-    const started=now(), metrics={firstResultMs:null,elapsedMs:null,matches:0};
+    const started=now(), metrics={backend:view.backend || 'local',firstResultMs:null,elapsedMs:null,matches:0};
     pane._gmSearchMetrics=metrics;
     return original.call(this,{
       onNewSearch(){listener.onNewSearch();},
@@ -327,13 +341,49 @@ function installGmailSearch(win,mail,interfaces=Ci,components=Cc,modules=ChromeU
     const tabmail=win.document.getElementById('tabmail');
     if(!tabmail)throw new Error('Open a Thunderbird mail window first.');
     if(!folders.length)throw new Error('No searchable mail folders are available.');
-    const view=createGmailSearchView(source,ast,{
+    const environment={
       AbortController:win.AbortController,folders,searchCombined:nativeSearch,searchAtom:nativeSearch,searchAll:(items,signal,onHit)=>nativeSearch(null,items,signal,onHit),
       attachmentNames,yieldControl:()=>new Promise(resolve=>win.setTimeout(resolve,0)),
       sort:[[interfaces.nsMsgViewSortType.byDate,interfaces.nsMsgViewSortOrder.descending]],
       reportError:report,failureCode:0x80004005,
       onStart:view=>views.add(view),onStop:view=>views.delete(view),
-    });
+    };
+    let view=null,notice='';
+    const indexedPlan=configuration.enabled?.() && typeof gmailIndexedPlan==='function' ? gmailIndexedPlan(ast) : null;
+    const indexedText=indexedPlan?.text;
+    if(indexedText){
+      if(win.Services.prefs?.getBoolPref('mailnews.database.global.indexer.enabled',false)){
+        try{
+          const {GlodaMsgSearcher}=modules.importESModule('resource:///modules/gloda/GlodaMsgSearcher.sys.mjs');
+          if(typeof GlodaMsgSearcher!=='function')throw new Error('Index API unavailable');
+          const allowedFolders=new Set(folders.map(folder=>folder.URI));
+          let hybrid=null;
+          if(indexedPlan.filter){
+            const {Gloda}=modules.importESModule('resource:///modules/gloda/GlodaPublic.sys.mjs');
+            const {GlodaConstants}=modules.importESModule('resource:///modules/gloda/GlodaConstants.sys.mjs');
+            const matches=compileGmailMetadataMatch(indexedPlan.filter,{flags:interfaces.nsMsgFolderFlags,attachmentFlag:interfaces.nsMsgMessageFlags.Attachment,
+              tags:mail.tags.getAllTags(),identities:new Set(Array.from(mail.accounts.allIdentities,identity=>identity.email.toLowerCase())),
+              addresses:text=>mail.headerParser.extractHeaderAddressMailboxes(text).split(',').map(value=>value.trim())});
+            hybrid={AbortController:win.AbortController,filter:(signal,onHit)=>nativeSearch(indexedPlan.filter,folders,signal,onHit),
+              accept:header=>allowedFolders.has(header.folder?.URI) && matches(header),reportError:report,
+              query(text,ids,limit,listener){const query=Gloda.newQuery(GlodaConstants.NOUN_MESSAGE);
+                query.id(...ids);query.fulltextMatches(text);query.orderBy('-date');query.limit(limit);return query.getCollection(listener);}};
+          }
+          view=createGmailIndexedView(indexedText,{
+            sort:environment.sort,onStart:environment.onStart,onStop:environment.onStop,reportError:report,
+            accept:header=>!!header.folder && allowedFolders.has(header.folder.URI),
+            createCollection(text,limit,listener){
+              if(hybrid)return gmailLabelFirstCollection(text,limit,listener,hybrid);
+              const searcher=new GlodaMsgSearcher(null,text,true);
+              // Override this instance only: never modify the user's global limit.
+              Object.defineProperty(searcher,'retrievalLimit',{value:limit});
+              return searcher.buildFulltextQuery().getCollection(listener);
+            }
+          });
+        }catch(error){notice='Index unavailable; using local mail search.';}
+      }else notice='Index disabled; using local mail search.';
+    }
+    if(!view){view=createGmailSearchView(source,ast,environment);view.backend='local';if(notice)view.getSearchInfo=()=>({backend:'local',note:notice,hasMore:false});}
     // Use native list defaults so the usual row actions, labels and reader work.
     view.DEFAULT_COLUMN_STATES=GlodaSyntheticView.prototype.DEFAULT_COLUMN_STATES;
     const getDefault=view.getDefaultSetting;
@@ -388,7 +438,17 @@ function installGmailSearchStatus(win){
   const status=win.document.createElement('span');status.className='gm-search-status';
   status.setAttribute('role','status');status.setAttribute('aria-live','polite');
   status.style.cssText='margin-inline:12px;font-size:.9em;color:var(--layout-color,CanvasText);';
-  status.textContent='Searching…';host.append(status);
-  const unsubscribe=view.subscribeProgress(active=>{status.hidden=!active});
-  return {close(){unsubscribe();status.remove()}};
+  const more=view.loadMore?win.document.createElement('button'):null;
+  function refresh(active){
+    const info=view.getSearchInfo?.();status.textContent=info?.note ? (active && info.backend!=='index'?'Searching… ':'')+info.note : (active?'Searching…':'');
+    status.hidden=!active && !info?.note;
+    if(more)more.hidden=!info?.hasMore;
+  }
+  if(more){
+    more.type='button';more.textContent='Load more';more.hidden=true;
+    more.addEventListener('click',()=>{if(view.loadMore()){more.hidden=true;win.gViewWrapper?.refresh();}});
+  }
+  status.textContent='Searching…';host.append(status);if(more)host.append(more);
+  const unsubscribe=view.subscribeProgress(refresh);
+  return {close(){unsubscribe();status.remove();more?.remove();}};
 }
