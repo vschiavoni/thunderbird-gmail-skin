@@ -77,13 +77,25 @@ test('hybrid planner requires labels and preserves OR and negated-text semantics
  for(const q of ['school OR label:cuso','-school label:cuso','AI label:cuso','school is:unread'])assert.equal(plan(q),null,q);
  assert.ok(plan('school -label:cuso'));
 });
-test('label filtering precedes index queries, batches IDs, and never queries unrelated mail',async()=>{
+test('label-index queries use only native full-text API without SQL or a pre-filter limit',()=>{
+ const s=context();let text,order;
+ const listener={},collection={};
+ const Gloda={newQuery(noun,options){assert.equal(noun,7);assert.equal(options,undefined);return {
+   id(){assert.fail('ID constraints cannot be combined with full text')},
+   limit(){assert.fail('a pre-filter limit could hide label matches')},
+   fulltextMatches(value){text=value},orderBy(value){order=value},
+   getCollection(value){assert.equal(value,listener);return collection}
+ };}};
+ assert.equal(s.gmailLabelIndexedQuery(Gloda,7,'"school"',listener),collection);
+ assert.equal(text,'"school"');assert.equal(order,'-date');
+});
+test('label filtering precedes one native index query and intersects live candidate IDs',async()=>{
  const s=context(),calls=[],hits=[];let finished=false,filterDone=false;
  const candidates=Array.from({length:501},(_,n)=>({...header(n),getUint32Property(){return n+32}}));
- s.gmailLabelFirstCollection('"school"',201,{onItemsAdded:items=>hits.push(...items),onQueryCompleted(){finished=true}},{AbortController,
+ s.gmailLabelFirstCollection('"school"',502,{onItemsAdded:items=>hits.push(...items),onQueryCompleted(){finished=true}},{AbortController,
  async filter(signal,hit){for(const h of candidates)hit(h);filterDone=true;},accept:()=>true,
- query(text,ids,limit,events){assert.equal(filterDone,true);assert.ok(ids.length<=250);assert.equal(limit,201);calls.push(ids);events.onItemsAdded(ids.map(id=>({id})));events.onQueryCompleted();return {listener:events,becomeExplicit(){}};}});
- await new Promise(resolve=>setImmediate(resolve));assert.equal(finished,true);assert.equal(calls.length,3);assert.equal(hits.length,501);assert.equal(hits[500].folderMessage,candidates[500]);
+ query(text,events){assert.equal(filterDone,true);calls.push(text);events.onItemsAdded([{id:1},...candidates.map(h=>({id:h.getUint32Property()})),{id:9999}]);events.onQueryCompleted();return {listener:events,becomeExplicit(){}};}});
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(finished,true);assert.equal(calls.length,1);assert.equal(hits.length,501);assert.equal(hits[500].folderMessage,candidates[500]);
 });
 test('empty or unindexed label candidates avoid full-text queries; cancellation ignores late candidates',async()=>{
  const s=context();let queries=0,done=0;
@@ -92,6 +104,22 @@ test('empty or unindexed label candidates avoid full-text queries; cancellation 
  await new Promise(resolve=>setImmediate(resolve));assert.equal(queries,0);assert.equal(done,1);
  let complete;const c=s.gmailLabelFirstCollection('"school"',201,{onQueryCompleted(){done++}},{...env,filter:()=>new Promise(resolve=>complete=resolve)});
  c.becomeExplicit();complete();await new Promise(resolve=>setImmediate(resolve));assert.equal(done,1);assert.equal(queries,0);
+});
+test('hybrid limit counts accepted label matches, releases the query and ignores later callbacks',async()=>{
+ const s=context(),hits=[];let events,collection,done=0;
+ const candidates=[32,33,34,35].map(id=>({...header(id),getUint32Property:()=>id}));
+ s.gmailLabelFirstCollection('"school"',3,{onItemsAdded:items=>hits.push(...items),onQueryCompleted(){done++}},
+ {AbortController,filter:async(signal,hit)=>candidates.forEach(hit),accept:h=>h.messageKey!==33,
+ query(text,listener){events=listener;collection={listener,becomeExplicit(){this.released=true}};return collection;}});
+ await new Promise(resolve=>setImmediate(resolve));
+ events.onItemsAdded(Array.from({length:300},(_,i)=>({id:1000+i})));
+ assert.equal(hits.length,0);assert.equal(done,0,'unrelated hits do not exhaust the page');
+ events.onItemsAdded([{id:32},{id:32},{id:33},{id:34},{id:35}]);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(hits.map(item=>item.folderMessage.messageKey),[32,34,35]);
+ assert.equal(done,1);assert.equal(collection.listener,null);assert.equal(collection.released,true);
+ events.onItemsAdded([{id:35}]);events.onQueryCompleted();
+ assert.equal(hits.length,3);assert.equal(done,1);
 });
 test('hybrid index errors report failure rather than successful empty results',async()=>{
  const s=context();let error;
