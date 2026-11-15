@@ -44,6 +44,8 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             data += ('\nvar GM_SIDEBAR_BRAND = "data:image/png;base64,' + brand + '";\n').encode()
             data += b'\n' + (source / 'search-query.js').read_bytes()
             data += b'\n' + (source / 'search-index.js').read_bytes()
+            data += b'\n' + (source / 'label-suggestions.js').read_bytes()
+            data += b'\n' + (source / 'label-suggestions-ui.js').read_bytes()
             data += b'\n' + (source / 'search-native.js').read_bytes()
             data += b'\n' + (source / 'inbox.js').read_bytes()
             data += b'\n' + (source / 'conversation.js').read_bytes()

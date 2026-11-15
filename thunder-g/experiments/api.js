@@ -346,13 +346,14 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       const zoom = installMailZoom(doc.defaultView,fontSize,action=>reader.zoom(action));
       const dates = installCompactDates(doc.defaultView);
       const inbox = installInboxControls(doc.defaultView,{threadGuides,threadExpandArrows,personalIndicators,coloredStars,previewTrimming,reader,openSettings:()=>settingsFire?.async().catch(console.error)});
+      const suggestions=installLabelSuggestions(doc.defaultView,MailServices,Services.prefs);
       const searchStatus=installGmailSearchStatus(doc.defaultView);
       const conversationBrowser = watchConversationBrowser(doc.defaultView, attach);
       const detach=event=>{if(event.target!==doc)return;const controller=documents.get(doc);documents.delete(doc);controller?.close();};
       doc.defaultView.addEventListener('unload',detach,{once:true});
       documents.set(doc, { setPreviewTrimming:inbox.setPreviewTrimming, setColoredStars:inbox.setColoredStars, setPersonalIndicators:inbox.setPersonalIndicators, setThreadExpandArrows:inbox.setThreadExpandArrows, setThreadGuides(enabled){inbox.setThreadGuides(enabled);}, refresh() { labels.refresh(); dates.refresh(); }, close() {
         doc.defaultView.removeEventListener('unload',detach);
-        searchStatus.close();folderSize.close();
+        suggestions.close();searchStatus.close();folderSize.close();
         readers.delete(doc);
         snoozeOrder?.close();
         pages.close(); pagedDocuments.delete(doc); zoom.close();

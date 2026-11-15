@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Experimental branch only: analyze selected unlabeled conversations locally, preview a read-only dry run, or save separate tentative suggestions with dashed chips; analysis never assigns or creates native labels; explicit per-row or checked-row confirmation revalidates eligibility and applies existing labels with Undo.
+
 ## 0.31.0
 
 - Block native numeric label commands and conversation-frame label overrides while the embedded composer has focus, including recipient fields and resumed drafts.
