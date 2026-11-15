@@ -242,4 +242,4 @@ For profiling, the mail pane’s `_gmSearchMetrics` object exposes only `backend
 
 Label-and-text conjunctions such as `school AND label:cuso` filter live label assignments first, then intersect native full-text results with those live candidates. Nested labels accept their full path or leaf name. The result limit is applied after label filtering; no combined Gloda ID/full-text constraints are used. Unindexed messages can still be absent. OR/negated text and unsupported short terms retain local search.
 
-See [Which queries use which search path?](../search/#which-queries-use-which-search-path) for supported indexed combinations, local fallback examples, and token-length restrictions. Local fallback does not mean the query is unsupported.
+See [Which queries use which search path?](search.md#which-queries-use-which-search-path) for supported indexed combinations, local fallback examples, and token-length restrictions. Local fallback does not mean the query is unsupported.
