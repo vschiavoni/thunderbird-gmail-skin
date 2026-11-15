@@ -366,8 +366,7 @@ function installGmailSearch(win,mail,interfaces=Ci,components=Cc,modules=ChromeU
               addresses:text=>mail.headerParser.extractHeaderAddressMailboxes(text).split(',').map(value=>value.trim())});
             hybrid={AbortController:win.AbortController,filter:(signal,onHit)=>nativeSearch(indexedPlan.filter,folders,signal,onHit),
               accept:header=>allowedFolders.has(header.folder?.URI) && matches(header),reportError:report,
-              query(text,ids,limit,listener){const query=Gloda.newQuery(GlodaConstants.NOUN_MESSAGE);
-                query.id(...ids);query.fulltextMatches(text);query.orderBy('-date');query.limit(limit);return query.getCollection(listener);}};
+              query:(text,listener)=>gmailLabelIndexedQuery(Gloda,GlodaConstants.NOUN_MESSAGE,text,listener)};
           }
           view=createGmailIndexedView(indexedText,{
             sort:environment.sort,onStart:environment.onStart,onStop:environment.onStop,reportError:report,

@@ -76,7 +76,7 @@ Index matching is tokenized, not an exact substring guarantee. Recent messages, 
 
 Leaving or replacing a query detaches its collection listener, ignores late callbacks and stops live collection updates. The underlying bounded Gloda database query may finish in the background: this adapter does not claim to interrupt SQLite or force reindexing. It neither creates a second index nor changes indexer preferences. Real-mailbox first-result time, completion time, result completeness and memory use still require profiling before merging this experiment.
 
-Label-and-text conjunctions such as `school AND label:cuso` filter live label assignments first, then query the full-text index using only those message IDs. Nested labels accept their full path or leaf name. Candidate IDs are batched to bound query size; the result limit is applied after label filtering. Unindexed messages can still be absent. OR/negated text and unsupported short terms retain local search.
+Label-and-text conjunctions such as `school AND label:cuso` filter live label assignments first, then run a native full-text query and intersect its results with those live candidates. Nested labels accept their full path or leaf name. One native index query is used, without manually generated SQL. The result limit is applied after label filtering so unrelated indexed hits cannot hide matching labeled messages. Unindexed messages can still be absent. OR/negated text and unsupported short terms retain local search.
 
 ### Which queries use which search path?
 
