@@ -239,6 +239,13 @@ function createNativeSnooze({onTiming=null}={}) {
       await copy(header,inbox,true);
       const restored=matches(inbox,message)[0];
       if(restored)stampReturned(restored);
+      else Promise.resolve().then(async()=>{
+        if(closed)return;
+        await refresh(inbox);
+        if(closed)return;
+        const arrived=matches(inbox,message)[0];
+        if(arrived)stampReturned(arrived);
+      }).catch(error=>{if(!closed)adapter.report(error);});
     },
     async hasReply(job){
       const accounts=new Set();

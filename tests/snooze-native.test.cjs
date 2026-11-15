@@ -151,8 +151,8 @@ test('native move completion does not wait for delayed IMAP summary headers',asy
   assert.equal(f.saved[0].state,'sleeping');assert.equal(held.messages.length,1);
   assert.equal(held.pending.length,0);assert.equal(held.refreshes,1,'one background refresh populates the Snoozed view without polling');
   await f.service.cancel(f.saved[0].id);
-  assert.equal(f.saved.length,0);assert.equal(f.inbox.pending.length,1);
-  f.inbox.QueryInterface().updateFolderWithListener(null,{OnStopRunningUrl(){}});
+  assert.equal(f.saved.length,0);assert.equal(f.inbox.pending.length,0);
+  assert.equal(f.inbox.refreshes,1,'missing destination headers trigger an automatic Inbox refresh');
   const restored=f.inbox.messages[0];f.listener.msgAdded(restored);
   assert.ok(Number(restored.getStringProperty('thunderGSnoozeReturned'))>0,'late Inbox headers still receive returned ordering metadata');
 });
