@@ -13,12 +13,23 @@ function gmailComposerTypingTarget(event){
       // designMode editors are not reliably reported as contenteditable.
       if(doc && !seen.has(doc))pending.push(doc);
       if(doc?.defaultView?.frameElement)pending.push(doc.defaultView.frameElement);
+      if(node.document)pending.push(node.document);
       if(node.activeElement)pending.push(node.activeElement);
       if(node.shadowRoot?.activeElement)pending.push(node.shadowRoot.activeElement);
       if(node.contentDocument)pending.push(node.contentDocument);
     }catch(_){/* An inaccessible or closing frame is not a typing target. */}
   }
   return false;
+}
+// Native XUL key commands may execute without the original keyboard event.
+// Inspect the focused window/element chain, including the top mail window.
+function gmailComposerHasFocus(win){
+  try{
+    const top=win.top || win,dispatcher=top.document?.commandDispatcher;
+    return gmailComposerTypingTarget({target:dispatcher?.focusedElement,
+      originalTarget:dispatcher?.focusedWindow?.document,
+      currentTarget:top.document,view:win});
+  }catch(_){return false;}
 }
 function gmailTypingTarget(event){
   const target=event.target,doc=target?.ownerDocument;

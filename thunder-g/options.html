@@ -135,6 +135,11 @@
             <div class="setting-copy"><label for="search-results-as-list"><span data-i18n="always_show_search_results_as_a_list_56b900d">Always show search results as a list</span></label><p id="search-list-help"><span data-i18n="open_global_searches_in_the_styled_message_list_enab_d158989">Open global searches in the styled message list. Enabled by default. Turn off for Thunderbird’s timeline and faceted results. Applies to new searches.</span></p></div>
             <input class="switch" id="search-results-as-list" type="checkbox" role="switch" aria-describedby="search-list-help">
           </div>
+          <div class="setting-row">
+            <div class="setting-copy"><label for="in-place-search">Search in the current mail tab (experimental)</label><p id="in-place-search-help">Replace the message list with progressive local search results. Back to mail restores the previous folder. Off by default. Plain text uses Thunderbird’s index when available, with Load more for additional results. Advanced queries use live local metadata. A notice identifies disabled-index fallback and possible indexing gaps.</p></div>
+            <input class="switch" id="in-place-search" type="checkbox" role="switch" aria-describedby="in-place-search-help">
+          </div>
+          <p id="in-place-search-status" role="status"></p>
           <details><summary><span data-i18n="about_your_existing_layout_5cd284f">About your existing layout</span></summary><div class="details-content"><p><span data-i18n="your_columns_density_and_interface_font_size_stay_na_9ade245">Your columns, density and interface font size stay native. Page totals include messages inside collapsed threads; scrolling follows visible rows.</span></p><p><span data-i18n="hiding_today_pane_applies_immediately_turning_it_off_0fc7cd6">Hiding Today Pane applies immediately. Turning it off restores Thunderbird’s existing visibility setting without changing calendar preferences.</span></p></div></details>
         </section>
 
@@ -256,6 +261,7 @@
       </main>
     </div>
   </div>
+  <script src="in-place-search-options.js"></script>
   <script src="read-timing-options.js"></script>
   <script src="folder-options.js"></script>
   <script src="preview-options.js"></script>

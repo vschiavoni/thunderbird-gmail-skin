@@ -43,6 +43,7 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             brand = base64.b64encode((source / 'icons/thunder-g-128.png').read_bytes()).decode()
             data += ('\nvar GM_SIDEBAR_BRAND = "data:image/png;base64,' + brand + '";\n').encode()
             data += b'\n' + (source / 'search-query.js').read_bytes()
+            data += b'\n' + (source / 'search-index.js').read_bytes()
             data += b'\n' + (source / 'search-native.js').read_bytes()
             data += b'\n' + (source / 'inbox.js').read_bytes()
             data += b'\n' + (source / 'conversation.js').read_bytes()

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Block native numeric label commands and conversation-frame label overrides while the embedded composer has focus, including recipient fields and resumed drafts.
+
+- Support `*` wildcards in label searches, including nested paths and label-first indexed queries.
+
+- Filter live labels before indexed full-text searches for label-and-text conjunctions, then intersect native full-text results without incompatible ID constraints (fixing the INTERSECT SQL error), with regression coverage.
+
+- Experimental same-tab search: use Gloda for supported plain-text queries, show explicit result limits with Load more, and identify disabled/unavailable-index fallback.
+
+- Match nested labels by exact leaf name (`label:subtest`) or full path (`label:test/subtest`).
+- Execute metadata-only search expressions in one native scan and resolve label keys once per search.
+
+- Experimental branch: opt-in same-tab search with progressive results, Back to mail, cancellation on navigation, and local performance counters.
+
 ## 0.30.0
 
 - Extend the compatibility range to Thunderbird 160.x while preserving the 153.0 minimum; add update-feed regression coverage (#43, fixes #42).

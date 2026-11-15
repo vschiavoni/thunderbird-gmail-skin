@@ -851,7 +851,10 @@ function installIndependentReader(win) {
               ['_toggleMessageTagKey',number=>toggleTagNumber(header,number)],
               ['_toggleMessageTag',(key,add)=>setMessageTag(header,key,add)],
               ['_removeAllMessageTags',()=>toggleTagNumber(header,0)]]) {
-              originals.set(name,controller[name]);controller[name]=replacement;
+              originals.set(name,controller[name]);controller[name]=(...args)=>{
+                if(typeof gmailComposerHasFocus==='function' && gmailComposerHasFocus(win))return;
+                return replacement(...args);
+              };
             }
             restoreCommands=()=>{for(const [name,value] of originals)controller[name]=value};
           }

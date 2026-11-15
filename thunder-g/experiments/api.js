@@ -242,7 +242,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     let dockIcon=null;
     let settingsFire;
     const skinWindows = new Map(),gmailSearchWindows=new Map();
-    let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true;
+    let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true,inPlaceSearch=false;
     const searchViews=new Map();
     let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, coloredStars=null,previewTrimming=null;
     const readers = new Map();
@@ -377,7 +377,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       }
       loadSkin(win);
       if(win.document.documentURI==='chrome://messenger/content/messenger.xhtml' && !gmailSearchWindows.has(win))
-        gmailSearchWindows.set(win,installGmailSearch(win,MailServices));
+        gmailSearchWindows.set(win,installGmailSearch(win,MailServices,undefined,undefined,undefined,{enabled:()=>inPlaceSearch,beforeSearch:pane=>readers.get(pane.document)?.showList()}));
       if(win.document.documentURI==='chrome://messenger/content/messenger.xhtml' && !startupWindows.has(win)) {
         let activityManager=null;
         try {activityManager=Cc['@mozilla.org/activity-manager;1'].getService(Ci.nsIActivityManager);}catch(_){/* Native dialogs still report connection errors. */}
@@ -500,6 +500,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         }
       },
       async setDockIcon(enabled,options={}){if(enabled)dockIcon ||= createNativeDockIcon(context.extension);await dockIcon?.setEnabled(enabled===true,options);},
+      async setInPlaceSearch(enabled){inPlaceSearch=enabled===true;for(const search of gmailSearchWindows.values())search.settingsChanged?.();},
       async setSearchResultsAsList(enabled){searchResultsAsList=enabled!==false;},
       async setShowColumnHeaders(enabled) {
         showColumnHeaders = enabled === true;
