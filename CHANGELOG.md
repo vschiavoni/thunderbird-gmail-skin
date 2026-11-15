@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.31.0
+
 - Block native numeric label commands and conversation-frame label overrides while the embedded composer has focus, including recipient fields and resumed drafts.
 
 - Support `*` wildcards in label searches, including nested paths and label-first indexed queries.
