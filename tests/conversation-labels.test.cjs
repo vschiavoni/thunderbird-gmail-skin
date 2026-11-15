@@ -106,3 +106,10 @@ test('strict inheritance retains valid cross-folder ancestors, siblings and desc
  f.scope.inheritConversationLabels(members,f.mail);
  for(const header of members){assert.ok(header.keys.has('project'));assert.ok(header.keys.has('team'));}
 });
+test('reviewed exact-scope label writes do not expand into subject-grouped unrelated messages',()=>{
+ const f=fixture(),inbox=f.folder('inbox'),sent=f.folder('sent');
+ const target=f.message(inbox,'root'),copy=f.message(sent,'root'),unrelated=f.message(inbox,'different');target.thread=[target,unrelated];unrelated.thread=target.thread;
+ f.scope.applyConversationLabel([target,copy],'project',true,null,null,{exactScope:true});
+ assert.equal(target.keys.has('project'),true);assert.equal(copy.keys.has('project'),true);assert.equal(unrelated.keys.has('project'),false);
+ f.scope.applyConversationLabel([target,copy],'project',false,null,null,{exactScope:true});assert.equal(target.keys.has('project'),false);assert.equal(copy.keys.has('project'),false);
+});

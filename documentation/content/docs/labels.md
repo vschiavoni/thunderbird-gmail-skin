@@ -59,3 +59,108 @@ Unread visibility uses Thunderbird’s existing native counts and change notific
 Select several labels in the sidebar using Shift or Command/Ctrl, then open **⋮** on one of the selected labels. **Edit selected labels…** lets you choose a shared parent, color, sidebar visibility and message-list visibility. Fields default to **Keep current** so mixed values are preserved. The menu’s color and visibility actions also apply to the selected labels.
 
 The editor previews all changed label paths before Apply. Selected parent/child pairs move together once, including descendants; color and visibility change only explicitly selected labels. Native tag keys and message assignments stay intact. Duplicate paths and moves into a selected subtree are rejected before writing; failed writes attempt to restore earlier values. Opening a menu on an unselected label edits only that label.
+
+## Experimental local suggestions (development branch)
+
+Available only on `codex/local-label-suggestions`, not part of a released version.
+Select **1–500 messages** using the normal checkboxes in a folder or search result,
+then click **✧ Suggest labels**. It sits beside the Settings gear normally and
+moves to the right side of the selected-message action bar while checkboxes are selected. Multiple selected
+messages in the same conversation produce one result. Larger selections show an
+explicit limit message. Report text is selectable; use Cmd/Ctrl+A within the panel
+to select the report and Cmd/Ctrl+C to copy it.
+
+- **Dry run** reads local metadata and displays suggested labels, supporting
+  evidence, and reasons for skipped conversations. It writes no preferences,
+  message properties, labels, or assignments. Existing saved suggestions remain
+  untouched.
+- **Run · save suggestions** performs the same analysis, replaces the previous
+  saved report, and draws dashed **Suggested: label** chips in the message list.
+  These are *not* Thunderbird tags: they do not affect counts, searches, other
+  clients, label inheritance, or synchronization.
+- **Cancel analysis** stops processing without saving a partial report. Closing
+  the panel, unloading the tab, or disabling the extension cancels pending work.
+- **Clear saved suggestions** deletes only the separate experimental report.
+  Real assignments are never modified by clearing suggestions.
+- Each fresh result has **Confirm · assign label** and **Discard** buttons. Confirm
+  is an explicit write action, including when reviewing dry-run results; Discard
+  only removes the tentative proposal. Discarding a dry-run proposal writes no
+  preferences. Future analyses may suggest a discarded label again.
+- Nothing is checked by default. Check individual proposals, or explicitly choose
+  **Select all suggestions**, then use **Confirm selected · assign labels** or
+  **Discard selected**. Only checked, confirmable proposals are applied.
+- Confirmation takes a fresh local header snapshot, checks current conversation
+  membership, and rechecks live tags immediately before writing. Conversations
+  that acquired any user label are skipped. It only adds an existing label to the
+  exact References-linked members and physical copies, including Sent/Archives;
+  it never expands via subject-based native grouping or removes other labels.
+- Confirmed rows show the normal conversation-style colored label chip (including
+  its dark-mode palette), rather than the dashed tentative chip, and have **Undo confirmation**. Undo removes only the keyword added
+  to the exact physical messages in that confirmation, preserving other labels
+  and legacy numeric tags. Undo is available while this report remains open and
+  has not been replaced by another analysis. It does not remove labels inherited
+  by messages that arrive after confirmation. Partial native failures are shown
+  explicitly with an Undo action for any assignments that may have succeeded.
+- Canceling a confirmation batch stops remaining assignments; already confirmed
+  rows remain visible with Undo. The report states how many were confirmed.
+  Historical saved snapshots can be discarded but must be reanalyzed before
+  confirmation. Rechecking a large account can take time, so review several
+  proposals together to share one fresh scan.
+
+### What it learns and when it abstains
+
+This first version uses **headers only**, including participants and subject
+words. It does not read bodies, signatures, attachments, or quoted text, and
+makes no network requests. No external service, model download, or second mail
+index is used. Consequently, suggestions may be less accurate than a future
+body-aware implementation. Evidence strengths are heuristics, not calibrated
+probabilities.
+
+It reads local physical folder summaries in the selected accounts, including
+Sent, Archives, Trash and Junk, excluding virtual views. Accounts are isolated.
+Message-ID and References links establish conversation membership; subjects and
+shared senders alone never establish membership. Physical duplicates count as
+one training conversation. Any existing user label on any linked local member
+makes a selected conversation ineligible. The built-in Inbox chip is not a user
+label and does not disqualify it.
+
+Training uses already labeled, unselected conversations and **only existing
+labels**. At least two distinct training conversations must support a label,
+with shared subject evidence plus a participant or another subject term. Weak
+matches and close alternatives are skipped. Label names are not invented.
+Missing conversation identities, unavailable local folder summaries, or scan
+limits cause conservative skips or stop the run rather than treating unreadable
+mail as unlabeled. This cannot infer conversations or messages absent from local
+headers.
+
+### Limits, storage and invalidation
+
+Analysis runs only when requested and yields between small batches. Each run
+reads at most 100,000 headers. Training considers up to 2,500 labeled
+conversations, with bounded feature storage; a conversation with over 20 labels
+is not used for training. Features use at most the first 100 local messages and
+64 distinct features per conversation. Selected conversations exceeding 1,000
+local messages are skipped. Bounded subject/participant inputs and References
+limits protect against oversized headers. The report indicates when training
+limits were applied. Large accounts may still take time: the prototype builds a
+fresh header snapshot on each run, even for a small selection.
+
+Run stores one report in the profile preference
+`extensions.thunderg.experimentalLabelSuggestions`, independently of Thunderbird
+tag definitions and keywords. It includes label keys/names, message identifiers,
+local folder/message keys, participant/subject-word evidence and a timestamp;
+full message bodies and full subjects are not stored. Treat this as private local
+profile data. It is not included in the label-assignment export.
+
+Mail membership, labeling/header-evidence, or label-definition changes invalidate visible
+chips; changes during analysis prevent saving a stale report. Recycled rows
+re-render chips without starting another analysis. After restart, the saved
+report can be reviewed in the panel as a snapshot, but chips are not restored
+until a fresh Run checks eligibility. Saved proposals do not automatically apply
+to newly arriving messages. Suggestions may be inspected again or cleared at
+any time.
+
+Explicit confirmation uses Thunderbird’s normal keyword-assignment mechanism,
+so accepted labels may synchronize with the mail account as ordinary labels do.
+The inference and rechecking stages remain local. Tentative proposals never
+synchronize.

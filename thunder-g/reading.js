@@ -253,8 +253,10 @@ function showConversationLabelNotice(win, name, add, undo) {
   conversationLabelNotices.set(win,close);
 }
 
-function applyConversationLabel(messages, key, add, win=null, refresh=null) {
-  const physical = conversationPhysicalMessages(conversationLabelScope(messages));
+function applyConversationLabel(messages, key, add, win=null, refresh=null, {exactScope=false}={}) {
+  // Reviewed suggestions already resolved and validated their exact References scope.
+  // All existing callers keep the usual native conversation expansion.
+  const physical = exactScope ? messages : conversationPhysicalMessages(conversationLabelScope(messages));
   function write(headers, adding) {
     const folders = new Map();
     for (const header of headers) {
