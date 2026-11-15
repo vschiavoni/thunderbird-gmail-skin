@@ -81,6 +81,15 @@ function gmailIndexedPlan(ast) {
 }
 
 // Native label filtering completes before any indexed text query is submitted.
+function gmailLabelIndexedQuery(Gloda, noun, text, listener) {
+  // Gloda's id(...) constraint cannot be combined with fulltextMatches(...).
+  // Let the native API generate SQL; intersect live label candidates below.
+  const query=Gloda.newQuery(noun);
+  query.fulltextMatches(text);query.orderBy('-date');
+  // No pre-filter limit: unrelated indexed hits must not hide labeled matches.
+  return query.getCollection(listener);
+}
+
 function gmailLabelFirstCollection(text,limit,listener,environment) {
   const controller=new environment.AbortController();let active=null,disposed=false,release=null;
   const result={listener,becomeExplicit(){disposed=true;controller.abort();release?.();if(active){active.listener=null;active.becomeExplicit?.();active=null;}}};
@@ -94,18 +103,23 @@ function gmailLabelFirstCollection(text,limit,listener,environment) {
       candidates.get(id).push(header);
     });
     if(disposed)return;
-    const ids=[...candidates.keys()];
-    // Stay below SQLite's bind-variable limit, including the full-text parameter.
-    for(let offset=0;offset<ids.length && !disposed;offset+=250){
+    if(candidates.size){
       await new Promise((resolve,reject)=>{
-        let completed=false;release=resolve;
+        let completed=false,count=0;const seen=new Set();release=resolve;
+        function finish(){if(completed)return;completed=true;resolve();}
         const events={onItemsAdded(items){
+          if(completed || disposed)return;
           for(const item of items)for(const header of candidates.get(item.id)||[]){
-            if(environment.accept(header))emit('onItemsAdded',[{folderMessage:header}]);
+            if(completed || disposed)return;
+            const key=header.folder.URI+'#'+header.messageKey;
+            if(seen.has(key) || !environment.accept(header))continue;
+            seen.add(key);emit('onItemsAdded',[{folderMessage:header}]);
+            if(++count>=limit){finish();return;}
           }
-        },onItemsModified(){},onItemsRemoved(){},onQueryCompleted(){completed=true;resolve();}};
+        },onItemsModified(){},onItemsRemoved(){},onQueryCompleted:finish,
+        onError(error){if(!completed){completed=true;reject(error);}}};
         try{
-          const collection=environment.query(text,ids.slice(offset,offset+250),limit,events);
+          const collection=environment.query(text,events);
           if(disposed || completed){collection.listener=null;collection.becomeExplicit?.();}
           else active=collection;
         }catch(error){reject(error);}
