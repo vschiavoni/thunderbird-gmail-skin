@@ -87,4 +87,4 @@ Folder sidebar display controls are available under **Thunder-G Settings → Inb
 
 Multiple embedded composers can stay open in the same mail tab. Opening another draft, starting another message, or opening a conversation minimizes the current composer into a bottom dock. Select its title to restore it; other composers minimize automatically. Text, attachments, undo history and native autosave remain intact. Closing a minimized draft saves it using the same draft workflow as the expanded composer.
 
-Experimental same-tab search is being developed on `codex/in-place-search`. It is opt-in under Settings → Inbox and is not enabled in normal releases.
+Experimental same-tab search is available as an opt-in under Settings → Inbox. It is off by default; supported queries use Thunderbird’s local index, with label wildcards and documented local-search fallbacks.

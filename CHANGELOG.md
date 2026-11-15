@@ -6,7 +6,7 @@
 
 - Support `*` wildcards in label searches, including nested paths and label-first indexed queries.
 
-- Filter live labels before indexed full-text searches for label-and-text conjunctions, with bounded candidate batches and regression coverage.
+- Filter live labels before indexed full-text searches for label-and-text conjunctions, then intersect native full-text results without incompatible ID constraints (fixing the INTERSECT SQL error), with regression coverage.
 
 - Experimental same-tab search: use Gloda for supported plain-text queries, show explicit result limits with Load more, and identify disabled/unavailable-index fallback.
 
