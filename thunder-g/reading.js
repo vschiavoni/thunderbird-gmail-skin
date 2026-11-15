@@ -171,8 +171,14 @@ function installConversationLabelCommands(win) {
   if(!commands)return {close(){}};
   const selected=()=>Array.from(win.gDBView?.getSelectedMsgHdrs?.() || (win.gMessage?[win.gMessage]:[]));
   function replace(name,fn){if(typeof commands[name]!=='function')return;const original=commands[name];commands[name]=fn;saved.set(name,{original,fn});}
-  replace('_toggleMessageTag',(key,add)=>applyConversationLabel(selected(),key,add,win));
+  const editing=()=>typeof gmailComposerHasFocus==='function' && gmailComposerHasFocus(win);
+  if(typeof commands._toggleMessageTagKey==='function'){
+    const original=commands._toggleMessageTagKey;
+    replace('_toggleMessageTagKey',function(...args){if(!editing())return original.apply(this,args);});
+  }
+  replace('_toggleMessageTag',(key,add)=>{if(!editing())return applyConversationLabel(selected(),key,add,win);});
   replace('_removeAllMessageTags',()=>{
+    if(editing())return;
     const messages=conversationLabelScope(selected());
     for(const tag of MailServices.tags.getAllTags())if(messages.some(header=>assignedTags(header,[tag]).length))applyConversationLabel(messages,tag.key,false,win);
   });
@@ -811,6 +817,7 @@ function installReadingMode(win) {
     return false;
   }
   function labelKey(event) {
+    if(gmailComposerTypingTarget(event) || gmailComposerHasFocus(win)){shortcutRouter?.reset();return;}
     if(handleGmailShortcutHelpKey(event,shortcutHelp,shortcutRouter))return;
     if(shortcutRouter?.handle(event))return;
     const action=mailZoomAction(event);

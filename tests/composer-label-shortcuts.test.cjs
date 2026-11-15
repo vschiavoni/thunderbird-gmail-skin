@@ -39,3 +39,40 @@ test('mail shortcuts resume outside the composer and a merely open unfocused com
  doc.activeElement=normal;
  assert.equal(s.independentTagKey(event('1',{target:normal,currentTarget:doc})),1,'leaving the editor restores numeric shortcuts immediately');
 });
+
+test('native label command entry points cannot mutate labels while any embedded field has focus',()=>{
+ const s=scope(),mailDoc={nodeType:9,documentURI:'about:3pane'},top={document:mailDoc};
+ const composeDoc={nodeType:9,documentURI:'chrome://messenger/content/messengercompose/messengercompose.xhtml'};
+ const win={top,document:mailDoc,gDBView:{getSelectedMsgHdrs:()=>[]}};let numbers=0,writes=0;
+ const numeric=function(){numbers++;assert.equal(this,win.commandController)};
+ win.commandController={_toggleMessageTagKey:numeric,_toggleMessageTag(){},_removeAllMessageTags(){}};
+ s.applyConversationLabel=()=>{writes++};s.conversationLabelScope=()=>[];
+ s.MailServices={tags:{getAllTags:()=>[]}};
+ const installed=s.installConversationLabelCommands(win);
+ for(const name of ['body','subject','to','cc','bcc','identity','attachment']){
+   mailDoc.activeElement={contentDocument:composeDoc};composeDoc.activeElement={name,ownerDocument:composeDoc};
+   for(let n=0;n<=9;n++)win.commandController._toggleMessageTagKey(n);
+   win.commandController._toggleMessageTag('project',true);win.commandController._toggleMessageTag('project',false);
+   win.commandController._removeAllMessageTags();
+ }
+ assert.equal(numbers,0);assert.equal(writes,0);
+ mailDoc.activeElement={ownerDocument:mailDoc};win.commandController._toggleMessageTagKey(1);win.commandController._toggleMessageTag('project',true);
+ assert.equal(numbers,1);assert.equal(writes,1);
+ installed.close();assert.equal(win.commandController._toggleMessageTagKey,numeric);
+});
+test('focus guard handles retargeted windows, shadow editors and command dispatcher focus',()=>{
+ const s=scope(),editor={nodeType:9,documentURI:'about:blank',designMode:'on'};
+ const mail={nodeType:9,documentURI:'about:3pane'},top={document:mail};
+ for(const focus of [{contentDocument:editor},{shadowRoot:{activeElement:{contentDocument:editor}}}]){
+   mail.activeElement=focus;assert.equal(s.gmailComposerHasFocus({top,document:{}}),true);
+ }
+ mail.activeElement={};mail.commandDispatcher={focusedWindow:{document:editor}};
+ assert.equal(s.gmailComposerHasFocus({top}),true);
+ mail.commandDispatcher={};assert.equal(s.gmailComposerHasFocus({top}),false);
+});
+test('conversation frame command overrides and main routing guard composer focus',()=>{
+ const reader=fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8');
+ assert.match(reader,/controller\[name\]=\(\.\.\.args\)=>\{\s*if\(typeof gmailComposerHasFocus==='function' && gmailComposerHasFocus\(win\)\)return;/);
+ const reading=fs.readFileSync(path.join(__dirname,'../thunder-g/reading.js'),'utf8');
+ assert.match(reading,/function labelKey\(event\) \{\s*if\(gmailComposerTypingTarget\(event\) \|\| gmailComposerHasFocus\(win\)\)/);
+});

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Block native numeric label commands and conversation-frame label overrides while the embedded composer has focus, including recipient fields and resumed drafts.
+
 - Support `*` wildcards in label searches, including nested paths and label-first indexed queries.
 
 - Filter live labels before indexed full-text searches for label-and-text conjunctions, with bounded candidate batches and regression coverage.
