@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8');
-function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(fs.readFileSync('thunder-g/default-reply.js','utf8'),scope);vm.runInContext(source,scope);return scope;}
+function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(fs.readFileSync('thunder-g/default-reply.js','utf8'),scope);vm.runInContext(fs.readFileSync('thunder-g/compose.js','utf8'),scope);vm.runInContext(fs.readFileSync('thunder-g/attachment-previews.js','utf8'),scope);vm.runInContext(source,scope);return scope;}
 function message(key,id,folder='inbox',date=key){return {messageKey:key,messageId:id,dateInSeconds:date,folder:{URI:folder},mime2DecodedSubject:'Subject',mime2DecodedAuthor:'Sender',getStringProperty(name){return name==='keywords' && this.tagged?'work':''}}}
 test('conversation grouping deduplicates physical and logical copies, retains selected copy and sorts by date',()=>{
   const scope=context(),anchor=message(1,'same','inbox',20),sent=message(2,'other','sent',10);
@@ -270,7 +270,7 @@ test('each message renders its own DKIM chip and keeps tags beside the sender in
   f.anchor.getStringProperty=name=>name==='dkim_verifier@pl-result'?JSON.stringify({version:'3.0',dkim:[{result:'SUCCESS',sdid:'example.org'}]}):'work';
   await f.reader.open(f.anchor);
   const card=f.cards.children[0],sender=card.children[0].children[0].children[1];
-  assert.equal(sender.children.find(node=>node.className==='tags').children.length,0);assert.equal(card.children.length,2,'no separate tag row occupies body space');
+  assert.equal(sender.children.find(node=>node.className==='tags').children.length,0);assert.equal(card.children.filter(node=>node.className!=='gm-sent-attachments').length,2,'no separate tag row occupies body space');
   const dkim=card.children[0].children[1].children[1];assert.equal(dkim.textContent,'DKIM verified');assert.equal(dkim.getAttribute('data-tone'),'success');
   f.anchor.getStringProperty=name=>name==='dkim_verifier@pl-result'?JSON.stringify({version:'3.0',dkim:[{result:'PERMFAIL'}]}):'work';
   f.tagListener.msgPropertyChanged(f.anchor,'dkim_verifier@pl-result');assert.equal(dkim.getAttribute('data-tone'),'failure');
@@ -954,11 +954,11 @@ test('default Reply all opens the embedded reply-all composer for the clicked me
  await f.reader.open(f.anchor);f.loaded();f.scope.setThunderGDefaultReplyBehavior('reply-all');f.browsers[0].replyButton.emit('command',{preventDefault(){},stopImmediatePropagation(){}});
  assert.equal(opened.header,f.anchor);assert.equal(opened.command,'cmd_replyall');f.reader.close();
 });
-async function permanentSendFixture(){
+async function permanentSendFixture(extra={}){
  const f=readerFixture({permanentSentCards:true});await f.reader.open(f.anchor);f.loaded();let placement;
  f.scope.inlineReplyEnabled=true;f.scope.inlineComposeControllers=new WeakMap([[f.win,{float(){},open(_header,_command,options){placement=options}}]]);
  f.actions.children[1].emit('click');
- const state={id:{},state:'sending',from:'Me',to:'Recipient <recipient@example.test>',cc:'Other <other@example.test>',body:'<b>Literal answer</b>\n\nOn Tuesday wrote:\n> old text\n\n--\nSignature',date:1700000000000};
+ const state={id:{},state:'sending',from:'Me',to:'Recipient <recipient@example.test>',cc:'Other <other@example.test>',body:'<b>Literal answer</b>\n\nOn Tuesday wrote:\n> old text\n\n--\nSignature',date:1700000000000,...extra};
  placement.onSendState(state);return {...f,placement,state,card:f.cards.children[1],snapshot:f.cards.children[1].children[1]};
 }
 test('experimental sent card keeps the same visible body, recipients and expanded quotes after native hydration',async()=>{
@@ -972,11 +972,14 @@ test('experimental sent card keeps the same visible body, recipients and expande
  assert.equal(f.reader.getMessages().at(-1),copy,'labels and commands use a real saved header');
  f.reader.close();
 });
-test('experimental permanent card retains a native saved-message/attachment escape hatch and default reply action',async()=>{
- const f=await permanentSendFixture(),open=f.snapshot.children.find(node=>node.className==='gm-open-saved-message');assert.equal(open.disabled,true);
- const copy=sentReplyFixture(f);f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(copy);assert.equal(open.disabled,false);
+test('experimental permanent card toggles the saved message inline and retains default reply action',async()=>{
+ const f=await permanentSendFixture(),open=f.card.children.find(node=>node.className==='gm-sent-view-controls').children[0];assert.equal(open.disabled,true);
+ const copy=sentReplyFixture(f);f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(copy);assert.equal(open.disabled,true);
  const shown=[],original=f.scope.ChromeUtils.importESModule;f.scope.ChromeUtils.importESModule=uri=>uri.includes('MailUtils')?{MailUtils:{openMessageInNewWindow:header=>shown.push(header)}}:original(uri);
- open.emit('click');assert.equal(shown[0],copy);f.loaded();
+ open.emit('click');assert.equal(f.snapshot.hidden,false);f.loaded();assert.equal(open.disabled,false);
+ const backend=f.card.children.find(node=>node.className==='body');
+ open.emit('click');assert.equal(shown.length,0);assert.equal(f.snapshot.hidden,true);assert.equal(backend.style.visibility,'');assert.equal(backend.inert,false);assert.equal(open.getAttribute('aria-expanded'),'true');assert.equal(open.textContent,'Back to sent view');
+ f.flush();assert.equal(f.snapshot.removed,undefined);open.emit('click');assert.equal(f.snapshot.hidden,false);assert.equal(backend.style.visibility,'hidden');assert.equal(backend.inert,true);assert.equal(open.getAttribute('aria-expanded'),'false');
  const action=f.card.children[0].children[1].children.find(node=>node.className==='gm-permanent-reply');assert.equal(action.disabled,false);f.scope.setThunderGDefaultReplyBehavior('reply-all');assert.equal(action.getAttribute('aria-label'),'Reply all');
  f.scope.inlineReplyEnabled=false;action.emit('click',{preventDefault(){},stopImmediatePropagation(){}});assert.deepEqual(f.commands.at(-1),['cmd_replyall','mailbox://sent/2']);f.reader.close();assert.equal(action.events.click.length,0);
 });
@@ -989,7 +992,9 @@ test('native viewport changes and font-size changes do not replace the permanent
 test('permanent snapshot stays readable when the hidden native viewer fails and is removed on reader close',async()=>{
  const f=await permanentSendFixture();f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));
  const viewer=f.browsers.at(-1);viewer.contentWindow.displayMessage=()=>{throw Error('native failure')};viewer.emit('load',{target:viewer.contentDocument});
- assert.equal(f.snapshot.removed,undefined);assert.equal(f.snapshot.hidden,false);assert.equal(f.snapshot.children.find(node=>node.className==='gm-open-saved-message').disabled,false);f.reader.close();assert.equal(f.cards.children.length,0);
+ assert.equal(f.snapshot.removed,undefined);assert.equal(f.snapshot.hidden,false);const open=f.card.children.find(node=>node.className==='gm-sent-view-controls').children[0];assert.equal(open.disabled,false);
+ const backend=f.card.children.find(node=>node.className==='body');open.emit('click');assert.equal(f.snapshot.hidden,true);assert.equal(backend.children[0].hidden,false);assert.equal(backend.children[0].children[0].textContent,'Retry saved view');
+ backend.children[0].children[0].emit('click');assert.notEqual(f.browsers.at(-1),viewer);f.loaded();open.emit('click');assert.equal(f.snapshot.hidden,false);f.reader.close();assert.equal(f.cards.children.length,0);
 });
 test('experimental draft-only sent card remains permanent and failed sends still remove their previews',async()=>{
  const f=readerFixture({permanentSentCards:true});let placement;const draft=f.prepare(message(9,'draft-id','drafts')),copy=sentReplyFixture(f,10,'sent-draft',[]);
@@ -997,4 +1002,106 @@ test('experimental draft-only sent card remains permanent and failed sends still
  const state={id:{},state:'sending',body:'Draft content',messageId:'draft-id'};placement.onSendState(state);const snapshot=f.cards.children[0].children[1];
  f.tagListener.msgAdded(copy);placement.onSendState({...state,state:'sent',messageId:'sent-draft'});f.loaded();assert.equal(f.cards.children.length,1);assert.equal(snapshot.removed,undefined);assert.equal(f.reader.getMessages()[0],copy);f.reader.close();
  const other=await permanentSendFixture();other.placement.onSendState({...other.state,state:'saving-draft'});assert.equal(other.cards.children.length,1);assert.equal(other.card.removed,true);assert.equal(other.reader.getMessages().length,1);other.reader.close();
+});
+
+test('conversation zoom updates every permanent sent body and both saved views together',async()=>{
+ const f=await permanentSendFixture();
+ f.win.ZoomManager={enlarge:p=>p.fullZoom=(p.fullZoom||1)+.1,reduce:p=>p.fullZoom=(p.fullZoom||1)-.1,reset:p=>p.fullZoom=1,getZoomForBrowser:p=>p.fullZoom||1,setZoomForBrowser:(p,v)=>p.fullZoom=v};
+ f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));f.loaded();
+ const second={...f.state,id:{},body:'Second reply'};f.placement.onSendState(second);
+ const next=f.cards.children.at(-1),snapshot=next.children[1];
+ f.placement.onSendState({...second,state:'sent',messageId:'reply-two'});f.tagListener.msgAdded(sentReplyFixture(f,3,'reply-two'));f.loaded();
+ const controls=next.children.find(n=>n.className==='gm-sent-view-controls');controls.children[0].emit('click');
+ f.reader.zoom('increaseSize');
+ for(const frame of f.browsers)assert.equal(frame.pane.fullZoom,1.1);
+ assert.equal(f.snapshot.style.zoom,'1.1');assert.equal(snapshot.style.zoom,'1.1');
+ controls.children[0].emit('click');assert.equal(snapshot.hidden,false);assert.equal(snapshot.style.zoom,'1.1');
+ f.reader.zoom('resetSize');for(const frame of f.browsers)assert.equal(frame.pane.fullZoom,1);
+ assert.equal(f.snapshot.style.zoom,'1');assert.equal(snapshot.style.zoom,'1');f.reader.close();
+});
+
+test('rich sent card retains the same safe formatting nodes through Sent-copy hydration and saved-view toggles',async()=>{
+ const f=await permanentSendFixture();
+ const state={...f.state,id:{},richBody:{tag:'div',children:[{tag:'strong',children:[{text:'Bold reply'}]},{tag:'img',src:'data:image/png;base64,AAAA',alt:'Inline'}]}};
+ f.placement.onSendState(state);const card=f.cards.children.at(-1),body=card.children[1],rich=body.children[1];
+ assert.equal(rich.className,'gm-sent-rich-content');assert.equal(rich.children[0].tag,'strong');assert.equal(rich.children[1].getAttribute('src'),'data:image/png;base64,AAAA');
+ f.placement.onSendState({...state,state:'sent',messageId:'rich-reply'});f.tagListener.msgAdded(sentReplyFixture(f,4,'rich-reply'));f.loaded();
+ assert.equal(body.children[1],rich);assert.equal(rich.removed,undefined);
+ const button=card.children.find(n=>n.className==='gm-sent-view-controls').children[0];button.emit('click');button.emit('click');assert.equal(body.hidden,false);assert.equal(body.children[1],rich);f.reader.close();
+});
+
+test('rich sent links open externally without navigating the privileged card',async()=>{
+ const f=await permanentSendFixture(),opened=[];
+ f.scope.Services={io:{newURI:href=>({spec:href})}};f.scope.Cc={'@mozilla.org/uriloader/external-protocol-service;1':{getService:()=>({loadURI:uri=>opened.push(uri.spec)})}};
+ const state={...f.state,id:{},richBody:{tag:'div',children:[{tag:'a',href:'https://example.org/',children:[{text:'Link'}]}]}};f.placement.onSendState(state);
+ const link=f.cards.children.at(-1).children[1].children[1].children[0];let prevented=false;
+ link.emit('click',{preventDefault(){prevented=true},stopPropagation(){}});assert.equal(prevented,true);assert.deepEqual(opened,['https://example.org/']);f.reader.close();
+});
+
+async function attachmentSendFixture(attachments){
+ const f=await permanentSendFixture({attachments:['same.pdf','same.pdf']});
+ const region=f.card.children.find(n=>n.className==='gm-sent-attachments');
+ assert.equal(region.children.length,2);for(const row of region.children)assert.equal(row.children[1].disabled,true);
+ f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));
+ const frame=f.browsers.at(-1);frame.contentWindow.currentAttachments=attachments;frame.contentWindow.gMessageListeners=[];
+ f.win.top={browsingContext:{id:'main'}};f.loaded();return {...f,region,frame};
+}
+test('permanent sent attachments open and save native saved parts, including duplicate filenames',async()=>{
+ const calls=[],attachments=[0,1].map(index=>({name:'same.pdf',hasFile:true,isAllowedURL:true,open(context){calls.push(['open',index,context])},save(context){calls.push(['save',index,context])}}));
+ const f=await attachmentSendFixture(attachments),rows=f.region.children;
+ assert.equal(rows[0].children[0].textContent,'same.pdf');assert.equal(rows[1].children[1].disabled,false);
+ rows[1].children[1].emit('click');await Promise.resolve();rows[0].children[2].emit('click');await Promise.resolve();
+ assert.deepEqual(calls,[['open',1,f.win.top.browsingContext],['save',0,f.win.top.browsingContext]]);assert.equal(f.snapshot.hidden,false);
+ const saved=f.card.children.find(n=>n.className==='gm-sent-view-controls').children[0];saved.emit('click');assert.equal(f.region.hidden,false,'tiles remain available in saved view');saved.emit('click');
+ assert.equal(f.frame.contentWindow.gMessageListeners.length,1);f.frame.contentWindow.gMessageListeners[0].onStartHeaders();f.frame.contentWindow.gMessageListeners[0].onEndHeaders();f.reader.close();assert.equal(f.frame.contentWindow.gMessageListeners.length,0);
+ rows[0].children[1].emit('click');assert.equal(calls.length,2,'detached controls cannot open attachments after closing');
+});
+test('unavailable or unsafe attachments remain disabled and filenames are rendered literally',async()=>{
+ let calls=0;const attachments=[{name:'<img src=x onerror=bad()>',hasFile:false,isAllowedURL:true},{name:'unsafe',hasFile:true,isAllowedURL:false}].map(a=>({...a,open(){calls++},save(){calls++}}));
+ const f=await attachmentSendFixture(attachments);assert.equal(f.region.children[0].children[0].textContent,attachments[0].name);
+ for(const row of f.region.children){assert.equal(row.children[1].disabled,true);assert.equal(row.children[2].disabled,true);row.children[1].emit('click');}
+ assert.equal(calls,0);f.reader.close();
+});
+test('attachment errors allow retry, concurrent actions are blocked, and save cancellation is quiet',async()=>{
+ let reject,opens=0,saves=0;const attachment={name:'file.pdf',hasFile:true,isAllowedURL:true,open(){opens++;return new Promise((resolve,no)=>{reject=no})},save(){saves++;return null}};
+ const f=await attachmentSendFixture([attachment]),row=f.region.children[0],open=row.children[1],save=row.children[2],status=row.children[3];
+ open.emit('click');open.emit('click');save.emit('click');assert.equal(opens,1);assert.equal(saves,0);assert.equal(save.disabled,true);
+ reject(Error('failed'));await new Promise(resolve=>setImmediate(resolve));assert.match(status.textContent,/Could not open/);assert.equal(open.disabled,false);
+ save.emit('click');await Promise.resolve();assert.equal(saves,1);assert.equal(status.textContent,'');assert.equal(save.disabled,false);f.reader.close();
+});
+test('late attachment parsing refreshes controls and invalidates old attachment rows',async()=>{
+ let calls=0;const first={name:'old.pdf',hasFile:true,isAllowedURL:true,open(){calls++},save(){}};
+ const f=await attachmentSendFixture([first]),old=f.region.children[0].children[1];
+ const replacement={...first,name:'new.pdf'};f.frame.contentWindow.currentAttachments=[replacement];f.frame.contentWindow.gMessageListeners[0].onEndAttachments();
+ assert.equal(f.region.children[0].children[0].textContent,'new.pdf');old.emit('click');assert.equal(calls,0);
+ f.region.children[0].children[1].emit('click');await Promise.resolve();assert.equal(calls,1);
+ f.frame.contentWindow.currentAttachments=[];f.frame.contentWindow.gMessageListeners[0].onEndAttachments();assert.equal(f.region.hidden,true);f.reader.close();
+});
+
+test('native messages and saved sent views use the same attachment tiles instead of the native strip',async()=>{
+ const f=readerFixture();await f.reader.open(f.anchor);const frame=f.browsers[0];
+ frame.contentWindow.currentAttachments=[{name:'document.pdf',hasFile:true,isAllowedURL:true,open(){},save(){}}];frame.contentWindow.gMessageListeners=[];f.loaded();
+ const region=f.cards.children[0].children.find(n=>n.className==='gm-sent-attachments');assert.equal(region.hidden,false);assert.equal(region.children[0].getAttribute('data-kind'),'pdf');
+ assert.equal(region.children[0].children.at(-1).className,'gm-sent-attachment-preview');
+ const style=frame.contentDocument.documentElement.children.find(n=>n.tag==='style');assert.match(style.textContent,/#attachmentView, #attachment-splitter \{ display:none/);f.reader.close();assert.equal(frame.contentWindow.gMessageListeners.length,0);
+});
+test('late thumbnail completion cannot replace content in a closed conversation',async()=>{
+ let resolve;const f=await permanentSendFixture();f.scope.attachmentThumbnail=()=>new Promise(done=>{resolve=done});
+ f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));const frame=f.browsers.at(-1);
+ frame.contentWindow.currentAttachments=[{name:'photo.gif',hasFile:true,isAllowedURL:true,open(){},save(){}}];f.loaded();
+ await Promise.resolve();const region=f.card.children.find(n=>n.className==='gm-sent-attachments'),preview=region.children[0].children.at(-1);
+ f.reader.close();resolve('data:image/png;base64,AAAA');await new Promise(done=>setImmediate(done));assert.equal(preview.children[0].tag,'span');
+});
+
+test('conversation date includes the full year outside the current year in each locale',()=>{
+ const f=context(),now=new Date(2026,10,16,12);
+ for(const locale of ['en-US','it-IT']){
+  assert.match(f.conversationDateText(new Date(2024,10,20,12,53),locale,now),/2024/);
+  assert.doesNotMatch(f.conversationDateText(new Date(2026,10,20,12,53),locale,now),/2026/);
+  assert.match(f.conversationDateText(new Date(2027,0,1,12),locale,now),/2027/);
+ }
+});
+test('opened old message visibly shows its year in the conversation header',async()=>{
+ const f=readerFixture();f.anchor.dateInSeconds=new Date(2024,10,20,12,53).getTime()/1000;
+ await f.reader.open(f.anchor);const time=f.cards.children[0].children[0].children[1].children[0];assert.match(time.textContent,/2024/);assert.match(time.dateTime,/2024/);f.reader.close();
 });

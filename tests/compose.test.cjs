@@ -643,3 +643,14 @@ test('onStartSending provides an authoritative ID even when aftersend fires befo
  const f=sendFixture();f.native.gMsgCompose.compFields.messageId='<draft-id>';f.start();f.listener.onStartSending('<real-message-id>');f.afterSend();
  assert.equal(f.states.at(-1).messageId,'<real-message-id>');f.status.close();
 });
+
+test('experimental HTML send captures rich content once while ordinary sends keep plaintext feedback',()=>{
+ const f=sendFixture();let reads=0;
+ f.native.gMsgCompose.composeHTML=true;
+ const node={nodeType:1,localName:'strong',childNodes:[{nodeType:3,nodeValue:'Formatted reply'}],style:{getPropertyValue:()=>''}};
+ f.native.GetCurrentEditor=()=>{reads++;return {outputToString:()=> 'Formatted reply',document:{body:{childNodes:[node],style:{getPropertyValue:()=>''}}}}};
+ scope.permanentSentCardsEnabled=true;
+ try{f.start();assert.equal(reads,1);assert.equal(f.states[0].richBody.children[0].tag,'strong');node.childNodes[0].nodeValue='Changed after sending';assert.equal(f.states[0].richBody.children[0].children[0].text,'Formatted reply');}
+ finally{delete scope.permanentSentCardsEnabled;f.status.close();}
+ const ordinary=sendFixture();ordinary.native.gMsgCompose.composeHTML=true;ordinary.start();assert.equal(ordinary.states[0].richBody,null);ordinary.status.close();
+});

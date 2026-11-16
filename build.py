@@ -50,6 +50,7 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             data += b'\n' + (source / 'conversation.js').read_bytes()
             data += b'\n' + (source / 'compose.js').read_bytes()
             data += b'\n' + (source / 'pagination.js').read_bytes()
+            data += b'\n' + (source / 'attachment-previews.js').read_bytes()
             data += b'\n' + (source / 'independent-reader.js').read_bytes()
         info = ZipInfo(relative, date_time=(1980, 1, 1, 0, 0, 0))
         info.compress_type = ZIP_DEFLATED

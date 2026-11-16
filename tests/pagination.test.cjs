@@ -21,7 +21,7 @@ test('zoom delegates Ctrl/Cmd plus/minus/reset to native controls and leaves tex
   assert.equal(scope.mailZoomAction({ctrlKey:true,key:'+',target:{closest:()=>({})}}),null);
   assert.equal(scope.mailZoomAction({ctrlKey:true,key:'+',defaultPrevented:true,target}),null);
   let listener,removed,zoomed=0,stopped=0;
-  const win={document:{getElementById:()=>null},addEventListener(name,fn){listener=fn},removeEventListener(name,fn){removed=fn}};
+  const win={document:{getElementById:()=>null},addEventListener(name,fn){if(name==='keydown')listener=fn},removeEventListener(name,fn){if(name==='keydown')removed=fn}};
   const zoom=scope.installMailZoom(win,{increaseSize(){zoomed++}});
   listener({ctrlKey:true,key:'+',target,preventDefault(){},stopImmediatePropagation(){stopped++}});
   assert.equal(zoomed,1);assert.equal(stopped,1);zoom.close();assert.equal(removed,listener);
@@ -245,4 +245,17 @@ test('flat and grouped views count messages while threaded totals stay independe
  assert.equal(scope.nativePageRows(view).total,3);
  view.viewFlags=0x41;view.isContainer=i=>i===0;view.getFlagsAt=i=>i===0?0x20000000:0;
  assert.equal(scope.nativePageRows(view).total,101,'a collapsed sort group counts its messages, not one conversation');
+});
+
+test('menu and native wheel zoom share conversation scope and retain native behavior outside it',()=>{
+ const events={},calls=[];let reading=true;
+ const win={document:{getElementById:()=>null},addEventListener(name,fn){events[name]=fn},removeEventListener(name){delete events[name]}};
+ const control=scope.installMailZoom(win,{},action=>{if(!reading)return false;calls.push(action);return true});
+ function fire(type,id){const event={type,target:{id},preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}};events[type](event);return event;}
+ for(const id of ['cmd_fullZoomEnlarge','cmd_fullZoomReduce','cmd_fullZoomReset'])assert.equal(fire('command',id).stopped,true);
+ for(const type of ['DoZoomEnlarge','DoZoomReduce'])assert.equal(fire(type).stopped,true);
+ assert.deepEqual(calls,['increaseSize','reduceSize','resetSize','increaseSize','reduceSize']);
+ assert.equal(fire('command','cmd_reply').stopped,undefined);
+ reading=false;assert.equal(fire('command','cmd_fullZoomEnlarge').stopped,undefined);assert.equal(fire('DoZoomReduce').stopped,undefined);
+ control.close();assert.deepEqual(events,{});
 });

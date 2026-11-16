@@ -66,8 +66,17 @@ function installMailZoom(win, fontSize, zoomContent = null) {
     event.preventDefault(); event.stopImmediatePropagation();
     if (!zoomContent?.(action)) fontSize[action]();
   }
-  win.addEventListener('keydown',keydown,true);
-  return {close(){win.removeEventListener('keydown',keydown,true)}};
+  function conversationCommand(event) {
+    const action={cmd_fullZoomEnlarge:'increaseSize',cmd_fullZoomReduce:'reduceSize',cmd_fullZoomReset:'resetSize'}[event.target?.id];
+    if(action && zoomContent?.(action)){event.preventDefault();event.stopImmediatePropagation();}
+  }
+  function scrollZoom(event) {
+    const action=event.type==='DoZoomEnlarge'?'increaseSize':'reduceSize';
+    if(zoomContent?.(action)){event.preventDefault();event.stopImmediatePropagation();}
+  }
+  const listeners=[['keydown',keydown],['command',conversationCommand],['DoZoomEnlarge',scrollZoom],['DoZoomReduce',scrollZoom]];
+  for(const [name,listener] of listeners)win.addEventListener(name,listener,true);
+  return {close(){for(const [name,listener] of listeners)win.removeEventListener(name,listener,true)}};
 }
 function installNativePagination(win, reader) {
   const doc=win.document, tree=doc.getElementById('threadTree');

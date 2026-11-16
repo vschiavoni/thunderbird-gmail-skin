@@ -1,3 +1,68 @@
+// Never insert composer HTML into chrome. Copy only passive, bounded content.
+const sentRichTags=new Set('div p br span b strong i em u s strike sub sup pre code blockquote ul ol li table tbody thead tfoot tr td th hr a img h1 h2 h3 h4 h5 h6'.split(' '));
+function sentRichLink(value) {
+  const link=String(value || '').trim();
+  return /^(https?:\/\/|mailto:)/i.test(link) && !/[\x00-\x20\x7f]/.test(link)?link:'';
+}
+function sentRichStyle(style) {
+  const result={};
+  for(const key of ['color','background-color','font-family','font-size','font-weight','font-style','text-decoration','text-align','white-space']) {
+    const value=style?.getPropertyValue?.(key) || '';
+    if(value.length<=160 && /^[a-zA-Z0-9 #(),.%"'\-]+$/.test(value) && !/url|var|expression|important/i.test(value))result[key]=value;
+  }
+  return result;
+}
+function captureSentRichContent(editor) {
+  const root=editor?.document?.body;if(!root)return null;
+  let count=0,characters=0,imageBytes=0;
+  function copy(node,depth=0) {
+    if(++count>10000 || depth>40)throw Error('Snapshot limit');
+    if(node.nodeType===3){characters+=node.nodeValue.length;if(characters>1000000)throw Error('Snapshot limit');return {text:node.nodeValue};}
+    if(node.nodeType!==1)return null;
+    const originalTag=String(node.localName || '').toLowerCase(),tag=originalTag==='font'?'span':originalTag;
+    if(!sentRichTags.has(tag))return null;
+    if(tag==='img') {
+      let src='';
+      try {
+        const width=node.naturalWidth,height=node.naturalHeight;
+        if(!node.complete || !width || !height || width*height>4000000)throw Error('Image unavailable');
+        const canvas=node.ownerDocument.createElement('canvas');canvas.width=width;canvas.height=height;
+        canvas.getContext('2d').drawImage(node,0,0);src=canvas.toDataURL('image/png');
+        if(src.length>2800000 || (imageBytes+=src.length)>8000000)throw Error('Image limit');
+      }catch(_){return {text:node.getAttribute('alt') || '[Inline image — see saved view]'};}
+      return {tag,src,alt:node.getAttribute('alt') || ''};
+    }
+    const item={tag,style:sentRichStyle(node.style),children:Array.from(node.childNodes || [],child=>copy(child,depth+1)).filter(Boolean)};
+    if(originalTag==='font'){
+      const legacy={'color':node.getAttribute('color') || '', 'font-family':node.getAttribute('face') || '', 'font-size':({'1':'10px','2':'13px','3':'16px','4':'18px','5':'24px','6':'32px','7':'48px'})[node.getAttribute('size')] || ''};
+      Object.assign(item.style,sentRichStyle({getPropertyValue:key=>legacy[key]}));
+    }
+    if(tag==='a')item.href=sentRichLink(node.getAttribute('href'));
+    return item;
+  }
+  try{return {tag:'div',style:sentRichStyle(root.style),children:Array.from(root.childNodes,child=>copy(child)).filter(Boolean)}}catch(_){return null;}
+}
+function renderSentRichContent(doc,snapshot,openLink) {
+  let count=0,characters=0,imageBytes=0;
+  function render(item,depth=0) {
+    if(!item || ++count>10000 || depth>40)throw Error('Snapshot limit');
+    if(typeof item.text==='string'){characters+=item.text.length;if(characters>1000000)throw Error('Snapshot limit');return doc.createTextNode(item.text);}
+    if(!sentRichTags.has(item.tag))throw Error('Unsupported snapshot tag');
+    const node=doc.createElement(item.tag);
+    for(const [key,value] of Object.entries(sentRichStyle({getPropertyValue:key=>item.style?.[key]})))node.style.setProperty(key,value);
+    if(item.tag==='img'){
+      if(typeof item.src!=='string' || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(item.src) || item.src.length>2800000 || (imageBytes+=item.src.length)>8000000)throw Error('Unsafe image');
+      node.setAttribute('src',item.src);node.setAttribute('alt',String(item.alt || ''));node.style.maxWidth='100%';node.style.height='auto';
+    }else if(item.tag==='a'){
+      const href=sentRichLink(item.href);
+      if(href){node.setAttribute('href',href);node.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openLink(href);});}
+    }
+    for(const child of item.children || [])node.append(render(child,depth+1));
+    return node;
+  }
+  try {const node=render(snapshot);node.className='gm-sent-rich-content';return node;}catch(_){return null;}
+}
+
 /* Use Thunderbird's draft machinery, including account folders and attachments. */
 function createComposeAutosave(prefs) {
   const names = ['mail.compose.autosave','mail.compose.autosaveinterval'];
@@ -381,9 +446,9 @@ function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineRe
   }
   function snapshot() {
     const fields=compose.compFields;
-    let body='';try{body=native.GetCurrentEditor().outputToString('text/plain',0)}catch(_){}
+    let body='',richBody=null;try{const editor=native.GetCurrentEditor();body=editor.outputToString('text/plain',0);if(typeof permanentSentCardsEnabled!=='undefined' && permanentSentCardsEnabled && compose.composeHTML)richBody=captureSentRichContent(editor)}catch(_){}
     ++sequence;return {id:{},from:displayAddress(fields.from || native.gCurrentIdentity?.email),to:displayAddress(fields.to),
-      subject:fields.subject || '',date:Date.now(),cc:displayAddress(fields.cc),body,messageId:fields.messageId || '',attachments:Array.from(native.gAttachmentBucket?.itemChildren || [],item=>item.attachment?.name || '').filter(Boolean)};
+      subject:fields.subject || '',date:Date.now(),cc:displayAddress(fields.cc),body,richBody,messageId:fields.messageId || '',attachments:Array.from(native.gAttachmentBucket?.itemChildren || [],item=>item.attachment?.name || '').filter(Boolean)};
   }
   function emit(state){if(!closed && job)onState({...job,state})}
   function starting(event) {
