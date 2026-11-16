@@ -217,9 +217,12 @@ function installSnoozedFolderMode(win,service,mail=globalThis.MailServices,prefs
     if(!unifiedRow||unifiedRow.parentNode!==target||unifiedRow.modeName!==destinationMode||unifiedRow.uri!==unified.URI){
       unifiedRow?.remove();unifiedRow=pane._createFolderRow(destinationMode,unified,'folder');
       unifiedRow.name=gmText('Snoozed');unifiedRow.classList?.add('gm-unified-snoozed-row');target.append(unifiedRow);
+      unifiedRow.updateUnreadMessageCount=()=>{unifiedRow.unreadCount=0;};
+      unifiedRow.updateTotalMessageCount=()=>{unifiedRow.totalCount=service.list().length;};
     }
     // A snooze job represents one conversation, even when it holds several messages.
-    unifiedRow.unreadCount=service.list().length;
+    unifiedRow.unreadCount=0;
+    unifiedRow.totalCount=service.list().length;
     if(integrated){const inboxURI=smart._folderTypes?.find(type=>type.type==='inbox')?.folderURI;const children=[...target.children],index=children.findIndex(row=>row.uri===inboxURI);const next=index>=0?children[index+1]:null;if(next&&next!==unifiedRow)target.insertBefore(unifiedRow,next);}
     if(mode.containerHeader)mode.containerHeader.hidden=true;
   }
