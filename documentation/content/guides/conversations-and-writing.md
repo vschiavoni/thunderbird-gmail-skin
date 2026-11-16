@@ -113,3 +113,34 @@ You can keep multiple embedded composers open in the same mail tab. Opening a di
 ## Automatic read timing
 
 Under **Settings → Conversations → Mark messages as read**, choose Immediately, After 1 second, After 3 seconds, After 20 seconds or Never. The existing native Thunderbird preference is preserved until you change it. Leaving the conversation before the delay expires cancels its read timer, keeping the message unread. The setting uses Thunderbird’s native read policy and persists across restarts.
+
+## Experimental permanent sent cards — step 1
+
+On **`codex/permanent-sent-cards` only**, newly sent inline messages keep the same
+visible plain-text body that appeared when Send was pressed. The saved Sent copy
+updates the card’s native identity, labels, security metadata and reply actions,
+but its native message body does not replace the visible snapshot. Existing
+messages still use Thunderbird’s normal rendering. This experiment is not merged
+or released and does not change the sending process.
+
+The original recipient text, signature, line wrapping, and quote-expansion choice
+remain in the same body nodes. The permanent card responds to message zoom and
+provides the configured Reply/Reply-all action after native initialization.
+**Open saved message / attachments** opens Thunderbird’s full saved message in a
+separate window once its native header is available.
+
+This is a deliberately limited first prototype. It renders the composer’s
+plain-text snapshot, not HTML, embedded images, clickable native attachment
+widgets, or the full set of native security notices. Those remain available in
+the native saved-message window; a visible hint explains this limitation. The
+native viewer still initializes offscreen for message actions and retains its
+normal MIME and remote-content policies, but no hidden-body resizing changes the
+visible card. Sender/label/security metadata may update after saving even though
+the body stays in place.
+
+Snapshots are held only for the current open conversation, not persisted in the
+profile or added to message data. Leaving and reopening uses the saved message’s
+normal native rendering. Failed sends remove their immediate card as before;
+draft recovery is unchanged. Further steps should evaluate rich-content fidelity,
+attachment controls, recipient presentation and long-lived behavior before
+considering a merge.

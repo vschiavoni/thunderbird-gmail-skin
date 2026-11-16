@@ -36,3 +36,7 @@ test('background restores and propagates reply behavior only from local storage'
  await vm.runInContext(fs.readFileSync('thunder-g/background.js','utf8'),s);assert.deepEqual(calls,['reply-all']);changed({defaultReplyBehavior:{newValue:'reply'}},'local');changed({defaultReplyBehavior:{newValue:'reply-all'}},'sync');changed({defaultReplyBehavior:{newValue:'unknown'}},'local');assert.deepEqual(calls,['reply-all','reply','reply']);
  const schema=JSON.parse(fs.readFileSync('thunder-g/experiments/schema.json','utf8'))[0].functions.find(fn=>fn.name==='setDefaultReplyBehavior');assert.deepEqual(schema.parameters[0].enum,['reply','reply-all']);
 });
+test('the same default-reply binding supports an HTML permanent-card button without duplicate native command handlers',()=>{
+ const s=scope(),b=button(),calls=[];const control=s.installDefaultReplyControl(b,command=>calls.push(command),()=>true,'click');
+ assert.equal(b.events.has('command'),false);s.setThunderGDefaultReplyBehavior('reply-all');b.events.get('click')(event());assert.deepEqual(calls,['cmd_replyall']);control.close();assert.equal(b.events.size,0);
+});

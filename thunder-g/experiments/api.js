@@ -74,6 +74,8 @@ var thunderGSnooze=null;
 var thunderGSnoozeOrder=null;
 var { setTimeout, clearTimeout } = ChromeUtils.importESModule("resource://gre/modules/Timer.sys.mjs");
 var verifyIndependentDkim = null,openIndependentDkimPopup=null;
+// Experimental branch: retain the composer snapshot as the visible sent body.
+var permanentSentCardsEnabled=true;
 var compactConversationsEnabled=true;
 var independentBimiEnabled=false,independentBimiListeners=new Set();
 var { ExtensionParent } = ChromeUtils.importESModule("resource://gre/modules/ExtensionParent.sys.mjs");

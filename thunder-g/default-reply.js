@@ -10,7 +10,7 @@ function thunderGDefaultReplyAction(){
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${path}" fill="none" stroke="black" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
   return {command:all?'cmd_replyall':'cmd_replySender',label:all?'Reply all':'Reply',icon:`url("data:image/svg+xml,${encodeURIComponent(svg)}")`};
 }
-function installDefaultReplyControl(button,run,isCurrent=()=>true){
+function installDefaultReplyControl(button,run,isCurrent=()=>true,eventType='command'){
   const attributes=new Map(['label','title','tooltiptext','aria-label','data-gm-default-reply'].map(name=>[name,button.getAttribute(name)]));
   const image=button.style.getPropertyValue('--gm-default-reply-icon'),priority=button.style.getPropertyPriority('--gm-default-reply-icon');
   function update(){
@@ -23,9 +23,9 @@ function installDefaultReplyControl(button,run,isCurrent=()=>true){
     if(!isCurrent())return;
     event.preventDefault();event.stopImmediatePropagation();run(thunderGDefaultReplyAction().command);
   }
-  button.addEventListener('command',command,true);thunderGDefaultReplyListeners.add(update);
+  button.addEventListener(eventType,command,true);thunderGDefaultReplyListeners.add(update);
   const stopLanguage=typeof gmOnLanguageChange==='function'?gmOnLanguageChange(update):()=>{};update();
-  return {close(){button.removeEventListener('command',command,true);thunderGDefaultReplyListeners.delete(update);stopLanguage();
+  return {close(){button.removeEventListener(eventType,command,true);thunderGDefaultReplyListeners.delete(update);stopLanguage();
     for(const [name,value] of attributes){if(value==null)button.removeAttribute(name);else button.setAttribute(name,value);}
     if(image)button.style.setProperty('--gm-default-reply-icon',image,priority);else button.style.removeProperty('--gm-default-reply-icon');
   }};

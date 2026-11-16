@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Experimental branch only, step 1: retain the inline composer’s visible plain-text sent body after native Sent-copy hydration, with stable quote/scroll state, native label/reply actions and an explicit full-message/attachment window.
+
 - Add a saved Default reply behavior option (Reply or Reply all), with live single/double-arrow header icons, matching tooltips and correctly routed compose actions.
 
 - Fix labeling after sending a draft-only conversation: hydrate the exact saved Sent copy, prefer transport Message-IDs over stale draft IDs, and refresh an open loading label picker without requiring list navigation.

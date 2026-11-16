@@ -435,6 +435,10 @@ function installIndependentReader(win) {
     .actions { display:flex; flex-wrap:wrap; gap:.5em; margin:16px 0 4px var(--message-inset); }
     .actions button,.fallback { display:inline-flex; align-items:center; justify-content:center; gap:9px; min-block-size:36px; min-inline-size:104px; font:inherit;color:inherit; background:transparent; border:1px solid var(--layout-border-0,#dadce0); border-radius:1.5em; padding:6px 18px; cursor:pointer; }
     .gm-pending-recipients { background:var(--layout-background-1,#f8f9fa); border-bottom:1px solid var(--layout-border-0,#dadce0); padding:12px 10px; margin-bottom:12px; font-size:.9em; }
+    .gm-permanent-sent-card .gm-permanent-reply{appearance:none;border:0;border-radius:50%;background:transparent;color:inherit;inline-size:32px;block-size:32px;padding:6px;cursor:pointer}
+    .gm-permanent-reply > span{display:block;inline-size:20px;block-size:20px;background:currentColor;mask:var(--gm-default-reply-icon) center/contain no-repeat}
+    .gm-permanent-sent-card .gm-permanent-reply:disabled{opacity:.4;cursor:default}
+    .gm-open-saved-message{margin:8px 10px;padding:4px 8px;font:inherit;cursor:pointer}
     .gm-pending-text { margin:0 10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; font:1em/1.35 monospace; }
     .gm-pending-signature { opacity:.65; }
     article { position:relative; }
@@ -492,7 +496,7 @@ function installIndependentReader(win) {
     snoozeNotice.textContent=reminder?snoozeReminderText(reminder,gmLocale()):'';
   }
   const stopSnooze=snoozeService?.subscribe(refreshSnooze);
-  const zoomResizers=new Map();
+  const zoomResizers=new Map(),permanentBodies=new Set();
   let messageZoom=null;
   function zoomConversation(action) {
     if(closed || host.hidden)return false;
@@ -502,7 +506,12 @@ function installIndependentReader(win) {
     if(manager && method && panes.length){
       manager[method](panes[0]);messageZoom=manager.getZoomForBrowser(panes[0]);
       for(const pane of panes)manager.setZoomForBrowser(pane,messageZoom);
+      for(const body of permanentBodies)body.style.zoom=String(messageZoom);
       for(const resize of zoomResizers.values())resize();
+    }
+    if(method && !panes.length && permanentBodies.size){
+      messageZoom=action==='resetSize'?1:Math.max(.3,Math.min(5,(messageZoom||1)*(action==='increaseSize'?1.1:1/1.1)));
+      for(const body of permanentBodies)body.style.zoom=String(messageZoom);
     }
     return true;
   }
@@ -525,14 +534,14 @@ function installIndependentReader(win) {
   function reconcilePendingReplies() {
     for(const [id,entry] of pendingReplies) {
       if(entry.messageId && currentHeaders.some(header=>normalizeSendId(header.messageId)===normalizeSendId(entry.messageId))) {
-        entry.card.remove();pendingReplies.delete(id);
+        permanentBodies.delete(entry.body);entry.card.remove();pendingReplies.delete(id);
       }
     }
   }
   function sendFeedback(state,token) {
     if(closed || host.hidden || token!==ticket)return;
     if(['saving-draft','draft-saved','draft-error'].includes(state.state)) {
-      pendingReplies.get(state.id)?.card.remove();pendingReplies.delete(state.id);if(!pendingReplies.size)pendingSentCopies.clear();return;
+      permanentBodies.delete(pendingReplies.get(state.id)?.body);pendingReplies.get(state.id)?.card.remove();pendingReplies.delete(state.id);if(!pendingReplies.size)pendingSentCopies.clear();return;
     }
     let entry=pendingReplies.get(state.id);
     if(!entry) {
@@ -560,7 +569,15 @@ function installIndependentReader(win) {
         body.append(quoted,reveal);
       }
       if(state.attachments?.length)body.append(text('div','address',state.attachments.join(' · ')));
-      card.append(heading,body);cards.append(card);entry={card,notice,body};pendingReplies.set(state.id,entry);
+      let savedButton=null;
+      if(typeof permanentSentCardsEnabled!=='undefined' && permanentSentCardsEnabled){
+        permanentBodies.add(body);body.style.zoom=String(messageZoom || 1);
+        const hint=text('small','gm-permanent-hint','Experimental plain-text sent view. Open the saved message for HTML, inline images, attachments and full security details.');hint.style.cssText='display:block;opacity:.7;margin:8px 10px';body.append(hint);
+        savedButton=text('button','gm-open-saved-message','Open saved message / attachments');savedButton.type='button';savedButton.disabled=true;
+        savedButton.title='Available once Thunderbird has saved the Sent copy. Opens the native message in a separate window.';
+        savedButton.addEventListener('click',()=>{if(!closed && token===ticket && entry?.header)ChromeUtils.importESModule('resource:///modules/MailUtils.sys.mjs').MailUtils.openMessageInNewWindow(entry.header);});body.append(savedButton);
+      }
+      card.append(heading,body);cards.append(card);entry={card,notice,body,savedButton};pendingReplies.set(state.id,entry);
       card.scrollIntoView({block:'nearest',inline:'nearest'});
     }
     entry.messageId=state.messageId;gmBindValue(entry.notice, "textContent", () => state.state==='sent'?gmText("Sent"):gmText("Sending…"));
@@ -750,11 +767,17 @@ function installIndependentReader(win) {
     hideCleanupFrame=null;
     hideCleanupTimer=null;
   }
-  function clearCards(){cancelHideCleanup();removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
+  function clearCards(){cancelHideCleanup();removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();permanentBodies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
   function text(tag,className,value){const node=doc.createElement(tag);node.className=className;node.textContent=value;return node}
   function buildCard(header,expand,token,before=null,hydration=null) {
+    const permanent=!!hydration && typeof permanentSentCardsEnabled!=='undefined' && permanentSentCardsEnabled;
     const article=hydration?.card || doc.createElement('article');
-    if(hydration){article.replaceChildren();article.className='';}
+    if(hydration){
+      if(permanent){for(const child of [...article.children])if(child!==hydration.body)child.remove();}
+      else article.replaceChildren();
+      article.className=permanent?'gm-permanent-sent-card':'';
+      hydration.header=header;if(hydration.savedButton)hydration.savedButton.disabled=false;
+    }
     messageCards.set(header,article);
     const cardHeader=doc.createElement('div');cardHeader.className='card-header';
     const latest=header===actionHeader;
@@ -804,7 +827,7 @@ function installIndependentReader(win) {
         if(!isCurrent())return;dkimPending=false;liveDkim={...result,version:'2.1'};renderDkim();refreshBimi();
       },()=>{if(isCurrent()){dkimPending=false;dkimUnavailable=true;renderDkim();}});
     }
-    cardHeader.append(toggle,meta);article.append(cardHeader);
+    cardHeader.append(toggle,meta);if(permanent)article.insertBefore(cardHeader,hydration.body);else article.append(cardHeader);
     const messageTags=doc.createElement('div');messageTags.className='tags';messageTags.setAttribute('aria-label','Labels on this message');
     sender.append(messageTags);
     const renderMessageTags=()=>{
@@ -828,9 +851,10 @@ function installIndependentReader(win) {
     tagRenderers.add(renderMessageTags);renderMessageTags();
     const body=doc.createElement('div');body.className='body';body.hidden=true;article.append(body);
     let pendingBody=hydration?.body || null;
-    if(pendingBody){article.append(pendingBody);body.style.position='absolute';body.style.visibility='hidden';body.style.inlineSize='100%';}
-    function revealSavedBody(){if(!pendingBody)return;preserveReaderPosition(host,article,()=>{pendingBody.remove();pendingBody=null;body.style.position='';body.style.visibility='';body.style.inlineSize='';});}
-    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null,defaultReplyControl=null;
+    if(pendingBody){if(!permanent)article.append(pendingBody);body.style.position='absolute';body.style.visibility='hidden';body.style.inlineSize='100%';
+      if(permanent){body.inert=true;body.style.blockSize='0';body.style.overflow='hidden';}}
+    function revealSavedBody(){if(!pendingBody || permanent)return;preserveReaderPosition(host,article,()=>{pendingBody.remove();pendingBody=null;body.style.position='';body.style.visibility='';body.style.inlineSize='';});}
+    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null,defaultReplyControl=null,permanentReplyControl=null,permanentReplyButton=null;
     const quoteButton=text('button','quote-toggle','…');quoteButton.type='button';quoteButton.hidden=true;
     gmBindAttribute(quoteButton, 'aria-label', () => gmText("Show quoted text"));quoteButton.setAttribute('aria-expanded','false');
     quoteButton.addEventListener('click',()=>toggleQuotes?.());
@@ -839,7 +863,13 @@ function installIndependentReader(win) {
     fallback.addEventListener('click',()=>{
       ChromeUtils.importESModule('resource:///modules/MailUtils.sys.mjs').MailUtils.openMessageInNewWindow(header);
     });error.append(fallback);
+    if(permanent){
+      const reply=text('button','gm-permanent-reply','');permanentReplyButton=reply;reply.type='button';reply.disabled=true;reply.append(text('span','',''));
+      permanentReplyControl=installDefaultReplyControl(reply,command=>runCommand(command,header),()=>isCurrent() && ready,'click');meta.append(reply);
+    }
     function release(){
+      if(permanent)permanentBodies.delete(pendingBody);
+      permanentReplyControl?.close();permanentReplyControl=null;if(permanentReplyButton)permanentReplyButton.disabled=true;
       try { browser?.contentWindow?.ClearPendingReadTimer?.(); } catch (_) {}
       if(timeout!==null)win.clearTimeout(timeout);timeout=null;
       bodyResize?.disconnect();bodyResize=null;
@@ -886,7 +916,7 @@ function installIndependentReader(win) {
       },true);
       browser.addEventListener('MsgLoaded',()=>{
         if(closed || token!==ticket || browser!==frame)return;
-        if(timeout!==null)win.clearTimeout(timeout);timeout=null;ready=true;error.hidden=true;
+        if(timeout!==null)win.clearTimeout(timeout);timeout=null;ready=true;error.hidden=true;if(permanentReplyButton)permanentReplyButton.disabled=false;
         frames.set(independentMessageKey(header),frame);updateActions();
         // Keep visual and keyboard order aligned, retaining native star behavior.
         const star=frame.contentDocument.getElementById('starMessageButton');
@@ -991,7 +1021,7 @@ function installIndependentReader(win) {
         if(content?.body && win.ResizeObserver) {
           const resizeBody=()=>{
             resizeFrame=null;
-            if(browser!==frame || closed || token!==ticket || body.hidden)return;
+            if(browser!==frame || closed || token!==ticket || body.hidden || permanent)return;
             const chrome=Math.max(0,frame.clientHeight-pane.clientHeight);
             const contentHeight=independentContentHeight(content);
             // Content rectangles use the message document's CSS pixels;
@@ -1044,12 +1074,12 @@ function installIndependentReader(win) {
       activateMessage(header);
       if(header===actionHeader)return;
       if(body.hidden) {
-        if(browser) {body.hidden=false;preview.hidden=true;article.setAttribute('data-expanded','');toggle.setAttribute('aria-expanded','true');zoomResizers.get(browser)?.();}
+        if(browser) {body.hidden=false;if(permanent && pendingBody)pendingBody.hidden=false;preview.hidden=true;article.setAttribute('data-expanded','');toggle.setAttribute('aria-expanded','true');zoomResizers.get(browser)?.();}
         else expandCard();
       } else {
         // Retain a loaded frame while folded so footer Reply/Print still target
         // the latest message. All frames are released when leaving the reader.
-        body.hidden=true;preview.hidden=false;article.removeAttribute('data-expanded');toggle.setAttribute('aria-expanded','false');
+        body.hidden=true;if(permanent && pendingBody)pendingBody.hidden=true;preview.hidden=false;article.removeAttribute('data-expanded');toggle.setAttribute('aria-expanded','false');
       }
     });
     cleanups.add(release);if(!hydration){if(before)cards.insertBefore(article,before);else cards.append(article);}if(expand)expandCard();
@@ -1084,7 +1114,7 @@ function installIndependentReader(win) {
       }
     }
     activateMessage(selected);
-    for(const [id,entry] of pending){cards.append(entry.card);pendingReplies.set(id,entry);}
+    for(const [id,entry] of pending){cards.append(entry.card);pendingReplies.set(id,entry);if(typeof permanentSentCardsEnabled!=='undefined' && permanentSentCardsEnabled)permanentBodies.add(entry.body);}
     for(const [id,header] of savedCopies)pendingSentCopies.set(id,header);
     updateActions();refreshTags();reconcilePendingReplies();
     revealFrame=win.requestAnimationFrame(()=>{

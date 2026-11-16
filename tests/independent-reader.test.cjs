@@ -30,7 +30,7 @@ test('index queries include Sent and cancel stale conversations; timeouts preser
   first.onQueryCompleted({items:[]});result=await query.promise;assert.equal(result.indexed,false);assert.equal(result.messages[0],anchor);
   query=scope.independentConversation(win,anchor,gloda);timer();result=await query.promise;assert.equal(result.messages.length,1);assert.equal(result.indexed,false);
 });
-function readerFixture({photo=null,tagged=false,verifyIndependentDkim,snooze}={}) {
+function readerFixture({photo=null,tagged=false,verifyIndependentDkim,snooze,permanentSentCards=false}={}) {
   function node(tag='div') {
     const attrs=new Map(),classes=new Set(),css=new Map();
     return {tag,children:[],events:{},style:{
@@ -63,7 +63,7 @@ function readerFixture({photo=null,tagged=false,verifyIndependentDkim,snooze}={}
       browser.replyButton=node('button');browser.pane=pane;browser.content=content;browsers.push(browser);return browser;
     }};
   const tags=[{key:'work',tag:'Work',color:'#336699'}];
-  const scope=context({thunderGSnooze:snooze,verifyIndependentDkim,Services:{prefs:{getBoolPref:()=>false}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
+  const scope=context({permanentSentCardsEnabled:permanentSentCards,thunderGSnooze:snooze,verifyIndependentDkim,Services:{prefs:{getBoolPref:()=>false}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
     MailServices:{headerParser:{parseDecodedHeader:name=>[{name,email:`${name.toLowerCase()}@example.org`}]},
       ab:{cardForEmailAddress:()=>photo?{photoURL:photo}:null},tags:{getAllTags:()=>tags},
       mfn:{addListener(fn){tagListener=fn},removeListener(fn){removedListener=fn}}},
@@ -953,4 +953,48 @@ test('default Reply all opens the embedded reply-all composer for the clicked me
  const f=readerFixture();let opened;f.scope.inlineReplyEnabled=true;f.scope.inlineComposeControllers=new WeakMap([[f.win,{float(){},open(header,command){opened={header,command}}}]]);
  await f.reader.open(f.anchor);f.loaded();f.scope.setThunderGDefaultReplyBehavior('reply-all');f.browsers[0].replyButton.emit('command',{preventDefault(){},stopImmediatePropagation(){}});
  assert.equal(opened.header,f.anchor);assert.equal(opened.command,'cmd_replyall');f.reader.close();
+});
+async function permanentSendFixture(){
+ const f=readerFixture({permanentSentCards:true});await f.reader.open(f.anchor);f.loaded();let placement;
+ f.scope.inlineReplyEnabled=true;f.scope.inlineComposeControllers=new WeakMap([[f.win,{float(){},open(_header,_command,options){placement=options}}]]);
+ f.actions.children[1].emit('click');
+ const state={id:{},state:'sending',from:'Me',to:'Recipient <recipient@example.test>',cc:'Other <other@example.test>',body:'<b>Literal answer</b>\n\nOn Tuesday wrote:\n> old text\n\n--\nSignature',date:1700000000000};
+ placement.onSendState(state);return {...f,placement,state,card:f.cards.children[1],snapshot:f.cards.children[1].children[1]};
+}
+test('experimental sent card keeps the same visible body, recipients and expanded quotes after native hydration',async()=>{
+ const f=await permanentSendFixture(),snapshot=f.snapshot,text=snapshot.children[1],recipients=snapshot.children[0],quote=snapshot.children.find(node=>node.className==='quote-toggle');
+ quote.emit('click');assert.equal(quote.getAttribute('aria-expanded'),'true');
+ const host=f.layout.children[0];host.scrollTop=550;
+ f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});const copy=sentReplyFixture(f);f.tagListener.msgAdded(copy);
+ assert.equal(f.cards.children[1],f.card);assert.equal(snapshot.parentNode,f.card);assert.equal(snapshot.removed,undefined);assert.equal(f.card.className,'gm-permanent-sent-card');
+ const backend=f.card.children.find(node=>node.className==='body');assert.equal(backend.style.visibility,'hidden');assert.equal(backend.inert,true);assert.equal(backend.style.blockSize,'0');
+ f.loaded();f.flush();assert.equal(snapshot.removed,undefined);assert.equal(snapshot.children[1],text);assert.equal(snapshot.children[0],recipients);assert.equal(text.textContent,'<b>Literal answer</b>\n');assert.equal(quote.getAttribute('aria-expanded'),'true');assert.equal(host.scrollTop,550);
+ assert.equal(f.reader.getMessages().at(-1),copy,'labels and commands use a real saved header');
+ f.reader.close();
+});
+test('experimental permanent card retains a native saved-message/attachment escape hatch and default reply action',async()=>{
+ const f=await permanentSendFixture(),open=f.snapshot.children.find(node=>node.className==='gm-open-saved-message');assert.equal(open.disabled,true);
+ const copy=sentReplyFixture(f);f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(copy);assert.equal(open.disabled,false);
+ const shown=[],original=f.scope.ChromeUtils.importESModule;f.scope.ChromeUtils.importESModule=uri=>uri.includes('MailUtils')?{MailUtils:{openMessageInNewWindow:header=>shown.push(header)}}:original(uri);
+ open.emit('click');assert.equal(shown[0],copy);f.loaded();
+ const action=f.card.children[0].children[1].children.find(node=>node.className==='gm-permanent-reply');assert.equal(action.disabled,false);f.scope.setThunderGDefaultReplyBehavior('reply-all');assert.equal(action.getAttribute('aria-label'),'Reply all');
+ f.scope.inlineReplyEnabled=false;action.emit('click',{preventDefault(){},stopImmediatePropagation(){}});assert.deepEqual(f.commands.at(-1),['cmd_replyall','mailbox://sent/2']);f.reader.close();assert.equal(action.events.click.length,0);
+});
+test('native viewport changes and font-size changes do not replace the permanent snapshot',async()=>{
+ const f=await permanentSendFixture();const zoom={enlarge:browser=>browser.fullZoom=(browser.fullZoom||1)+.1,reduce:browser=>browser.fullZoom=(browser.fullZoom||1)-.1,reset:browser=>browser.fullZoom=1,getZoomForBrowser:browser=>browser.fullZoom||1,setZoomForBrowser:(browser,value)=>browser.fullZoom=value};f.win.ZoomManager=zoom;
+ f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));f.loaded();
+ f.reader.zoom('increaseSize');assert.ok(Number(f.snapshot.style.zoom)>1);f.flush();assert.equal(f.snapshot.removed,undefined);
+ f.reader.zoom('resetSize');assert.equal(f.snapshot.style.zoom,'1');f.reader.close();
+});
+test('permanent snapshot stays readable when the hidden native viewer fails and is removed on reader close',async()=>{
+ const f=await permanentSendFixture();f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));
+ const viewer=f.browsers.at(-1);viewer.contentWindow.displayMessage=()=>{throw Error('native failure')};viewer.emit('load',{target:viewer.contentDocument});
+ assert.equal(f.snapshot.removed,undefined);assert.equal(f.snapshot.hidden,false);assert.equal(f.snapshot.children.find(node=>node.className==='gm-open-saved-message').disabled,false);f.reader.close();assert.equal(f.cards.children.length,0);
+});
+test('experimental draft-only sent card remains permanent and failed sends still remove their previews',async()=>{
+ const f=readerFixture({permanentSentCards:true});let placement;const draft=f.prepare(message(9,'draft-id','drafts')),copy=sentReplyFixture(f,10,'sent-draft',[]);
+ f.scope.resumeInlineDraft=async(_win,_draft,options)=>{placement=options};await f.reader.open(draft,{draft});
+ const state={id:{},state:'sending',body:'Draft content',messageId:'draft-id'};placement.onSendState(state);const snapshot=f.cards.children[0].children[1];
+ f.tagListener.msgAdded(copy);placement.onSendState({...state,state:'sent',messageId:'sent-draft'});f.loaded();assert.equal(f.cards.children.length,1);assert.equal(snapshot.removed,undefined);assert.equal(f.reader.getMessages()[0],copy);f.reader.close();
+ const other=await permanentSendFixture();other.placement.onSendState({...other.state,state:'saving-draft'});assert.equal(other.cards.children.length,1);assert.equal(other.card.removed,true);assert.equal(other.reader.getMessages().length,1);other.reader.close();
 });
