@@ -2262,5 +2262,11 @@
   },
   "snooze_sync_note": {
     "message": "Reminders stay in this profile. Gmail snooze and other clients do not sync."
+  },
+  "default_reply_behavior": {
+    "message": "Default reply behavior"
+  },
+  "default_reply_behavior_help": {
+    "message": "Choose the top-right reply action in the Thunder-G conversation reader. Applies immediately; an open composer is unchanged."
   }
 }

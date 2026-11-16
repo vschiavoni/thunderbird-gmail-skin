@@ -520,6 +520,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       async setThreadExpandArrows(enabled){threadExpandArrows=enabled===true;for(const controller of documents.values())controller.setThreadExpandArrows?.(threadExpandArrows);},
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},
       async setGmailShortcuts(enabled){gmailShortcutsEnabled=enabled===true;},
+      async setDefaultReplyBehavior(value){setThunderGDefaultReplyBehavior(value);},
       async setInlineReplyEnabled(enabled){inlineReplyEnabled=enabled===true;},
       async setInlineNewMessageEnabled(enabled){inlineNewMessageEnabled=enabled===true;},
       async setBimiEnabled(enabled){independentBimiEnabled=enabled===true;for(const refresh of independentBimiListeners)refresh();},

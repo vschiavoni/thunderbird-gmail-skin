@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8');
-function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(source,scope);return scope;}
+function context(extra={}) {const scope=require('./localization-context.cjs').createContext(extra);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-navigation.js'),'utf8'),scope);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8').split('function commonLabelKeys')[1].replace(/^/,'function commonLabelKeys'),scope);vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);vm.runInContext(fs.readFileSync('thunder-g/default-reply.js','utf8'),scope);vm.runInContext(source,scope);return scope;}
 function message(key,id,folder='inbox',date=key){return {messageKey:key,messageId:id,dateInSeconds:date,folder:{URI:folder},mime2DecodedSubject:'Subject',mime2DecodedAuthor:'Sender',getStringProperty(name){return name==='keywords' && this.tagged?'work':''}}}
 test('conversation grouping deduplicates physical and logical copies, retains selected copy and sorts by date',()=>{
   const scope=context(),anchor=message(1,'same','inbox',20),sent=message(2,'other','sent',10);
@@ -915,4 +915,42 @@ test('open conversation shows its snooze deadline and updates after reschedule a
   assert.equal(banner.hidden,false);assert.match(banner.textContent,/Snoozed until/);assert.match(banner.textContent,/09:10|9:10/);
   reminder={...reminder,due:new Date(2026,10,11,10,20).getTime()};changed();assert.match(banner.textContent,/10:20/);
   reminder=null;changed();assert.equal(banner.hidden,true);f.reader.close();assert.equal(unsubscribed,true);
+});
+for(const copyFirst of [false,true])test(`draft-only sent conversation becomes labelable without reopening (copy first: ${copyFirst})`,async()=>{
+ const f=readerFixture();let placement;
+ const ready=[];f.win.CustomEvent=class{constructor(type){this.type=type}};f.win.dispatchEvent=event=>{if(event.type==='gm-conversation-messages-changed')ready.push(f.reader.getMessages().length)};
+ const draft=f.prepare(message(9,'draft-id','drafts')),copy=sentReplyFixture(f,10,'actual-sent-id',[]);
+ f.scope.resumeInlineDraft=async(_win,_draft,options)=>{placement=options};
+ await f.reader.open(draft,{draft});assert.equal(f.reader.getMessages().length,0);
+ const state={id:{},state:'sending',from:'Me',to:'Recipient',body:'Sent draft',messageId:'draft-id'};placement.onSendState(state);
+ assert.equal(f.cards.children.length,1);const pending=f.cards.children[0];
+ const unrelated=sentReplyFixture(f,11,'unrelated',[]);f.tagListener.msgAdded(unrelated);assert.equal(f.reader.getMessages().length,0);
+ if(copyFirst)f.tagListener.msgAdded(copy);
+ placement.onSendState({...state,state:'sent',messageId:'<actual-sent-id>'});
+ if(!copyFirst)f.tagListener.msgAdded(copy);
+ assert.equal(f.reader.getMessages().length,1);assert.equal(f.reader.getMessages()[0],copy);assert.equal(ready.at(-1),1,'an already-open picker is notified only with a real saved scope');
+ assert.equal(f.cards.children.length,1);assert.equal(f.cards.children[0],pending,'saved copy hydrates the same card');
+ f.tagListener.msgAdded(copy);assert.equal(f.reader.getMessages().length,1,'repeated notifications do not duplicate messages');f.reader.close();
+});
+test('exact-ID Sent summary lookup recovers a missed copy notification in a draft-only conversation',async()=>{
+ const f=readerFixture();let placement;
+ const draft=f.prepare(message(9,'draft-id','drafts')),copy=sentReplyFixture(f,10,'actual-sent-id',[]);let lookups=0;
+ copy.folder.msgDatabase={getMsgHdrForMessageID(id){lookups++;assert.equal(id,'actual-sent-id');return copy}};
+ f.scope.resumeInlineDraft=async(_win,_draft,options)=>{placement=options};await f.reader.open(draft,{draft});
+ const state={id:{},state:'sending',body:'Message',messageId:'draft-id'};placement.onSendState(state);
+ placement.onSendState({...state,state:'sent',messageId:'<actual-sent-id>'});
+ assert.ok(lookups>0);assert.equal(f.reader.getMessages()[0],copy);f.reader.close();
+});
+test('conversation top-right action follows the default reply choice with a live matching icon and command',async()=>{
+ const f=readerFixture();await f.reader.open(f.anchor);f.loaded();const reply=f.browsers[0].replyButton;
+ const single=reply.style.getPropertyValue('--gm-default-reply-icon');assert.equal(reply.getAttribute('tooltiptext'),'Reply');
+ f.scope.setThunderGDefaultReplyBehavior('reply-all');assert.equal(reply.getAttribute('aria-label'),'Reply all');assert.notEqual(reply.style.getPropertyValue('--gm-default-reply-icon'),single);
+ reply.emit('command',{preventDefault(){},stopImmediatePropagation(){}});assert.deepEqual(f.commands.at(-1),['cmd_replyall','mailbox://inbox/1']);
+ f.actions.children[1].emit('click');assert.deepEqual(f.commands.at(-1),['cmd_replySender','mailbox://inbox/1'],'explicit footer Reply stays explicit');
+ f.scope.setThunderGDefaultReplyBehavior('reply');reply.emit('command',{preventDefault(){},stopImmediatePropagation(){}});assert.equal(f.commands.at(-1)[0],'cmd_replySender');f.reader.close();assert.equal(reply.events.command.length,0);
+});
+test('default Reply all opens the embedded reply-all composer for the clicked message',async()=>{
+ const f=readerFixture();let opened;f.scope.inlineReplyEnabled=true;f.scope.inlineComposeControllers=new WeakMap([[f.win,{float(){},open(header,command){opened={header,command}}}]]);
+ await f.reader.open(f.anchor);f.loaded();f.scope.setThunderGDefaultReplyBehavior('reply-all');f.browsers[0].replyButton.emit('command',{preventDefault(){},stopImmediatePropagation(){}});
+ assert.equal(opened.header,f.anchor);assert.equal(opened.command,'cmd_replyall');f.reader.close();
 });

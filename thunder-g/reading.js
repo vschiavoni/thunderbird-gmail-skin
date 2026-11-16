@@ -565,6 +565,9 @@ function installReadingMode(win) {
   }
   function sameSelection() {
     const selected = win.gDBView?.getSelectedMsgHdrs() || [];
+    // A sent draft can disappear from the list or leave a successor selected.
+    // The active reader’s validated native scope, not that stale row, is authoritative.
+    if(pickerConversation && pickerConversation===independent)return conversationDocument()===independent && sameLabelMessages(independent.getMessages(),pickerMessages);
     if (!sameLabelMessages(Array.from(selected), pickerSelection)) return false;
     return !pickerConversation || (conversationDocument() === pickerConversation &&
       sameLabelMessages(resolveConversation(pickerConversation), pickerMessages));
@@ -601,11 +604,11 @@ function installReadingMode(win) {
     if(!active)syncBulk();
     anchor=labelPickerAnchor(doc,toolbar,labelsButton,anchor);
     const messages = win.gDBView?.getSelectedMsgHdrs() || [];
-    if (!messages.length) return;
+    if (!messages.length && !(active && useIndependent)) return;
     pickerSelection = Array.from(messages);
     pickerConversation = conversationDocument();
     pickerMessages = pickerConversation ? resolveConversation(pickerConversation) : pickerSelection;
-    if (pickerConversation && pickerMessages && !pickerSelection.every(selected =>
+    if (pickerConversation && pickerConversation!==independent && pickerMessages && !pickerSelection.every(selected =>
       pickerMessages.some(message => message.messageKey === selected.messageKey && message.folder.URI === selected.folder?.URI))) pickerMessages = null;
     const count = pickerMessages?.length;
     gmBindValue(heading, "textContent", () => gmText("Label as:"));
@@ -624,6 +627,13 @@ function installReadingMode(win) {
     returnFocus = doc.activeElement; search.value = ''; renderTags();
     tagPopup.openPopup(anchor, 'after_start', 0, 0, false, false);
   }
+  function sentLabelScopeReady(){
+    if(closed || !pickerOpen || !active || !useIndependent || pickerConversation!==independent || pickerMessages.length)return;
+    const messages=independent?.getMessages();if(!messages?.length)return;
+    pickerMessages=messages;pickerTags=MailServices.tags.getAllTags();search.disabled=false;
+    gmBindValue(empty,'textContent',()=>gmText('No matching labels'));renderTags();search.focus();
+  }
+  win.addEventListener('gm-conversation-messages-changed',sentLabelScopeReady);
   const createPopup=doc.createXULElement('panel');createPopup.classList.add('gm-label-panel');
   gmBindAttribute(createPopup, 'aria-label', () => gmText("New label"));doc.documentElement.append(createPopup);popups.push(createPopup);
   const form=doc.createElement('form');form.className='gm-new-label';
@@ -1133,6 +1143,7 @@ function installReadingMode(win) {
     win.removeEventListener('gm-create-sidebar-label',createSidebarLabel);
     for (const heading of headingTargets) heading.removeEventListener('click', headingClick);
     for (const document of keyDocuments) document.removeEventListener("keydown", labelKey, true);
+    win.removeEventListener("gm-conversation-messages-changed",sentLabelScopeReady);
     win.removeEventListener("load", documentLoaded, true);
     tagPopup.hidePopup?.();
     for (const popup of popups) popup.remove();

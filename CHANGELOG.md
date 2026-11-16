@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add a saved Default reply behavior option (Reply or Reply all), with live single/double-arrow header icons, matching tooltips and correctly routed compose actions.
+
+- Fix labeling after sending a draft-only conversation: hydrate the exact saved Sent copy, prefer transport Message-IDs over stale draft IDs, and refresh an open loading label picker without requiring list navigation.
+
 ## 0.31.0
 
 - Block native numeric label commands and conversation-frame label overrides while the embedded composer has focus, including recipient fields and resumed drafts.
