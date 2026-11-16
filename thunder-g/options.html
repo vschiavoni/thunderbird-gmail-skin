@@ -230,6 +230,12 @@
             <div class="setting-copy"><label for="inline-new-message"><span data-i18n="write_new_messages_in_this_window_e4d5bf5">Write new messages in this window</span> <span class="badge"><span data-i18n="experimental_b718f8c">Experimental</span></span></label><p id="new-message-help"><span data-i18n="start_in_a_floating_panel_resize_it_expand_it_beside_11127a6">Start in a floating panel. Resize it, expand it beside the sidebar, or open a separate window. Off by default.</span></p></div>
             <input class="switch" id="inline-new-message" type="checkbox" role="switch" aria-describedby="new-message-help">
           </div>
+          <fieldset class="setting-row default-reply-setting" aria-describedby="default-reply-help">
+            <legend data-i18n="default_reply_behavior">Default reply behavior</legend>
+            <div class="setting-copy"><p id="default-reply-help" data-i18n="default_reply_behavior_help">Choose the top-right reply action in the Thunder-G conversation reader. Applies immediately; an open composer is unchanged.</p></div>
+            <div><label><input type="radio" name="default-reply-behavior" value="reply" checked disabled> Reply</label><br><label><input type="radio" name="default-reply-behavior" value="reply-all" disabled> Reply all</label></div>
+          </fieldset>
+          <p id="default-reply-status" class="section-note" role="status" aria-live="polite"></p>
           <div class="setting-row">
             <div class="setting-copy"><label for="inline-reply-enabled"><span data-i18n="reply_in_this_window_9328ac7">Reply in this window</span> <span class="badge"><span data-i18n="experimental_b718f8c">Experimental</span></span></label><p id="reply-help"><span data-i18n="reply_and_reply_all_start_below_the_conversation_det_8f4541f">Reply and Reply all start below the conversation. Detach when you need more room. Disable Thunderbird Conversations first. Off by default.</span></p></div>
             <input class="switch" id="inline-reply-enabled" type="checkbox" role="switch" aria-describedby="reply-help">
@@ -263,6 +269,7 @@
   </div>
   <script src="in-place-search-options.js"></script>
   <script src="read-timing-options.js"></script>
+  <script src="default-reply-options.js"></script>
   <script src="folder-options.js"></script>
   <script src="preview-options.js"></script>
   <script src="stars.js"></script>

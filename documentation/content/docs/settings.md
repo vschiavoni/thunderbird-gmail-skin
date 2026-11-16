@@ -243,3 +243,16 @@ For profiling, the mail pane’s `_gmSearchMetrics` object exposes only `backend
 Label-and-text conjunctions such as `school AND label:cuso` filter live label assignments first, then intersect native full-text results with those live candidates. Nested labels accept their full path or leaf name. The result limit is applied after label filtering; no combined Gloda ID/full-text constraints are used. Unindexed messages can still be absent. OR/negated text and unsupported short terms retain local search.
 
 See [Which queries use which search path?](search.md#which-queries-use-which-search-path) for supported indexed combinations, local fallback examples, and token-length restrictions. Local fallback does not mean the query is unsupported.
+
+## Default reply behavior
+
+Under **Writing → Default reply behavior**, choose **Reply** (the default) or
+**Reply all**. The top-right action on each message in the Thunder-G conversation
+reader uses that command, with a matching single- or double-arrow icon, tooltip
+and accessible name. Changes apply immediately to already-open conversations
+without reloading their message bodies.
+
+The setting is stored locally with the extension’s other preferences. It applies
+to embedded replies and replies opened in a separate native compose window.
+Already-open composers keep their recipients. Explicit Reply/Reply-all menu or
+footer actions and the `r`/`a` keyboard shortcuts retain their named behavior.

@@ -521,6 +521,7 @@ function installIndependentReader(win) {
   const actions=doc.createElement('div');actions.className='actions';actions.setAttribute('role','group');gmBindAttribute(actions, 'aria-label', () => gmText("Reply to conversation"));
   const buttons=[],pendingReplies=new Map(),pendingSentCopies=new Map();
   const normalizeSendId=value=>String(value || '').trim().replace(/^<|>$/g,'');
+  function notifyLabelScope(){if(win.CustomEvent)win.dispatchEvent(new win.CustomEvent('gm-conversation-messages-changed'));}
   function reconcilePendingReplies() {
     for(const [id,entry] of pendingReplies) {
       if(entry.messageId && currentHeaders.some(header=>normalizeSendId(header.messageId)===normalizeSendId(entry.messageId))) {
@@ -566,7 +567,19 @@ function installIndependentReader(win) {
     // A forward may have no References header. Match only the exact Message-ID
     // from this composer, including when the Sent copy arrived before feedback.
     for(const header of [...pendingSentCopies.values()])tagListener.msgAdded(header);
+    if(state.state==='sent' && entry.messageId){
+      // Recover even if the native notification arrived before this preview or
+      // during a reader refresh. Exact-ID summary lookup only, never a scan.
+      for(const folder of independentSentFolders())try{
+        const header=folder.msgDatabase?.getMsgHdrForMessageID(normalizeSendId(entry.messageId));
+        if(header && normalizeSendId(header.messageId)===normalizeSendId(entry.messageId))tagListener.msgAdded(header);
+      }catch(_){/* A later copy notification may still hydrate the preview. */}
+    }
     reconcilePendingReplies();
+    if(!currentHeaders.length && pendingReplies.size){
+      status.textContent=gmCount('$1 message','$1 messages',pendingReplies.size);status.hidden=false;
+      gmBindValue(status,'title',()=>gmText('Waiting for the saved Sent copy before applying labels.'));
+    }
   }
   function runCommand(command,target=actionHeader) {
     if(typeof inlineReplyEnabled!=='undefined' && inlineReplyEnabled && ['cmd_replySender','cmd_replyall','cmd_forwardInline'].includes(command)) {
@@ -677,13 +690,19 @@ function installIndependentReader(win) {
   tagListener.msgKeyChanged=(_oldKey,header)=>sentCache.invalidateFolders([header?.folder]);
   tagListener.msgAdded=header=>{
     sentCache.invalidateFolders([header?.folder]);
-    if(closed || host.hidden || !currentHeaders.length || !header?.folder)return;
+    if(closed || host.hidden || (!currentHeaders.length && !pendingReplies.size) || !header?.folder)return;
     // Draft saves also emit msgAdded. Only actual Sent copies can become a
     // sent message. Replies match References; forwards match this composer’s ID.
     if(!independentSentFolders().some(folder=>folder.URI===header.folder.URI))return;
     const sentId=normalizeSendId(header.messageId);
     const pendingMatch=sentId && [...pendingReplies].find(([,entry])=>normalizeSendId(entry.messageId)===sentId);
     const ownSend=!!pendingMatch;
+    if(!currentHeaders.length && !ownSend){
+      // A draft-only conversation has no native members until its Sent copy
+      // arrives. Retain candidates but accept only this composer’s exact ID.
+      if(sentId){if(pendingSentCopies.size>=20)pendingSentCopies.delete(pendingSentCopies.keys().next().value);pendingSentCopies.set(sentId,header);}
+      return;
+    }
     // Copy notifications can precede the transport callback supplying the ID.
     // Keep the preview until an exact match is possible instead of drawing twice.
     if(sentId && pendingReplies.size && !ownSend && [...pendingReplies.values()].some(entry=>!entry.messageId)){
@@ -695,7 +714,7 @@ function installIndependentReader(win) {
       if(pendingSentCopies.size>=20)pendingSentCopies.delete(pendingSentCopies.keys().next().value);
       pendingSentCopies.set(sentId,header);
     }else pendingSentCopies.delete(sentId);
-    const next=independentMessages(related,currentHeaders[0]);
+    const next=independentMessages(related,currentHeaders[0] || header);
     if(next.length===currentHeaders.length){reconcilePendingReplies();return;}
     // Insert only the new card: existing viewers, scroll state and any other
     // unsent composer remain alive, even if the server reports an older date.
@@ -711,7 +730,8 @@ function installIndependentReader(win) {
     if(hydration)preserveReaderPosition(host,hydration.card,()=>{card=buildCard(header,true,ticket,following,hydration)});
     else card=buildCard(header,true,ticket,following);
     updateActions();refreshTags();reconcilePendingReplies();
-    gmBindValue(status, "textContent", () => gmText("$1 messages", next.length));status.hidden=false;
+    status.textContent=gmCount('$1 message','$1 messages',next.length);status.hidden=false;
+    gmBindValue(status,'title',()=>gmText('Conversation includes the saved Sent message.'));notifyLabelScope();
     if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);
     if(hydration)return;
     const token=ticket;
@@ -810,7 +830,7 @@ function installIndependentReader(win) {
     let pendingBody=hydration?.body || null;
     if(pendingBody){article.append(pendingBody);body.style.position='absolute';body.style.visibility='hidden';body.style.inlineSize='100%';}
     function revealSavedBody(){if(!pendingBody)return;preserveReaderPosition(host,article,()=>{pendingBody.remove();pendingBody=null;body.style.position='';body.style.visibility='';body.style.inlineSize='';});}
-    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null;
+    let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null,defaultReplyControl=null;
     const quoteButton=text('button','quote-toggle','…');quoteButton.type='button';quoteButton.hidden=true;
     gmBindAttribute(quoteButton, 'aria-label', () => gmText("Show quoted text"));quoteButton.setAttribute('aria-expanded','false');
     quoteButton.addEventListener('click',()=>toggleQuotes?.());
@@ -826,6 +846,7 @@ function installIndependentReader(win) {
       contentChanges?.disconnect();contentChanges=null;
       contentLoad?.();contentLoad=null;toggleQuotes=null;
       if(resizeFrame!==null)win.cancelAnimationFrame(resizeFrame);resizeFrame=null;
+      defaultReplyControl?.close();defaultReplyControl=null;
       messageActions?.close();messageActions=null;
       restoreCommands?.();restoreCommands=null;focusCleanup?.();focusCleanup=null;
       scrollCleanup?.();scrollCleanup=null;
@@ -873,16 +894,8 @@ function installIndependentReader(win) {
         if(star && replyControl && star.parentNode===replyControl.parentNode)star.parentNode.insertBefore(star,replyControl);
         messageActions?.close();messageActions=installIndependentMessageActions(frame,header,isCurrent,runCommand);
         const replyButton=frame.contentDocument.getElementById('hdrReplyToSenderButton');
-        if(replyButton && replyButton.getAttribute('data-gm-reply-bound')!=='true'){
-          replyButton.setAttribute('data-gm-reply-bound','true');
-          const reply=event=>{
-            if(closed || token!==ticket)return;
-            event.preventDefault();event.stopImmediatePropagation();
-            runCommand('cmd_replySender',header);
-          };
-          replyButton.addEventListener('command',reply,true);
-          cleanups.add(()=>replyButton.removeEventListener('command',reply,true));
-        }
+        defaultReplyControl?.close();defaultReplyControl=null;
+        if(replyButton)defaultReplyControl=installDefaultReplyControl(replyButton,command=>runCommand(command,header),()=>!closed && token===ticket);
         const senderHeader=frame.contentWindow.currentHeaderData?.sender?.headerValue;
         const viaDomain=independentViaDomain(address,senderHeader,MailServices.headerParser);
         via.hidden=!viaDomain;via.textContent=viaDomain?`via ${viaDomain}`:'';
@@ -914,7 +927,7 @@ function installIndependentReader(win) {
             background:transparent !important;
           }
           #hdrReplyToSenderButton > .toolbarbutton-icon {
-            list-style-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M9%205%203%2011l6%206%20M3%2011h9a7%207%200%200%201%207%207%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E") !important; width:20px; height:20px;
+            list-style-image:var(--gm-default-reply-icon,url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M9%205%203%2011l6%206%20M3%2011h9a7%207%200%200%201%207%207%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E")) !important; width:20px; height:20px;
           }
           #hdrReplyToSenderButton > .toolbarbutton-text { display:none !important; }
           #hdrReplyToSenderButton:hover { background:light-dark(#20212414,#ffffff20) !important; }
@@ -1043,7 +1056,7 @@ function installIndependentReader(win) {
     return article;
   }
   function render(headers,anchor,token,focusMessage=false){
-    const pending=[...pendingReplies];
+    const pending=[...pendingReplies],savedCopies=[...pendingSentCopies];
     clearCards();currentHeaders=headers;refreshSnooze();
     actionHeader=headers.at(-1) || anchor;
     const selected=(focusMessage && headers.find(header=>independentMessageKey(header)===independentMessageKey(anchor))) || actionHeader;
@@ -1072,6 +1085,7 @@ function installIndependentReader(win) {
     }
     activateMessage(selected);
     for(const [id,entry] of pending){cards.append(entry.card);pendingReplies.set(id,entry);}
+    for(const [id,header] of savedCopies)pendingSentCopies.set(id,header);
     updateActions();refreshTags();reconcilePendingReplies();
     revealFrame=win.requestAnimationFrame(()=>{
       revealFrame=null;
@@ -1161,6 +1175,7 @@ function installIndependentReader(win) {
       status.textContent=gmCount('$1 message','$1 messages',result.messages.length);
       status.hidden=result.messages.length===1;
       gmBindValue(status, "title", () => result.indexed?'':gmText("Conversation assembled from this folder and locally available sent messages"));
+      notifyLabelScope();
       if(draft && typeof resumeInlineDraft==='function'){
         const labelHeaders=currentHeaders.slice();
         await resumeInlineDraft(win,draft,{

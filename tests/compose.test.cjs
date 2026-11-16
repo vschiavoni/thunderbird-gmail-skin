@@ -298,7 +298,7 @@ function sendFixture({result='success',draftFails=false,busy=false,spellCheck=fa
  const original=native.GenericSendMessage;
  const clock={setTimeout(fn){timers.set(++timerId,fn);return timerId},clearTimeout(id){timers.delete(id)}};
  const status=scope.installInlineSendStatus(native,clock,state=>states.push(state),async()=>{saved++;if(draftFails)throw new Error('disk full');return 'draft://42'},modes,openSeparateComposer);
- return {native,states,status,original,modes,timers,fail(){sendListener.onStopSending('',1,'Send failed')},tick(){const pending=[...timers.values()];timers.clear();for(const fn of pending)fn()},get saved(){return saved}};
+ return {native,states,status,original,modes,timers,get listener(){return sendListener},start(){events.get('compose-send-message')?.({detail:{msgType:modes.Now}})},afterSend(){events.get('aftersend')?.({type:'aftersend'})},fail(){sendListener.onStopSending('',1,'Send failed')},tick(){const pending=[...timers.values()];timers.clear();for(const fn of pending)fn()},get saved(){return saved}};
 }
 test('inline send shows an immediate snapshot and reports Sent only after native aftersend',async()=>{
  const f=sendFixture();await f.native.GenericSendMessage(f.modes.Now);
@@ -626,4 +626,20 @@ test('pre-send spelling check transfers embedded sends without intercepting draf
  assert.equal(transfers,2);
  assert.deepEqual(f.states,[]);
  f.status.close();
+});
+
+test('resumed draft send feedback uses the native transport ID instead of stale compose fields',async()=>{
+ const f=sendFixture();f.native.gMsgCompose.compFields.messageId='<old-draft-id>';
+ await f.native.GenericSendMessage(f.modes.Now);
+ assert.equal(f.states[0].messageId,'<old-draft-id>');assert.equal(f.states.at(-1).messageId,'<outgoing-id>');assert.equal(f.states.at(-1).state,'sent');f.status.close();
+});
+test('late transport IDs correct already-sent previews once without reverting to the draft ID',()=>{
+ const f=sendFixture();f.native.gMsgCompose.compFields.messageId='<old-draft-id>';f.start();f.afterSend();
+ assert.equal(f.states.at(-1).messageId,'<old-draft-id>');
+ f.listener.onStopSending('<actual-sent-id>',0);assert.equal(f.states.at(-1).messageId,'<actual-sent-id>');assert.equal(f.states.at(-1).state,'sent');
+ const count=f.states.length;f.afterSend();f.listener.onStopSending('<actual-sent-id>',0);assert.equal(f.states.length,count);f.status.close();
+});
+test('onStartSending provides an authoritative ID even when aftersend fires before transport completion',()=>{
+ const f=sendFixture();f.native.gMsgCompose.compFields.messageId='<draft-id>';f.start();f.listener.onStartSending('<real-message-id>');f.afterSend();
+ assert.equal(f.states.at(-1).messageId,'<real-message-id>');f.status.close();
 });

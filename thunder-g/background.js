@@ -12,9 +12,9 @@ async function startThunderG() {
   // Optional settings must never prevent the companion from starting.
   let previewTrimming=null,inPlaceSearch=false;
   let coloredStars=null,dockIconEnabled=false,dockIconPreferences={};
-  let gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
+  let defaultReplyBehavior='reply',gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
   try {
-    const settings = await browser.storage.local.get({inPlaceSearch:false,previewTrimming:null,dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,personalIndicators:false,gmailLabelIcons:false,showNewMessageSymbol:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
+    const settings = await browser.storage.local.get({defaultReplyBehavior:'reply',inPlaceSearch:false,previewTrimming:null,dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,personalIndicators:false,gmailLabelIcons:false,showNewMessageSymbol:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
     searchResultsAsList=settings.searchResultsAsList!==false;
     inPlaceSearch=settings.inPlaceSearch===true;
     coloredStars=settings.coloredStars;
@@ -29,6 +29,7 @@ async function startThunderG() {
     threadGuides = settings.threadGuides !== false;
     bimiEnabled = settings.bimiEnabled === true;
     gmailShortcuts=settings.gmailShortcuts===true;
+    defaultReplyBehavior=settings.defaultReplyBehavior==='reply-all'?'reply-all':'reply';
     inlineReplyEnabled = settings.inlineReplyEnabled === true;
     inlineNewMessageEnabled = settings.inlineNewMessageEnabled === true;
     hideTodayPane = settings.hideTodayPane === true;
@@ -56,11 +57,13 @@ async function startThunderG() {
   await browser.inlineLabels.setCompactConversations(compactConversations);
   await browser.inlineLabels.setIndependentReader(independentReader);
   await browser.inlineLabels.setBimiEnabled?.(bimiEnabled);
+  await browser.inlineLabels.setDefaultReplyBehavior?.(defaultReplyBehavior);
   await browser.inlineLabels.setInlineReplyEnabled?.(inlineReplyEnabled);
   await browser.inlineLabels.setInlineNewMessageEnabled?.(inlineNewMessageEnabled);
   await browser.inlineLabels.setGmailShortcuts?.(gmailShortcuts);
   await browser.inlineLabels.start();
   browser.storage.onChanged.addListener((changes, area) => {
+    if(area==='local' && changes.defaultReplyBehavior)browser.inlineLabels.setDefaultReplyBehavior?.(changes.defaultReplyBehavior.newValue==='reply-all'?'reply-all':'reply')?.catch(console.error);
     if(area==='local' && changes.inPlaceSearch)browser.inlineLabels.setInPlaceSearch?.(changes.inPlaceSearch.newValue===true)?.catch(console.error);
     if(area==='local' && (changes.dockIconEnabled||changes.dockIconPreferences))browser.storage.local.get({dockIconEnabled:false,dockIconPreferences:{}}).then(settings=>browser.inlineLabels.setDockIcon(settings.dockIconEnabled===true,settings.dockIconPreferences)).catch(console.error);
     if(area==='local' && changes.gmailShortcuts)browser.inlineLabels.setGmailShortcuts(changes.gmailShortcuts.newValue===true).catch(console.error);

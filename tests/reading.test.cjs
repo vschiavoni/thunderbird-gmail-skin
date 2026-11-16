@@ -295,9 +295,9 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     header.folder.addKeywordsToMessages=(headers,key)=>calls.push(['add',Array.from(headers,h=>h.messageKey),key]);
     header.folder.removeKeywordsFromMessages=(headers,key)=>calls.push(['remove',Array.from(headers,h=>h.messageKey),key]);
   }
-  const nativeCommands=[];
+  const nativeCommands=[],windowEvents={};
   const win={document:doc,top:{document:doc},gDBView:{rowCount:2,getFlagsAt:()=>0,getMsgHdrAt:i=>messages[i],getSelectedMsgHdrs:()=>selected},commandController:{_toggleMessageTag:(...args)=>calls.push(args),doCommand:name=>nativeCommands.push(name)},
-    setTimeout(){return 1},clearTimeout(){},addEventListener(){},removeEventListener(){}};
+    setTimeout(){return 1},clearTimeout(){},addEventListener(name,fn){windowEvents[name]=fn},removeEventListener(name){delete windowEvents[name]}};
   let conversationMessages=[...messages,{messageKey:1,folder:{URI:'Sent'},getStringProperty:()=>''}],refreshes=0;
   if(independentMode) {
     scope.installIndependentReader=()=>({open:()=>Promise.resolve(),getMessages:()=>conversationMessages,refresh(){refreshes++},hide(){},close(){}});
@@ -322,13 +322,22 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     checkbox.checked=false;checkbox.events.change[0]();
     assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(4))),[['remove','inbox',[1],'one']]);
     assert.equal(refreshes,3,'message chips and title labels refresh after a conversation-wide write');
+    const sentCopy=conversationMessages.at(-1);
     conversationMessages=conversationMessages.slice(0,1);checkbox.checked=true;checkbox.events.change[0]();
     assert.equal(calls.length,5,'changing conversation membership invalidates the open picker');
     conversationMessages=[];pressL();
     assert.ok(nodes.some(n=>n.getAttribute?.('aria-label')?.includes('loading')),'loading must never imply a partial message count');
     assert.equal(nodes.find(n=>n.type==='search').disabled,true,'loading cannot fall back to labeling just the selected row');
     assert.ok(nodes.some(n=>n.textContent==='Conversation is still loading. Close this panel and try again.'));
-    controller.close();return;
+    // The selected Drafts row may have disappeared while the native Sent copy
+    // becomes the actual conversation. Refill an already-open loading picker.
+    conversationMessages=[sentCopy];selected=[];
+    windowEvents['gm-conversation-messages-changed']();
+    assert.equal(nodes.find(n=>n.type==='search').disabled,false);
+    const fresh=nodes.filter(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One').at(-1);
+    fresh.checked=true;fresh.events.change[0]();assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))),['add','Sent',[1],'one']);
+    pressL();assert.equal(nodes.find(n=>n.type==='search').disabled,false,'no selected native list row is required for the active Sent conversation');
+    controller.close();assert.equal(windowEvents['gm-conversation-messages-changed'],undefined);return;
   }
   nodes.find(n=>n.title==='Labels… (L)').events.click[0]();
   assert.ok(nodes.some(n=>n.textContent==='Label as:'));

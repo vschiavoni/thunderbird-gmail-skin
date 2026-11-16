@@ -2244,5 +2244,11 @@
   },
   "minimized_drafts": {
     "message": "Minimized drafts"
+  },
+  "default_reply_behavior": {
+    "message": "Default reply behavior"
+  },
+  "default_reply_behavior_help": {
+    "message": "Choose the top-right reply action in the Thunder-G conversation reader. Applies immediately; an open composer is unchanged."
   }
 }

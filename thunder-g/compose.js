@@ -390,7 +390,16 @@ function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineRe
     if(event.defaultPrevented || ![modes.Now,modes.Background].includes(event.detail?.msgType))return;
     job=snapshot();emit('sending');
   }
-  function sent(){if(!job || job.done)return;job.messageId=compose.compFields.messageId || job.messageId;job.done=true;job.delivered=true;emit('sent')}
+  function sent(id){
+    if(!job)return;
+    const messageId=(typeof id==='string' && id) || job.transportMessageId || compose.compFields.messageId || job.messageId;
+    if(job.done){
+      // aftersend can precede the callback that supplies the definitive ID.
+      if(job.delivered && messageId && messageId!==job.messageId){job.messageId=messageId;emit('sent');}
+      return;
+    }
+    job.messageId=messageId;job.done=true;job.delivered=true;emit('sent');
+  }
   function recoverLater(){clock.setTimeout(()=>{if(!closed && job?.error && !job.done)recover();},0)}
   async function recover(){
     if(closed || !job || job.done)return;
@@ -404,9 +413,9 @@ function installInlineSendStatus(native,clock,onState,saveDraft=()=>saveInlineRe
     }catch(error){if(!closed && job===failedJob && !job.recovered){job.draftError=inlineSendFailure(error?.result,error?.message);emit('draft-error')}}
   }
   const stateListener={NotifyComposeFieldsReady(){},NotifyComposeBodyReady(){},SaveInFolderDone(){},ComposeProcessDone(result){if(result!==0 && job && !job.done){job.transportStopped=true;job.error=inlineSendFailure(result);recoverLater()}}};
-  const listener={onStartSending(){if(job)job.transportStarted=true},onSendProgress(){},onStatus(){},onGetDraftFolderURI(){},
+  const listener={onStartSending(id){if(job){job.transportStarted=true;if(id)job.transportMessageId=id;}},onSendProgress(){},onStatus(){},onGetDraftFolderURI(){},
     onSendNotPerformed(id,status){if(job){job.transportStopped=true;job.error=inlineSendFailure(status);recoverLater()}},
-    onStopSending(id,status,message){if(job)job.transportStopped=true;if(job && id)job.messageId=id;if(status===0)sent();else if(job){job.error=inlineSendFailure(status,message);recoverLater()}},
+    onStopSending(id,status,message){if(job)job.transportStopped=true;if(job && id)job.transportMessageId=id;if(status===0)sent(id);else if(job){job.error=inlineSendFailure(status,message);recoverLater()}},
     onTransportSecurityError(id,status){if(job)job.error=inlineSendFailure(status,gmText("Connection security error. Check Thunderbird’s security prompt."))}};
   async function send(mode,...args) {
     const sending=[modes.Now,modes.Background].includes(mode),before=sequence;

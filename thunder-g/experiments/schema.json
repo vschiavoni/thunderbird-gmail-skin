@@ -2,6 +2,7 @@
   {
     "namespace": "inlineLabels",
     "functions": [
+      {"name":"setDefaultReplyBehavior","type":"function","async":true,"parameters":[{"name":"value","type":"string","enum":["reply","reply-all"]}]},
       {"name":"setInPlaceSearch","type":"function","async":true,"parameters":[{"name":"enabled","type":"boolean"}]},
       {"name":"readTiming","type":"function","async":true,"parameters":[{"name":"seconds","type":"integer","optional":true}],"returns":{"type":"integer"}},
       {"name":"folderPaneSettings","type":"function","async":true,"parameters":[{"name":"action","type":"string","optional":true},{"name":"enabled","type":"boolean","optional":true}],"returns":{"type":"string"}},

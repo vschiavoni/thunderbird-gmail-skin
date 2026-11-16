@@ -2244,5 +2244,11 @@
   },
   "minimized_drafts": {
     "message": "Bozze ridotte a icona"
+  },
+  "default_reply_behavior": {
+    "message": "Comportamento predefinito di risposta"
+  },
+  "default_reply_behavior_help": {
+    "message": "Scegli l’azione di risposta in alto a destra nel lettore delle conversazioni Thunder-G. Si applica subito; un messaggio già in composizione rimane invariato."
   }
 }
