@@ -43,7 +43,11 @@ test('single click opens the current-tab reader, back restores the list, and dou
   tree.contains=()=>true; tree.table={body:element()};
   const folderTree=element(), heading=element(), countHeading=element();
   const messagePane={},messageBrowser={contentWindow:{getMessagePaneBrowser:()=>messagePane}},zoomCalls=[];
+  const documentEvents={};
+  const visibleRows=Array.from({length:3},(_,index)=>({index,attributes:{},setAttribute(name,value){this.attributes[name]=value}}));
   const doc={getElementById:id=>({messageBrowser,paneLayout:layout,threadTree:tree,folderTree,threadPaneFolderName:heading,threadPaneFolderCountContainer:countHeading})[id],
+    querySelectorAll:selector=>selector.includes('#threadTree tr.')?visibleRows:[],
+    addEventListener(name,fn){(documentEvents[name]??=[]).push(fn)},removeEventListener(){},
     createElement:element,createElementNS:element,createXULElement:element,
     head:element(),documentElement:element()};
   const frameQueue=[]; let listener; let refreshes=0;
@@ -55,12 +59,25 @@ test('single click opens the current-tab reader, back restores the list, and dou
     threadPane:{_onSelect(){refreshes++}},Event:class {},
     requestAnimationFrame:fn=>{frameQueue.push(fn);return frameQueue.length},
     cancelAnimationFrame(){},addEventListener(){},removeEventListener(){}};
-  win.top={ZoomManager:{enlarge:browser=>zoomCalls.push(['enlarge',browser]),reduce:browser=>zoomCalls.push(['reduce',browser]),reset:browser=>zoomCalls.push(['reset',browser])}};
+  win.top={document:doc,ZoomManager:{enlarge:browser=>zoomCalls.push(['enlarge',browser]),reduce:browser=>zoomCalls.push(['reduce',browser]),reset:browser=>zoomCalls.push(['reset',browser])}};
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/snooze-ui.js'),'utf8'),scope);
   let moveAccepted;
   scope.thunderGSnooze={};scope.testSnoozeFactory=(_win,_service,options)=>{moveAccepted=options.onMoveAccepted;return {close(){},choose(){}}};
   vm.runInContext('installSnoozeUI=testSnoozeFactory',scope);
   const controller=scope.installReadingMode(win);
+  vm.runInContext('gmailShortcutsEnabled=true',scope);
+  tree.selectedIndex=0;tree.selectedIndices=[0];
+  const key=letter=>{const event={key:letter,target:{closest:()=>null},preventDefault(){},stopImmediatePropagation(){}};for(const handler of documentEvents.keydown)handler(event)};
+  key('j');
+  assert.equal(tree._gmKeyboardCursor?.index,1,'j advances the keyboard cursor');
+  assert.equal(tree.selectedIndex,0,'j keeps native selection in place');
+  assert.deepEqual(tree.selectedIndices,[0],'j keeps checked messages');
+  assert.equal(visibleRows[1].attributes['data-gm-keyboard-cursor'],'true','j highlights the next row');
+  key('k');
+  assert.equal(visibleRows[0].attributes['data-gm-keyboard-cursor'],'true','k moves the cursor back');
+  key('j');key('x');
+  assert.deepEqual(tree.selectedIndices,[0,1],'x toggles the focused row and retains prior selections');
+  controller.selectIndices([]);vm.runInContext('gmailShortcutsEnabled=false',scope);
   assert.equal(controller.zoom('increaseSize'),false,'the inbox retains UI sizing');
   assert.equal(layout.messagePaneVisible,false,'startup must be list only');
   const row={index:0,dataset:{}};

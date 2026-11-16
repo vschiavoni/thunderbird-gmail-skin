@@ -206,10 +206,11 @@
     text-decoration: none !important;
   }
 
-  #threadTree tbody > tr.table-layout:hover {
-    /* Keep the shadow inside the row so the next row cannot cover it. */
-    box-shadow: inset 0 -3px 3px -3px var(--gm-shadow),
-      inset 0 -1px var(--gm-border) !important;
+  #threadTree tbody > tr.table-layout:is(:hover,[data-gm-keyboard-cursor="true"]) {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 -1px 3px var(--gm-shadow),
+      0 2px 4px var(--gm-shadow), inset 0 -1px var(--gm-border) !important;
   }
 
   #threadTree tbody > tr.table-layout.selected {

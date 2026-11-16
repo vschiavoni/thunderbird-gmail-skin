@@ -1335,7 +1335,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       display:none; flex:0 0 auto; gap:2px; margin-inline-start:auto;
       pointer-events:auto;
     }
-    #threadTree tr:is(:hover,:has(.gm-row-actions button:focus-visible)) .gm-row-actions {
+    #threadTree tr:is(:hover,[data-gm-keyboard-cursor="true"],:has(.gm-row-actions button:focus-visible)) .gm-row-actions {
       display:flex !important;
     }
     #threadTree[data-gm-smart-action-done] .gm-row-actions { display:none !important; }
@@ -1364,7 +1364,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     }
     #threadTree .gm-row-actions button:focus-visible { outline:2px solid Highlight; }
     #threadTree .gm-row-actions svg { width:18px; height:18px; }
-    #threadTree tr:is(:hover,:has(.gm-row-actions button:focus-visible)) .subject-line > span:not(.gm-inline-labels) {
+    #threadTree tr:is(:hover,[data-gm-keyboard-cursor="true"],:has(.gm-row-actions button:focus-visible)) .subject-line > span:not(.gm-inline-labels) {
       min-width:0 !important;
     }
     @media (hover:none) { #threadTree .gm-row-actions { display:flex; } }
@@ -1375,6 +1375,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   `;
   doc.head.append(style);
   function render(row) {
+    row.setAttribute('data-gm-keyboard-cursor',String(tree._gmKeyboardCursor?.view===win.gDBView && tree._gmKeyboardCursor?.index===row.index));
     syncInboxRowCheckbox(row,new Set(tree.selectedIndices||[]));
     row.querySelector('.gm-message-drag-handle')?.remove();
     const selectionCell=row.querySelector('.selectcol-column, .tree-view-row-select');
