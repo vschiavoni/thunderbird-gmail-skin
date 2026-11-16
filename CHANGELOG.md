@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Improve attachment groups with counts, Save all, wrapped compact tiles, colored Office type badges and bounded embedded document thumbnails.
+
 - Show the full year in conversation message dates outside the current year.
 
 - Halve attachment tile dimensions and fix PDF.js 6 thumbnail cleanup; supply required native header-listener callbacks.

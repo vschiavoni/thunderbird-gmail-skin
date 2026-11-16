@@ -41,3 +41,30 @@ test('default PDF loader uses the shared Gecko module context from extension exp
  try{assert.equal(await scope.attachmentThumbnail(f.doc,f.attachment,()=>true),'data:image/png;base64,AAAA');assert.equal(imports.length,1);assert.equal(imports[0].length,1);assert.equal(library.GlobalWorkerOptions.workerSrc,'resource://pdf.js/build/pdf.worker.mjs');assert.equal(destroyed,1);}
  finally{delete scope.ChromeUtils;}
 });
+
+function storedThumbnailZip(name='docProps/thumbnail.png',payload=Buffer.from([137,80,78,71,13,10,26,10]),method=0){
+ const encoded=method===8?require('node:zlib').deflateRawSync(payload):payload;
+ const filename=Buffer.from(name),local=Buffer.alloc(30),central=Buffer.alloc(46),end=Buffer.alloc(22);
+ local.writeUInt32LE(0x04034b50);local.writeUInt16LE(method,8);local.writeUInt32LE(encoded.length,18);local.writeUInt32LE(payload.length,22);local.writeUInt16LE(filename.length,26);
+ central.writeUInt32LE(0x02014b50);central.writeUInt16LE(method,10);central.writeUInt32LE(encoded.length,20);central.writeUInt32LE(payload.length,24);central.writeUInt16LE(filename.length,28);
+ end.writeUInt32LE(0x06054b50);end.writeUInt16LE(1,8);end.writeUInt16LE(1,10);end.writeUInt32LE(central.length+filename.length,12);end.writeUInt32LE(local.length+filename.length+encoded.length,16);
+ return Buffer.concat([local,filename,encoded,central,filename,end]);
+}
+test('Office files use recognizable type badges and passive embedded thumbnails',async()=>{
+ for(const [name,kind,label] of [['file.docx','word','W'],['file.xlsx','sheet','X'],['file.pptx','slides','P'],['file.doc','word','W']]){
+  const type=scope.attachmentFileType({name});assert.equal(type.kind,kind);assert.equal(type.label,label);
+ }
+ const f=fixture({name:'file.docx',contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',fetchAttachment:async()=>storedThumbnailZip()});
+ assert.equal(await scope.attachmentThumbnail(f.doc,f.attachment,()=>true,{decodeImage:f.decodeImage}),'data:image/png;base64,AAAA');assert.equal(f.draws,1);
+});
+test('Office thumbnail parsing excludes unrelated entries, oversized entries and non-raster content',async()=>{
+ assert.equal(await scope.officeAttachmentThumbnail(storedThumbnailZip('word/document.xml'),{}),null);
+ const huge=storedThumbnailZip();huge.writeUInt32LE(2000000,huge.length-22-46-'docProps/thumbnail.png'.length+24);assert.equal(await scope.officeAttachmentThumbnail(huge,{}),null);
+ const f=fixture({name:'file.xlsx',contentType:'application/zip',fetchAttachment:async()=>storedThumbnailZip('docProps/thumbnail.png',Buffer.from('<svg onload="bad()"/>'))});
+ assert.equal(await scope.attachmentThumbnail(f.doc,f.attachment,()=>true,{decodeImage:()=>{throw Error('must not decode SVG')}}),null);
+});
+
+test('compressed embedded Office thumbnails decode through a bounded deflate stream',async()=>{
+ const raster=Buffer.from([137,80,78,71,13,10,26,10]),zip=storedThumbnailZip('docProps/thumbnail.png',raster,8);
+ const result=await scope.officeAttachmentThumbnail(zip,{Blob,DecompressionStream});assert.deepEqual(Buffer.from(result),raster);
+});

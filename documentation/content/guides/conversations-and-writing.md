@@ -150,7 +150,13 @@ its preview also opens the attachment. The native attachment strip is hidden onl
 inside this conversation reader. Raster images (including GIFs) use static
 thumbnails, and PDFs use a first-page preview through Thunderbird's bundled PDF.js.
 Tiles are compact (100 CSS pixels wide with a 60-pixel preview), with Open and
-Save side by side. Other formats retain a file-type tile.
+Save side by side. Attachment groups show their count and a native **Save all**
+action, wrapping after five compact tiles. Word, Excel and PowerPoint documents
+have colored type badges instead of a generic File label. Modern Office and
+OpenDocument files can display an embedded PNG/JPEG thumbnail when supplied by
+the document's author. This does not render Office pages: documents without an
+embedded thumbnail retain their type icon. No Office application or online
+conversion service is used.
 
 Preview generation reads only native message parts with a known size up to 8 MiB;
 external links and unknown-size files are not fetched automatically. At most the

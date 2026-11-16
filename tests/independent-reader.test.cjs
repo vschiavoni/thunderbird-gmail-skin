@@ -1105,3 +1105,12 @@ test('opened old message visibly shows its year in the conversation header',asyn
  const f=readerFixture();f.anchor.dateInSeconds=new Date(2024,10,20,12,53).getTime()/1000;
  await f.reader.open(f.anchor);const time=f.cards.children[0].children[0].children[1].children[0];assert.match(time.textContent,/2024/);assert.match(time.dateTime,/2024/);f.reader.close();
 });
+
+test('attachment group shows a count and Save all targets only this message’s current native parts',async()=>{
+ const f=await attachmentSendFixture([{name:'a.docx',hasFile:true,isAllowedURL:true,open(){},save(){}},{name:'b.xlsx',hasFile:true,isAllowedURL:false,open(){},save(){}}]);
+ const calls=[];f.frame.contentWindow.HandleMultipleAttachments=(parts,action)=>calls.push({parts,action});f.frame.contentWindow.gMessageListeners[0].onEndAttachments();
+ const heading=f.card.children.find(n=>n.className==='gm-attachment-heading');assert.equal(heading.children[0].textContent,'2 attachments');
+ const save=heading.children[1];assert.equal(save.getAttribute('aria-label'),'Save all attachments');save.emit('click');assert.equal(calls.length,1);assert.equal(calls[0].action,'save');assert.equal(calls[0].parts.length,1);assert.equal(calls[0].parts[0].name,'a.docx');
+ assert.equal(f.region.children[0].getAttribute('data-filetype'),'word');assert.equal(f.region.children[1].getAttribute('data-filetype'),'sheet');
+ f.reader.close();save.emit('click');assert.equal(calls.length,1);
+});

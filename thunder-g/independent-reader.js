@@ -447,13 +447,22 @@ function installIndependentReader(win) {
     .gm-sent-view-controls{display:flex;gap:8px;margin:8px 0 8px var(--message-inset)}
     .gm-open-saved-message{display:inline-flex;inline-size:auto!important;max-inline-size:max-content;min-inline-size:0;appearance:none;background:transparent;color:var(--layout-color-1,inherit);border:0;border-radius:4px;padding:4px 8px;font:inherit;font-size:.85em;line-height:1.4;cursor:pointer;text-align:start}
     .gm-open-saved-message:hover{background:light-dark(#20212414,#ffffff20)}
-    .gm-sent-attachments{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 12px var(--message-inset);font-size:.9em;border-top:1px solid var(--layout-border-0,#dadce0);padding-top:14px}
+    .gm-sent-attachments{display:flex;flex-wrap:wrap;gap:12px;max-inline-size:548px;margin:8px 0 12px var(--message-inset);font-size:.9em}
     .gm-sent-attachments[hidden]{display:none}
-    .gm-sent-attachment{position:relative;display:grid;grid-template-columns:1fr 1fr;inline-size:100px;max-inline-size:100%;border:1px solid var(--layout-border-0,#dadce0);border-radius:5px;overflow:hidden;background:var(--layout-background-0,#fff)}
+    .gm-sent-attachment{position:relative;display:grid;grid-template-columns:1fr 1fr;inline-size:100px;max-inline-size:100%;border:1px solid var(--layout-border-0,#dadce0);border-radius:3px;overflow:hidden;background:var(--layout-background-0,#fff)}
     .gm-sent-attachment .gm-sent-attachment-preview{border:0;border-radius:0;margin:0;padding:0;inline-size:100%;grid-column:1 / -1;order:-1;display:flex;align-items:center;justify-content:center;block-size:60px;background:light-dark(#f8f9fa,#24262a);overflow:hidden}
     .gm-sent-attachment-preview img{inline-size:100%;block-size:100%;object-fit:contain;background:white}
-    .gm-sent-attachment-filetype{font-size:16px;font-weight:600;color:#697386;letter-spacing:.04em}
+    .gm-sent-attachment-filetype{font-size:28px;opacity:.45;font-weight:600;color:#697386;letter-spacing:.04em}
     .gm-sent-attachment[data-kind="pdf"] .gm-sent-attachment-filetype{color:#d93025}
+    .gm-attachment-heading{display:flex;align-items:center;gap:12px;margin:18px 0 8px var(--message-inset);border-top:1px solid var(--layout-border-0,#dadce0);padding-top:12px;font-size:.9em;font-weight:600}
+    .gm-attachment-heading[hidden]{display:none}
+    .gm-attachment-heading button{appearance:none;background:transparent;color:inherit;border:0;border-radius:50%;padding:4px 8px;font-size:18px;cursor:pointer}
+    .gm-sent-attachment[data-filetype="word"]{--gm-file-color:#185abc}
+    .gm-sent-attachment[data-filetype="sheet"]{--gm-file-color:#188038}
+    .gm-sent-attachment[data-filetype="slides"]{--gm-file-color:#e8710a}
+    .gm-sent-attachment[data-filetype="pdf"]{--gm-file-color:#d93025}
+    .gm-sent-attachment-name::before{content:attr(data-badge);display:inline-block;margin-inline-end:5px;padding:0 3px;border-radius:2px;background:var(--gm-file-color,#697386);color:white;font-size:.75em;font-weight:600}
+    .gm-sent-attachment .gm-sent-attachment-filetype{color:var(--gm-file-color,#697386)}
     .gm-sent-attachment-name{grid-column:1 / -1;display:block;padding:4px 6px;font-size:.85em;background:light-dark(#f5f5f5,#303134);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .gm-sent-attachment button{min-inline-size:0;font:inherit;font-size:.75em;color:inherit;background:transparent;border:1px solid var(--layout-border-0,#dadce0);border-radius:16px;padding:3px 4px;margin:3px 2px;cursor:pointer}
     .gm-sent-attachment button:disabled{opacity:.45;cursor:default}
@@ -890,6 +899,7 @@ function installIndependentReader(win) {
     if(pendingBody){if(!permanent)article.append(pendingBody);body.style.position='absolute';body.style.visibility='hidden';body.style.inlineSize='100%';
       if(permanent){body.inert=true;body.style.blockSize='0';body.style.overflow='hidden';}}
     function revealSavedBody(){if(!pendingBody || permanent)return;preserveReaderPosition(host,article,()=>{pendingBody.remove();pendingBody=null;body.style.position='';body.style.visibility='';body.style.inlineSize='';});}
+    let attachmentHeading=null;
     let browser=null,timeout=null,zoom=null,bodyResize=null,contentChanges=null,contentLoad=null,resizeFrame=null,ready=false,toggleQuotes=null,restoreCommands=null,focusCleanup=null,scrollCleanup=null,messageActions=null,defaultReplyControl=null,permanentReplyControl=null,permanentReplyButton=null,attachmentListenerCleanup=null;
     if(permanent){
       body.id='gm-saved-sent-body-'+(++savedViewSequence);
@@ -921,11 +931,19 @@ function installIndependentReader(win) {
       if(!attachmentRegion || !ready || !browser || !isCurrent())return;
       const frame=browser,native=frame.contentWindow,attachments=Array.from(native.currentAttachments || []),region=attachmentRegion;
       region.replaceChildren();region.hidden=!attachments.length;
+      if(!attachmentHeading){attachmentHeading=text('div','gm-attachment-heading','');article.insertBefore(attachmentHeading,region);}
+      attachmentHeading.hidden=!attachments.length;attachmentHeading.replaceChildren(text('span','',attachments.length+' '+(attachments.length===1?'attachment':'attachments')));
+      const saveAll=text('button','','↓');saveAll.type='button';saveAll.title='Save all attachments';saveAll.setAttribute('aria-label','Save all attachments');
+      saveAll.disabled=!attachments.some(a=>a.hasFile && a.isAllowedURL) || typeof native.HandleMultipleAttachments!=='function';
+      saveAll.addEventListener('click',()=>{if(saveAll.parentNode!==attachmentHeading || !isCurrent() || !ready || browser!==frame || saveAll.disabled)return;
+        const current=Array.from(native.currentAttachments || []).filter(a=>attachments.includes(a) && a.hasFile && a.isAllowedURL);
+        if(current.length)native.HandleMultipleAttachments(current,'save');});attachmentHeading.append(saveAll);
+
       for(const attachment of attachments){
         const row=text('div','gm-sent-attachment',''),name=String(attachment.name || 'Attachment');region.append(row);
         const filename=text('span','gm-sent-attachment-name',name);filename.title=name;row.append(filename);
-        const kind=attachmentPreviewKind(attachment);row.setAttribute('data-kind',kind);
-        const previewBox=text('button','gm-sent-attachment-preview',''),filetype=text('span','gm-sent-attachment-filetype',kind==='pdf'?'PDF':kind==='image'?'Image':'File');previewBox.type='button';previewBox.setAttribute('aria-label','Open '+name);previewBox.append(filetype);
+        const kind=attachmentPreviewKind(attachment),fileType=attachmentFileType(attachment);row.setAttribute('data-kind',kind);row.setAttribute('data-filetype',fileType.kind);filename.setAttribute('data-badge',fileType.label);
+        const previewBox=text('button','gm-sent-attachment-preview',''),filetype=text('span','gm-sent-attachment-filetype',fileType.label);previewBox.type='button';previewBox.setAttribute('aria-label','Open '+name);previewBox.append(filetype);
         const status=text('span','gm-sent-attachment-status','');status.setAttribute('role','status');
         const buttons=[];
         function available(){return row.parentNode===region && isCurrent() && ready && browser===frame && Array.from(native.currentAttachments || []).includes(attachment) && attachment.hasFile && attachment.isAllowedURL;}
@@ -970,7 +988,7 @@ function installIndependentReader(win) {
 
     }
     function expandCard(){
-      activateMessage(header);body.hidden=false;if(permanent && pendingBody){pendingBody.hidden=savedView;if(hydration.viewControls)hydration.viewControls.hidden=false;}attachmentRegion.hidden=!attachmentRegion.children.length;preview.hidden=true;article.setAttribute('data-expanded','');toggle.setAttribute('aria-expanded','true');error.hidden=true;
+      activateMessage(header);body.hidden=false;if(permanent && pendingBody){pendingBody.hidden=savedView;if(hydration.viewControls)hydration.viewControls.hidden=false;}attachmentRegion.hidden=!attachmentRegion.children.length;if(attachmentHeading)attachmentHeading.hidden=attachmentRegion.hidden;preview.hidden=true;article.setAttribute('data-expanded','');toggle.setAttribute('aria-expanded','true');error.hidden=true;
       browser=doc.createXULElement('browser');
       const frame=browser;
       browser.addEventListener('load',event=>{
@@ -1161,12 +1179,12 @@ function installIndependentReader(win) {
       activateMessage(header);
       if(header===actionHeader)return;
       if(body.hidden) {
-        if(browser) {body.hidden=false;if(permanent && pendingBody){pendingBody.hidden=savedView;if(hydration.viewControls)hydration.viewControls.hidden=false;}attachmentRegion.hidden=!attachmentRegion.children.length;preview.hidden=true;article.setAttribute('data-expanded','');toggle.setAttribute('aria-expanded','true');zoomResizers.get(browser)?.();}
+        if(browser) {body.hidden=false;if(permanent && pendingBody){pendingBody.hidden=savedView;if(hydration.viewControls)hydration.viewControls.hidden=false;}attachmentRegion.hidden=!attachmentRegion.children.length;if(attachmentHeading)attachmentHeading.hidden=attachmentRegion.hidden;preview.hidden=true;article.setAttribute('data-expanded','');toggle.setAttribute('aria-expanded','true');zoomResizers.get(browser)?.();}
         else expandCard();
       } else {
         // Retain a loaded frame while folded so footer Reply/Print still target
         // the latest message. All frames are released when leaving the reader.
-        body.hidden=true;attachmentRegion.hidden=true;if(permanent && pendingBody){pendingBody.hidden=true;if(hydration.viewControls)hydration.viewControls.hidden=true;}preview.hidden=false;article.removeAttribute('data-expanded');toggle.setAttribute('aria-expanded','false');
+        body.hidden=true;attachmentRegion.hidden=true;if(attachmentHeading)attachmentHeading.hidden=true;if(permanent && pendingBody){pendingBody.hidden=true;if(hydration.viewControls)hydration.viewControls.hidden=true;}preview.hidden=false;article.removeAttribute('data-expanded');toggle.setAttribute('aria-expanded','false');
       }
     });
     cleanups.add(()=>{if(permanent){permanentBodies.delete(pendingBody);hydration.showSaved=null;}permanentReplyControl?.close();permanentReplyControl=null;release();});if(!hydration){if(before)cards.insertBefore(article,before);else cards.append(article);}if(expand)expandCard();
