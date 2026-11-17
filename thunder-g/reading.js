@@ -395,6 +395,10 @@ function installReadingMode(win) {
         background:var(--gm-selected, #c2dbff) !important; color:var(--gm-ink, #202124) !important;
         box-shadow:inset 0 -1px var(--gm-border, #b5cfee) !important;
       }
+      :root #threadTree tbody > tr.table-layout.selected:is(:hover,[data-gm-keyboard-cursor="true"]) {
+        box-shadow:0 -1px 3px var(--gm-shadow), 0 2px 4px var(--gm-shadow),
+          inset 0 -1px var(--gm-border, #b5cfee) !important;
+      }
       :root #threadTree .tree-view-row-select img,
       :root #threadTree .tree-view-header-select img { color:var(--gm-muted, #444746) !important; }
     }
@@ -709,6 +713,23 @@ function installReadingMode(win) {
   }
   const shortcutRouter=typeof createGmailShortcutRouter==='function'?createGmailShortcutRouter(runGmailAction):null;
   let shortcutHelp=null;
+  let keyboardCursor=null;
+  function syncKeyboardCursor(){
+    for(const row of doc.querySelectorAll?.('#threadTree tr.table-layout, #threadTree tr.card-layout') || [])
+      row.setAttribute('data-gm-keyboard-cursor',String(keyboardCursor!=null && keyboardCursor.view===win.gDBView && row.index===keyboardCursor.index));
+  }
+  function cursorIndex(view){
+    if(keyboardCursor!=null && view!=null && keyboardCursor.view===view && keyboardCursor.index>=0 && keyboardCursor.index<view.rowCount)
+      return keyboardCursor.index;
+    return tree.currentIndex>=0?tree.currentIndex:tree.selectedIndex>=0?tree.selectedIndex:0;
+  }
+  function moveKeyboardCursor(view,direction){
+    const next=adjacentMessageIndex(view,cursorIndex(view),direction);
+    if(next<0)return;
+    keyboardCursor={view,index:next};tree._gmKeyboardCursor=keyboardCursor;
+    tree.scrollToIndex?.(next);syncKeyboardCursor();
+  }
+  function resetKeyboardCursor(){keyboardCursor=null;tree._gmKeyboardCursor=null;syncKeyboardCursor();}
   function runGmailAction(action){
     const tabmail=win.top.document.getElementById('tabmail');
     if(closed || pickerOpen || (tabmail && tabmail.currentAbout3Pane!==win))return false;
@@ -791,17 +812,21 @@ function installReadingMode(win) {
     }
     if(action==='toolbar'){(toolbar.hidden?doc.querySelector('.gm-inbox-select-group input'):back)?.focus();return true;}
     if(!view?.rowCount)return true;
-    const index=tree.currentIndex>=0?tree.currentIndex:tree.selectedIndex>=0?tree.selectedIndex:0;
+    const index=cursorIndex(view);
     if(action==='next' || action==='previous'){
       if(active)navigate(action==='next'?1:-1);
-      else {const next=adjacentMessageIndex(view,index,action==='next'?1:-1);if(next>=0){tree.selectedIndex=next;tree.scrollToIndex?.(next);}}return true;
+      else moveKeyboardCursor(view,action==='next'?1:-1);
+      return true;
     }
     if(action==='message-next' || action==='message-previous'){if(active && useIndependent)independent.navigateMessage?.(action==='message-next'?1:-1);return true;}
     if(action==='expand-all' || action==='collapse-all'){if(active && useIndependent)independent.expandAll?.(action==='expand-all');return true;}
     if(action==='page-next' || action==='page-previous'){tree.dispatchEvent(new win.CustomEvent('gm-shortcut-page',{detail:action==='page-next'?1:-1}));return true;}
-    if(action==='open'){if(!active)open({index,dataset:{}});return true;}
+    if(action==='open'){
+      if(!active){tree.selectedIndex=index;open({index,dataset:{}});}
+      return true;
+    }
     if(action.startsWith('select-') || action==='toggle-selection'){
-      const selected=new Set(bulk?tree.selectedIndices:[]);
+      const selected=new Set(!active || bulk?tree.selectedIndices:[]);
       if(action==='toggle-selection'){if(selected.has(index))selected.delete(index);else selected.add(index);}
       else {
         selected.clear();const mode=action.slice(7),range=tree._gmPageSelectionBounds?.() || {rowStart:0,rowEnd:view.rowCount};
@@ -829,6 +854,15 @@ function installReadingMode(win) {
   function labelKey(event) {
     if(gmailComposerTypingTarget(event) || gmailComposerHasFocus(win)){shortcutRouter?.reset();return;}
     if(handleGmailShortcutHelpKey(event,shortcutHelp,shortcutRouter))return;
+    // Native arrow navigation changes selection. In the list, move only
+    // the visual cursor; checkbox selection remains explicit (click or X).
+    if(!active && !pickerOpen && !closed && !event.ctrlKey && !event.metaKey &&
+       !event.altKey && !event.shiftKey && !gmailTypingTarget(event) &&
+       (event.target===tree || event.target?.closest?.('#threadTree')===tree) &&
+       (event.key==='ArrowDown' || event.key==='ArrowUp') &&
+       runGmailAction(event.key==='ArrowDown'?'next':'previous')){
+      event.preventDefault();event.stopImmediatePropagation();return;
+    }
     if(shortcutRouter?.handle(event))return;
     const action=mailZoomAction(event);
     if(action && zoomReading(action)){event.preventDefault();event.stopImmediatePropagation();return;}
@@ -1108,11 +1142,14 @@ function installReadingMode(win) {
     }
   };
   MailServices.mfn.addListener(moveListener, Ci.nsIMsgFolderNotificationService.msgsMoveCopyCompleted);
-  function folderChange() { tagPopup.hidePopup(); leave(false); bulk = false; toolbar.hidden = true; threadPane?.classList.remove('gm-bulk-selecting'); }
+  function folderChange() { resetKeyboardCursor();tagPopup.hidePopup(); leave(false); bulk = false; toolbar.hidden = true; threadPane?.classList.remove('gm-bulk-selecting'); }
   function labelViewOpened(){leave(true);}
   win.addEventListener('gm-open-label-view',labelViewOpened);
   function backClick() { if (active) leave(true); else clearBulk(); }
   tree.addEventListener('click', selectionClick, true);
+  tree.addEventListener('pointerdown',resetKeyboardCursor,true);
+  tree.addEventListener('viewchange',resetKeyboardCursor);
+  tree.addEventListener('rowcountchange',resetKeyboardCursor);
   tree.addEventListener('select', selectionChanged);
   tree.addEventListener('click', click, true);
   tree.addEventListener('dblclick', doubleClick, true);
@@ -1121,12 +1158,16 @@ function installReadingMode(win) {
   function close() {
     if(closed)return;
     closed = true;
+    resetKeyboardCursor();delete tree._gmKeyboardCursor;
     leave(false);
     independent?.close();
     threadPane?.classList.remove('gm-bulk-selecting');
     layout.messagePaneVisible = originalMessagePaneVisible;
     MailServices.mfn.removeListener(moveListener);
     tree.removeEventListener('click', selectionClick, true);
+    tree.removeEventListener('pointerdown',resetKeyboardCursor,true);
+    tree.removeEventListener('viewchange',resetKeyboardCursor);
+    tree.removeEventListener('rowcountchange',resetKeyboardCursor);
     tree.removeEventListener('select', selectionChanged);
     tree.removeEventListener('click', click, true);
     tree.removeEventListener('dblclick', doubleClick, true);

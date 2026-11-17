@@ -193,7 +193,7 @@
 }
 
 
-#threadTree tr:hover .gm-message-drag-handle { opacity: .45; }
+#threadTree tr:is(:hover,[data-gm-keyboard-cursor="true"]) .gm-message-drag-handle { opacity: .45; }
 #threadTree[data-gm-dragging],
 #threadTree[data-gm-dragging] * {
   cursor: grabbing !important;
