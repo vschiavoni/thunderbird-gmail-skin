@@ -158,7 +158,11 @@ test('single click opens the current-tab reader, back restores the list, and dou
   tree.selectedIndices=[0,1,2,3];
   let countRefreshes=0;
   win.threadPaneHeader={updateSelectedCount(){countRefreshes++}};
+  let fullInvalidations=0;
+  tree.invalidate=()=>{fullInvalidations++};
   back.events.click();
+  assert.equal(fullInvalidations,0,'Back reuses the native list instead of rebuilding every row');
+  assert.equal(tree.scrollTop,120,'Back restores the previous list scroll position');
   assert.equal(tree.selectedIndices.length,0,'Back clears implicit conversation selection');
   assert.equal(countRefreshes,1,'Back refreshes the native Selected counter');
   assert.equal(layout.messagePaneVisible,false,'Back closes the current-tab reader');

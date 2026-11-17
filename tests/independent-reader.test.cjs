@@ -1114,3 +1114,38 @@ test('attachment group shows a count and Save all targets only this message’s 
  assert.equal(f.region.children[0].getAttribute('data-filetype'),'word');assert.equal(f.region.children[1].getAttribute('data-filetype'),'sheet');
  f.reader.close();save.emit('click');assert.equal(calls.length,1);
 });
+
+test('conversation label refresh is linear and retains unchanged chips while reflecting live label changes',async()=>{
+  const f=readerFixture({tagged:true});
+  const headers=[f.anchor,...Array.from({length:39},(_,index)=>f.prepare(message(index+2,`reply-${index}`)))];
+  f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:headers.length,getChildHdrAt:index=>headers[index]})};
+  let reads=0,definitions=0;
+  const assigned=f.scope.assignedTags,getTags=f.scope.MailServices.tags.getAllTags;
+  f.scope.assignedTags=(...args)=>{reads++;return assigned(...args)};
+  f.scope.MailServices.tags.getAllTags=()=>{definitions++;return getTags()};
+  await f.reader.open(f.anchor);
+  const titleTags=f.conversation.children.find(node=>node.tag==='h1').children[0];
+  function findTags(node){if(node.className==='tags')return node;for(const child of node.children || []){const found=findTags(child);if(found)return found}}
+  const firstTags=findTags(f.cards.children[0]),chip=firstTags.children[0],cards=f.cards.children.slice();
+  assert.ok(chip,'a label unique to one message stays on that message');
+  reads=0;definitions=0;f.reader.refresh();
+  assert.equal(reads,headers.length,'each message assignment is read once, not once per card');
+  assert.equal(definitions,1,'tag definitions are read once per refresh');
+  assert.equal(firstTags.children[0],chip,'unchanged message chips retain their DOM and handlers');
+  assert.equal(f.removals.length,0,'rendering never writes label assignments');
+  for(const header of headers)header.tagged=true;
+  f.tagListener.msgPropertyChanged(f.anchor,'keywords');
+  assert.equal(firstTags.children.length,0,'a newly common label moves out of individual cards');
+  assert.equal(titleTags.children.length,1,'the shared label is shown in the conversation title');
+  const commonChip=titleTags.children[0];
+  f.reader.refresh();assert.equal(titleTags.children[0],commonChip,'unchanged title chips are retained');
+  getTags()[0].tag='Renamed Work';f.reader.refresh();
+  assert.equal(titleTags.children[0].textContent,'Renamed Work','definition changes refresh visible chips');
+  headers.at(-1).tagged=false;f.reader.refresh();
+  assert.equal(titleTags.children.length,0,'a label removed from one message stops being common');
+  assert.equal(firstTags.children.length,1,'remaining assignments stay visible on individual cards');
+  assert.equal(f.cards.children.length,cards.length);
+  assert.ok(cards.every((card,index)=>f.cards.children[index]===card),'label refresh does not rebuild message cards');
+  assert.equal(f.removals.length,0,'no existing assignments are modified');
+  f.reader.close();
+});

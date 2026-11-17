@@ -663,12 +663,24 @@ function installIndependentReader(win) {
   }
   conversation.append(actions);
   function updateActions(){for(const button of buttons)button.disabled=resolving || !frames.has(independentMessageKey(actionHeader || {}))}
+  let titleTagSignature=null;
+  const tagSignature=tags=>tags.map(tag=>[tag.key,tag.tag,tag.color || '']);
   function refreshTags(){
     refreshSnooze();
     for(const render of securityRenderers)render();
-    for(const render of tagRenderers)render();
-    titleTags.replaceChildren();
+    // Snapshot label metadata once for this refresh, never cache assignments
+    // across notifications. Each message renderer shares the same intersection.
+    const definitions=typeof assignedTags==='function'?MailServices.tags.getAllTags():[];
+    const groups=currentHeaders.map(header=>typeof assignedTags==='function'?assignedTags(header,definitions):[]);
+    const byHeader=new Map(currentHeaders.map((header,index)=>[header,groups[index]]));
+    const common=commonLabelKeys(groups),tags=new Map();
+    for(const group of groups)for(const tag of group)tags.set(tag.key,tag);
+    for(const render of tagRenderers)render(byHeader,common);
     const inbox=independentInboxFolder(currentHeaders,Ci.nsMsgFolderFlags,removedInboxMessages);
+    const signature=JSON.stringify([inbox?.URI || null,gmText("Inbox"),tagSignature([...tags.values()].filter(tag=>common.has(tag.key)))]);
+    if(signature===titleTagSignature)return;
+    titleTagSignature=signature;
+    titleTags.replaceChildren();
     if(inbox){
       const chip=text('span','tag gm-inbox-chip',gmText("Inbox"));
       chip.style.backgroundColor='light-dark(#e0e3e1,#444746)';
@@ -706,9 +718,6 @@ function installIndependentReader(win) {
       titleTags.append(chip);
     }
     if(typeof assignedTags!=='function')return;
-    const tags=new Map(),definitions=MailServices.tags.getAllTags();
-    for(const header of currentHeaders)for(const tag of assignedTags(header,definitions))tags.set(tag.key,tag);
-    const common=commonLabelKeys(currentHeaders.map(header=>assignedTags(header,definitions)));
     for(const tag of tags.values()) {
       if(!common.has(tag.key))continue;
       const chip=text('span','tag',tag.tag),colors=chipColors(tag.color);
@@ -812,7 +821,7 @@ function installIndependentReader(win) {
     hideCleanupFrame=null;
     hideCleanupTimer=null;
   }
-  function clearCards(){cancelHideCleanup();removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();permanentBodies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
+  function clearCards(){titleTagSignature=null;cancelHideCleanup();removedInboxMessages.clear();pendingSentCopies.clear();pendingReplies.clear();permanentBodies.clear();if(revealFrame!==null)win.cancelAnimationFrame(revealFrame);revealFrame=null;for(const cleanup of cleanups)cleanup();cleanups.clear();cards.replaceChildren();tagRenderers.clear();securityRenderers.clear();messageDocs.clear();messageCards.clear();titleTags.replaceChildren();frames.clear();currentHeaders=[];actionHeader=null;activeHeader=null;activeCard=null;updateActions()}
   function text(tag,className,value){const node=doc.createElement(tag);node.className=className;node.textContent=value;return node}
   function buildCard(header,expand,token,before=null,hydration=null) {
     const permanent=!!hydration && typeof permanentSentCardsEnabled!=='undefined' && permanentSentCardsEnabled;
@@ -875,13 +884,14 @@ function installIndependentReader(win) {
     cardHeader.append(toggle,meta);if(permanent)article.insertBefore(cardHeader,hydration.body);else article.append(cardHeader);
     const messageTags=doc.createElement('div');messageTags.className='tags';messageTags.setAttribute('aria-label','Labels on this message');
     sender.append(messageTags);
-    const renderMessageTags=()=>{
+    let messageTagSignature=null;
+    const renderMessageTags=(byHeader,common)=>{
+      const tags=(byHeader.get(header) || []).filter(tag=>!common.has(tag.key));
+      const signature=JSON.stringify(tagSignature(tags));
+      if(signature===messageTagSignature)return;
+      messageTagSignature=signature;
       messageTags.replaceChildren();
-      if(typeof assignedTags!=='function')return;
-      const definitions=MailServices.tags.getAllTags();
-      const common=commonLabelKeys(currentHeaders.map(message=>assignedTags(message,definitions)));
-      for(const tag of assignedTags(header,definitions)){
-        if(common.has(tag.key))continue;
+      for(const tag of tags){
         const chip=text('span','tag',''),label=text('span','tag-label',tag.tag),colors=chipColors(tag.color);
         chip.style.backgroundColor=colors.background;chip.style.color=colors.foreground;bindLabelNavigation(label,tag,win);
         const remove=text('button','tag-remove','×');remove.type='button';remove.setAttribute('aria-label',`Remove ${tag.tag} from this conversation`);
@@ -893,7 +903,7 @@ function installIndependentReader(win) {
         chip.append(label,remove);messageTags.append(chip);
       }
     };
-    tagRenderers.add(renderMessageTags);renderMessageTags();
+    tagRenderers.add(renderMessageTags);
     const body=doc.createElement('div');body.className='body';body.hidden=true;article.append(body);
     let pendingBody=hydration?.body || null,savedView=false;
     const attachmentRegion=permanent?hydration.attachmentControls:text('div','gm-sent-attachments','');
