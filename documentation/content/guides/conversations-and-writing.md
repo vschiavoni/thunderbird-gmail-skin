@@ -184,3 +184,15 @@ Snapshots are held only for the current open conversation, not persisted in the
 profile or added to message data. Leaving and reopening uses the saved message’s
 normal native rendering. Failed sends remove their immediate card as before;
 draft recovery is unchanged.
+## Manually regroup messages in Betterbird
+
+Betterbird provides native [rethreading](https://betterbird.eu/expert-tips/#rethreading):
+you can attach a message to another conversation or detach it. Enable the native
+threaded view first, and work with one message at a time. Expand a collapsed
+conversation to select an individual message. In a unified Inbox, both messages
+must still belong to the same underlying account folder; Betterbird cannot join
+messages across accounts this way.
+
+Thunder-G defers its snooze ordering while a native mouse drag or keyboard
+rethreading operation is active. It does not change Betterbird's rethreading
+permissions or rewrite message dates.

@@ -39,6 +39,9 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
       flex: 1 1 auto; overflow: hidden; column-gap: 0 !important;
       padding-inline-start: 0 !important;
       margin-inline-start: 0 !important;
+      /* Betterbird draws native connectors as background images at the native
+         indent. Our compact layout owns this gutter and its optional guides. */
+      background-image: none !important;
     }
     /* The parent already has a twisty. Reserve one compact gutter only on
        child rows; native thread depth must not add another indent per level. */

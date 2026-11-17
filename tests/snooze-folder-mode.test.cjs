@@ -9,8 +9,14 @@ test('Snoozed folder mode toggles, remembers visibility, discovers new account f
   const folders=[{URI:'imap://a/snoozed'}],mail={accounts:{allServers:[{rootFolder:{containsChildNamed:()=>true,getChildNamed:()=>folders[0]}}]}};
   const prefs={getBoolPref:()=>saved,setBoolPref:(_key,value)=>saved=value};
   const scope=vm.createContext({gmText:text=>text});vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);
-  const install=()=>scope.installSnoozedFolderMode({document:doc,folderPane:pane},{unifiedFolder:()=>({URI:'mailbox://smart/Snoozed'}),subscribe(fn){callback=fn;return()=>unsubscribed=true}},mail,prefs);
+  let jobs=[{messages:[{},{}]},{messages:[{}]},{messages:[{}]}];
+  const install=()=>scope.installSnoozedFolderMode({document:doc,folderPane:pane},{unifiedFolder:()=>({URI:'mailbox://smart/Snoozed'}),list:()=>jobs,subscribe(fn){callback=fn;return()=>unsubscribed=true}},mail,prefs);
   let controller=install();assert.deepEqual([...active],['all','gmSnoozed']);assert.equal(pane._modes.gmSnoozed.containerList.children[0].uri,'mailbox://smart/Snoozed');
+  const row=pane._modes.gmSnoozed.containerList.children[0];
+  assert.equal(row.totalCount,3,'one badge count per conversation, not per message');
+  assert.equal(row.unreadCount,0,'Snoozed uses a conversation count, not an unread count');
+  jobs=jobs.slice(0,2);callback();assert.equal(row.totalCount,2);
+  row.totalCount=4;row.updateTotalMessageCount();assert.equal(row.totalCount,2,'native folder updates retain the conversation count');
   mail.accounts.allServers.push({rootFolder:{containsChildNamed:()=>true,getChildNamed:()=>({URI:'imap://b/snoozed'})}});callback();assert.equal(pane._modes.gmSnoozed.containerList.children.length,1);
   const item=menu.children[0];item.events.command({target:{enabled:false}});assert.equal(saved,false);
   controller.close();assert.equal(unsubscribed,true);assert.equal(pane._modes.gmSnoozed,undefined);assert.deepEqual([...active],['all']);
@@ -44,7 +50,7 @@ test('technical rows are hidden in account modes and restored when Snoozed is di
   const pane={_modes:{smart:{active:true,containerList:smartList}},get activeModes(){return active},set activeModes(v){active=v;const mode=this._modes.gmSnoozed;mode.active=v.includes('gmSnoozed');if(mode.active){mode.container=node();mode.containerHeader=node();mode.containerList=node();mode.init()}},_createFolderRow:(_name,folder)=>Object.assign(node(),{uri:folder.URI,modeName:_name}),updateContextCheckedFolderMode(){},toggleFolderMode(){this.activeModes=['all']}};
   const mail={accounts:{allServers:[{rootFolder:{containsChildNamed:()=>true,getChildNamed:()=>({URI:physical.uri})}}]}};
   const scope=vm.createContext({gmText:x=>x,console});vm.runInContext(fs.readFileSync('thunder-g/snooze-ui.js','utf8'),scope);
-  const controller=scope.installSnoozedFolderMode({document:doc,folderPane:pane,gFolder:{URI:physical.uri},displayFolder(uri){migrated=uri},MutationObserver:class{constructor(callback){mutated=callback}observe(){}disconnect(){}}},{unifiedFolder:()=>({URI:'mailbox://smart/Snoozed'}),subscribe:()=>()=>{}},mail,{getBoolPref:()=>true,setBoolPref(){}});
+  const controller=scope.installSnoozedFolderMode({document:doc,folderPane:pane,gFolder:{URI:physical.uri},displayFolder(uri){migrated=uri},MutationObserver:class{constructor(callback){mutated=callback}observe(){}disconnect(){}}},{unifiedFolder:()=>({URI:'mailbox://smart/Snoozed'}),list:()=>[],subscribe:()=>()=>{}},mail,{getBoolPref:()=>true,setBoolPref(){}});
   assert.equal('data-gm-snooze-storage' in physical.attrs,true);assert.equal('data-gm-snooze-storage' in ordinary.attrs,false);assert.equal(migrated,'mailbox://smart/Snoozed');
   assert.equal(smartList.children.length,1);assert.equal(pane._modes.gmSnoozed.containerList.children.length,0);
   assert.equal('data-gm-snooze-integrated' in pane._modes.gmSnoozed.container.attrs,true);

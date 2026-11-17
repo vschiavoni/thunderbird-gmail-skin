@@ -20,7 +20,7 @@
       }
       state.modes.forEach((mode, index) => {
         const row = document.createElement('div'); row.className = 'setting-row';
-        const label = state.options.find(item => item.id.toLowerCase().includes(mode === 'smart' ? 'unified' : mode));
+        const label = state.options.find(item => mode === 'gmSnoozed' ? item.id === 'gm-snoozed-folder-mode' : item.id.toLowerCase().includes(mode === 'smart' ? 'unified' : mode));
         const text = document.createElement('span'); text.textContent = label?.label || mode;
         row.append(text);
         for (const [direction, caption, disabled] of [['up', '↑', index === 0], ['down', '↓', index === state.modes.length - 1]]) {

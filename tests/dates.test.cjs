@@ -84,3 +84,21 @@ test('rapid view changes clear incomplete dates instead of retaining 1970 or ano
   row.view=win.gDBView;row.fillRow();assert.notEqual(cell.textContent,'');
   header=null;win.gDBView=view;row.view=view;row.fillRow();assert.equal(cell.textContent,'');controller.close();
 });
+
+test('returned notice occupies the subject action slot and never replaces the original date',async()=>{
+ const local=require('./localization-context.cjs').createContext({console,Ci:{nsMsgFolderFlags:{Inbox:1}}});
+ for(const file of ['snooze-ui.js','dates.js'])vm.runInContext(fs.readFileSync('thunder-g/'+file,'utf8'),local);
+ const properties=new Map([['thunderGSnoozeReturned',String(Math.floor(Date.now()/1000))]]);
+ const header={dateInSeconds:1700000000,getStringProperty:key=>properties.get(key)||'',setStringProperty:(key,value)=>properties.set(key,value)};
+ const attrs=new Map(),cell={textContent:'native',get title(){return attrs.get('title')},set title(v){attrs.set('title',v)},getAttribute:key=>attrs.get(key)??null,setAttribute:(key,value)=>attrs.set(key,value),removeAttribute:key=>attrs.delete(key)};
+ const actions={className:'gm-row-actions'},children=[actions];
+ const line={append:node=>children.push(node),insertBefore(node,before){children.splice(children.indexOf(before),0,node)},querySelector:()=>actions};
+ const prototype={fillRow(){}};const row=Object.assign(Object.create(prototype),{index:0,dataset:{},querySelector:selector=>selector==='.subject-line'?line:selector==='.gm-snooze-returned'?children.find(n=>n.className==='gm-snooze-returned'):cell});
+ const doc={querySelectorAll:()=>[row],createElement:()=>({remove(){children.splice(children.indexOf(this),1)}})};
+ const win={gFolder:{flags:1},gDBView:{getMsgHdrAt:()=>header},document:doc,navigator:{languages:['en-US']},customElements:{whenDefined:()=>Promise.resolve(),get:()=>({prototype})},setTimeout:()=>1,clearTimeout(){},addEventListener(){},removeEventListener(){}};
+ const controller=local.installCompactDates(win);await Promise.resolve();
+ assert.equal(children[0].textContent,'Snoozed < 1 hour ago');assert.equal(children[1],actions);
+ assert.equal(cell.textContent,local.compactMessageDate(header.dateInSeconds*1000,new Date(),'en-US').short);
+ assert.equal(attrs.has('data-gm-snoozed'),false,'the date cell is not styled as a returned notice');
+ local.acknowledgeSnoozeReturn([header]);controller.refresh();assert.deepEqual(children,[actions]);controller.close();
+});
