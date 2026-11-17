@@ -65,6 +65,11 @@ test('single click opens the current-tab reader, back restores the list, and dou
   scope.thunderGSnooze={};scope.testSnoozeFactory=(_win,_service,options)=>{moveAccepted=options.onMoveAccepted;return {close(){},choose(){}}};
   vm.runInContext('installSnoozeUI=testSnoozeFactory',scope);
   const controller=scope.installReadingMode(win);
+  const initialView=win.gDBView;
+  win.gDBView=undefined;
+  assert.doesNotThrow(()=>tree.events.viewchange(),'resetting a cursor without an active view is safe');
+  assert.ok(visibleRows.every(row=>row.attributes['data-gm-keyboard-cursor']==='false'),'missing views clear all cursor markers');
+  win.gDBView=initialView;
   vm.runInContext('gmailShortcutsEnabled=true',scope);
   tree.selectedIndex=0;tree.selectedIndices=[0];
   const key=letter=>{const event={key:letter,target:{closest:()=>null},preventDefault(){},stopImmediatePropagation(){}};for(const handler of documentEvents.keydown)handler(event)};
@@ -76,7 +81,7 @@ test('single click opens the current-tab reader, back restores the list, and dou
   key('k');
   assert.equal(visibleRows[0].attributes['data-gm-keyboard-cursor'],'true','k moves the cursor back');
   key('j');key('x');
-  assert.deepEqual(tree.selectedIndices,[0,1],'x toggles the focused row and retains prior selections');
+  assert.deepEqual(Array.from(tree.selectedIndices),[0,1],'x toggles the focused row and retains prior selections');
   controller.selectIndices([]);vm.runInContext('gmailShortcutsEnabled=false',scope);
   assert.equal(controller.zoom('increaseSize'),false,'the inbox retains UI sizing');
   assert.equal(layout.messagePaneVisible,false,'startup must be list only');

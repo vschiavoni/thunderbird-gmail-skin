@@ -716,10 +716,10 @@ function installReadingMode(win) {
   let keyboardCursor=null;
   function syncKeyboardCursor(){
     for(const row of doc.querySelectorAll?.('#threadTree tr.table-layout, #threadTree tr.card-layout') || [])
-      row.setAttribute('data-gm-keyboard-cursor',String(keyboardCursor?.view===win.gDBView && row.index===keyboardCursor.index));
+      row.setAttribute('data-gm-keyboard-cursor',String(keyboardCursor!=null && keyboardCursor.view===win.gDBView && row.index===keyboardCursor.index));
   }
   function cursorIndex(view){
-    if(keyboardCursor?.view===view && keyboardCursor.index>=0 && keyboardCursor.index<view.rowCount)
+    if(keyboardCursor!=null && view!=null && keyboardCursor.view===view && keyboardCursor.index>=0 && keyboardCursor.index<view.rowCount)
       return keyboardCursor.index;
     return tree.currentIndex>=0?tree.currentIndex:tree.selectedIndex>=0?tree.selectedIndex:0;
   }
