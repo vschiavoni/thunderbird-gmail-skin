@@ -854,6 +854,15 @@ function installReadingMode(win) {
   function labelKey(event) {
     if(gmailComposerTypingTarget(event) || gmailComposerHasFocus(win)){shortcutRouter?.reset();return;}
     if(handleGmailShortcutHelpKey(event,shortcutHelp,shortcutRouter))return;
+    // Native arrow navigation changes selection. In the list, move only
+    // the visual cursor; checkbox selection remains explicit (click or X).
+    if(!active && !pickerOpen && !closed && !event.ctrlKey && !event.metaKey &&
+       !event.altKey && !event.shiftKey && !gmailTypingTarget(event) &&
+       (event.target===tree || event.target?.closest?.('#threadTree')===tree) &&
+       (event.key==='ArrowDown' || event.key==='ArrowUp') &&
+       runGmailAction(event.key==='ArrowDown'?'next':'previous')){
+      event.preventDefault();event.stopImmediatePropagation();return;
+    }
     if(shortcutRouter?.handle(event))return;
     const action=mailZoomAction(event);
     if(action && zoomReading(action)){event.preventDefault();event.stopImmediatePropagation();return;}

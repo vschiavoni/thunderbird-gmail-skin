@@ -72,7 +72,7 @@ test('single click opens the current-tab reader, back restores the list, and dou
   win.gDBView=initialView;
   vm.runInContext('gmailShortcutsEnabled=true',scope);
   tree.selectedIndex=0;tree.selectedIndices=[0];
-  const key=letter=>{const event={key:letter,target:{closest:()=>null},preventDefault(){},stopImmediatePropagation(){}};for(const handler of documentEvents.keydown)handler(event)};
+  const key=(letter,target={closest:()=>null},modifiers={})=>{const event={key:letter,target,...modifiers,preventDefault(){},stopImmediatePropagation(){}};for(const handler of documentEvents.keydown)handler(event)};
   key('j');
   assert.equal(tree._gmKeyboardCursor?.index,1,'j advances the keyboard cursor');
   assert.equal(tree.selectedIndex,0,'j keeps native selection in place');
@@ -82,6 +82,16 @@ test('single click opens the current-tab reader, back restores the list, and dou
   assert.equal(visibleRows[0].attributes['data-gm-keyboard-cursor'],'true','k moves the cursor back');
   key('j');key('x');
   assert.deepEqual(Array.from(tree.selectedIndices),[0,1],'x toggles the focused row and retains prior selections');
+  key('ArrowDown',tree);
+  assert.equal(tree._gmKeyboardCursor.index,2,'Down moves the visual cursor');
+  assert.deepEqual(Array.from(tree.selectedIndices),[0,1],'Down preserves the checked rows');
+  key('ArrowUp',tree);
+  assert.equal(tree._gmKeyboardCursor.index,1,'Up moves the visual cursor back');
+  assert.deepEqual(Array.from(tree.selectedIndices),[0,1],'Up preserves the checked rows');
+  key('ArrowDown',tree,{shiftKey:true});
+  assert.equal(tree._gmKeyboardCursor.index,1,'Shift+Arrow remains native selection navigation');
+  key('ArrowDown',{closest:()=>null});
+  assert.equal(tree._gmKeyboardCursor.index,1,'arrows outside the message list remain native');
   controller.selectIndices([]);vm.runInContext('gmailShortcutsEnabled=false',scope);
   assert.equal(controller.zoom('increaseSize'),false,'the inbox retains UI sizing');
   assert.equal(layout.messagePaneVisible,false,'startup must be list only');
