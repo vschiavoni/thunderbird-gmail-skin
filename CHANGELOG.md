@@ -2,34 +2,19 @@
 
 ## Unreleased
 
-- Retain successful previews in the bounded cache across conversation returns and remove focus-triggered list redraws.
+## 0.32.0
 
-- Avoid full message-list invalidation on conversation return; share label calculations per refresh and retain unchanged label chips.
-
-- Use small filled disclosure triangles in the label tree and tighten label row spacing.
-
-- Use squarer Gmail-style message checkboxes and sharper star outlines; scale row controls and their gutters with interface font zoom.
-
-- Use Thunderbird’s native attachment icons in sent tiles and filename rows to match the embedded composer.
-
-- Improve attachment groups with counts, Save all, wrapped compact tiles and bounded embedded document thumbnails.
-
-- Show the full year in conversation message dates outside the current year.
-
-- Halve attachment tile dimensions and fix PDF.js 6 thumbnail cleanup; supply required native header-listener callbacks.
-
-- Conversation reader: replace native attachment strips with consistent Gmail-style tiles, static image thumbnails and PDF first-page previews, retaining native Open/Save actions.
-
-- add direct Open/Save controls to permanent sent cards using native saved attachments, with loading, availability, error and lifecycle handling.
-
-- preserve safe composer formatting, links and decoded inline images in permanent sent cards, with bounded capture and plain-text fallback.
-
-- Route zoom menu commands and mouse-wheel zoom through conversation-wide sizing, including permanent sent cards and saved views.
-- retain the inline composer’s visible plain-text sent body after native Sent-copy hydration, with stable quote/scroll state, native label/reply actions and an explicit in-card saved-formatting/attachment view with a return control.
-
-- Add a saved Default reply behavior option (Reply or Reply all), with live single/double-arrow header icons, matching tooltips and correctly routed compose actions.
-
-- Fix labeling after sending a draft-only conversation: hydrate the exact saved Sent copy, prefer transport Message-IDs over stale draft IDs, and refresh an open loading label picker without requiring list navigation.
+- Keep newly sent messages in permanent conversation cards, preserving safe rich formatting, links and inline images while the saved Sent copy supplies native actions and metadata.
+- Add compact attachment tiles with Open, Save and Save all, native file icons, image/PDF previews and bounded embedded Office document thumbnails.
+- Add configurable default Reply or Reply all behavior, including the matching conversation header icon.
+- Fix label assignment after sending draft-only conversations and refresh loading label pickers when the exact Sent copy becomes available.
+- Separate keyboard navigation from checkbox selection: Up/Down and J/K move a shadow cursor; X toggles selection without losing other checked rows.
+- Improve snooze recovery, Snoozed conversation counts and automatic Inbox refresh after server moves; show a returned-snooze notice without changing original message dates.
+- Preserve snooze reminder scheduling when closing settings, and improve Betterbird threading and recycled sender rows.
+- Match Gmail-style checkboxes and star outlines, scale controls with interface zoom, and use compact label rows with filled disclosure triangles.
+- Apply conversation zoom consistently across messages and sent cards, and show the full year on older message dates.
+- Avoid redundant full-list rebuilding when returning from a conversation, share label calculations per refresh, and retain unchanged label chips.
+- Reuse successful previews in a bounded cache instead of expiring them every five minutes, and remove focus-triggered list redraws.
 
 ## 0.31.0
 
