@@ -2,20 +2,22 @@
 
 ## Unreleased
 
-- Improve attachment groups with counts, Save all, wrapped compact tiles, colored Office type badges and bounded embedded document thumbnails.
+- Use Thunderbird’s native attachment icons in sent tiles and filename rows to match the embedded composer.
+
+- Improve attachment groups with counts, Save all, wrapped compact tiles and bounded embedded document thumbnails.
 
 - Show the full year in conversation message dates outside the current year.
 
 - Halve attachment tile dimensions and fix PDF.js 6 thumbnail cleanup; supply required native header-listener callbacks.
 
-- Experimental conversation reader: replace native attachment strips with consistent Gmail-style tiles, static image thumbnails and PDF first-page previews, retaining native Open/Save actions.
+- Conversation reader: replace native attachment strips with consistent Gmail-style tiles, static image thumbnails and PDF first-page previews, retaining native Open/Save actions.
 
-- Experimental branch only, step 3: add direct Open/Save controls to permanent sent cards using native saved attachments, with loading, availability, error and lifecycle handling.
+- add direct Open/Save controls to permanent sent cards using native saved attachments, with loading, availability, error and lifecycle handling.
 
-- Experimental branch only, step 2: preserve safe composer formatting, links and decoded inline images in permanent sent cards, with bounded capture and plain-text fallback.
+- preserve safe composer formatting, links and decoded inline images in permanent sent cards, with bounded capture and plain-text fallback.
 
 - Route zoom menu commands and mouse-wheel zoom through conversation-wide sizing, including permanent sent cards and saved views.
-- Experimental branch only, step 1: retain the inline composer’s visible plain-text sent body after native Sent-copy hydration, with stable quote/scroll state, native label/reply actions and an explicit in-card saved-formatting/attachment view with a return control.
+- retain the inline composer’s visible plain-text sent body after native Sent-copy hydration, with stable quote/scroll state, native label/reply actions and an explicit in-card saved-formatting/attachment view with a return control.
 
 - Add a saved Default reply behavior option (Reply or Reply all), with live single/double-arrow header icons, matching tooltips and correctly routed compose actions.
 

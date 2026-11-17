@@ -1,3 +1,14 @@
+function nativeAttachmentIcon(doc,attachment,size=16){
+  const icon=doc.createElement('img');icon.alt='';icon.setAttribute('aria-hidden','true');
+  if(attachment.contentType==='text/x-moz-deleted'){icon.setAttribute('src','chrome://messenger/skin/icons/attachment-deleted.svg');return icon;}
+  const extension=String(attachment.name || '').match(/\.([a-z0-9]{1,16})$/i)?.[1] || '';
+  const name='attachment'+(extension?'.'+extension:'');
+  try{const {makeMozIconSrcSet}=ChromeUtils.importESModule('resource:///modules/MozIconUtils.mjs');
+    icon.setAttribute('srcset',makeMozIconSrcSet(name,size,{contentType:attachment.contentType || undefined}));}
+  catch(_){icon.setAttribute('src','moz-icon://'+name+'?size='+size+(attachment.contentType?'&contentType='+encodeURIComponent(attachment.contentType):''));}
+  return icon;
+}
+
 function attachmentFileType(attachment){
   const name=String(attachment.name || '').toLowerCase(),type=String(attachment.contentType || '').toLowerCase();
   if(/\.(docx?|odt|rtf)$/.test(name) || /wordprocessing|msword|opendocument.text/.test(type))return {kind:'word',label:'W'};

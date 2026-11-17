@@ -1090,7 +1090,7 @@ test('late thumbnail completion cannot replace content in a closed conversation'
  f.placement.onSendState({...f.state,state:'sent',messageId:'reply'});f.tagListener.msgAdded(sentReplyFixture(f));const frame=f.browsers.at(-1);
  frame.contentWindow.currentAttachments=[{name:'photo.gif',hasFile:true,isAllowedURL:true,open(){},save(){}}];f.loaded();
  await Promise.resolve();const region=f.card.children.find(n=>n.className==='gm-sent-attachments'),preview=region.children[0].children.at(-1);
- f.reader.close();resolve('data:image/png;base64,AAAA');await new Promise(done=>setImmediate(done));assert.equal(preview.children[0].tag,'span');
+ f.reader.close();resolve('data:image/png;base64,AAAA');await new Promise(done=>setImmediate(done));assert.equal(preview.children[0].tag,'img');assert.match(preview.children[0].getAttribute('src'),/^moz-icon:/);
 });
 
 test('conversation date includes the full year outside the current year in each locale',()=>{

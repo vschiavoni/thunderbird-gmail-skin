@@ -114,15 +114,15 @@ You can keep multiple embedded composers open in the same mail tab. Opening a di
 
 Under **Settings → Conversations → Mark messages as read**, choose Immediately, After 1 second, After 3 seconds, After 20 seconds or Never. The existing native Thunderbird preference is preserved until you change it. Leaving the conversation before the delay expires cancels its read timer, keeping the message unread. The setting uses Thunderbird’s native read policy and persists across restarts.
 
-## Experimental permanent sent cards — steps 1–3
+## Permanent sent cards
 
-On **`codex/permanent-sent-cards` only**, newly sent inline messages keep the same
+Newly sent inline messages keep the same
 visible body that appeared when Send was pressed. HTML composers now keep a
 restricted rich-content snapshot; plain-text composers keep their text snapshot. The saved Sent copy
 updates the card’s native identity, labels, security metadata and reply actions,
 but its native message body does not replace the visible snapshot. Existing
-messages still use Thunderbird’s normal rendering. This experiment is not merged
-or released and does not change the sending process.
+messages still use Thunderbird’s normal rendering. Sending uses Thunderbird’s
+normal transport and saved Sent copies.
 
 The original recipient text, signature, line wrapping, and quote-expansion choice
 remain in the same body nodes. The permanent card responds to message zoom and
@@ -152,7 +152,8 @@ thumbnails, and PDFs use a first-page preview through Thunderbird's bundled PDF.
 Tiles are compact (100 CSS pixels wide with a 60-pixel preview), with Open and
 Save side by side. Attachment groups show their count and a native **Save all**
 action, wrapping after five compact tiles. Word, Excel and PowerPoint documents
-have colored type badges instead of a generic File label. Modern Office and
+use Thunderbird’s native file icons beside their filenames and as the fallback
+when no content thumbnail is available, matching the composer. Modern Office and
 OpenDocument files can display an embedded PNG/JPEG thumbnail when supplied by
 the document's author. This does not render Office pages: documents without an
 embedded thumbnail retain their type icon. No Office application or online
@@ -161,7 +162,7 @@ conversion service is used.
 Preview generation reads only native message parts with a known size up to 8 MiB;
 external links and unknown-size files are not fetched automatically. At most the
 first 12 attachments per message are previewed, sequentially. Images over 16 million
-pixels, encrypted/unreadable PDFs and decoding failures retain a file-type tile.
+pixels, password-protected/unreadable PDFs and decoding failures retain a file-type tile.
 PDF evaluation, XFA and annotation rendering are disabled. Preview failures do not
 disable Open/Save, and leaving the conversation discards late results.
 
@@ -173,8 +174,8 @@ filenames remain distinct. Missing or disallowed attachments stay disabled. Fail
 actions show a retryable message; cancelling Save leaves the card unchanged.
 Late attachment parsing refreshes the controls, and leaving the conversation
 invalidates them. No temporary composer file URL is used to open an attachment.
-Full native attachment widgets and security notices also remain available in the
-in-card saved-message view. The native viewer initializes offscreen for actions
+Full native security notices remain available in the in-card saved-message view;
+attachment tiles remain available in both views. The native viewer initializes offscreen for actions
 and retains normal MIME and remote-content policies; its resizing does not change
 the visible snapshot. Sender/label/security metadata may update after saving even though
 the body stays in place.
@@ -182,6 +183,4 @@ the body stays in place.
 Snapshots are held only for the current open conversation, not persisted in the
 profile or added to message data. Leaving and reopening uses the saved message’s
 normal native rendering. Failed sends remove their immediate card as before;
-draft recovery is unchanged. Further steps should evaluate recipient presentation,
-rich-content fidelity and long-lived behavior before
-considering a merge.
+draft recovery is unchanged.

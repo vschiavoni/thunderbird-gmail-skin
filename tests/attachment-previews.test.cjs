@@ -68,3 +68,11 @@ test('compressed embedded Office thumbnails decode through a bounded deflate str
  const raster=Buffer.from([137,80,78,71,13,10,26,10]),zip=storedThumbnailZip('docProps/thumbnail.png',raster,8);
  const result=await scope.officeAttachmentThumbnail(zip,{Blob,DecompressionStream});assert.deepEqual(Buffer.from(result),raster);
 });
+
+test('native attachment icons use Thunderbird’s icon helper with extension, MIME type and display size',()=>{
+ const calls=[],doc={createElement:()=>({attrs:{},setAttribute(key,value){this.attrs[key]=value}})};
+ scope.ChromeUtils={importESModule(uri){assert.equal(uri,'resource:///modules/MozIconUtils.mjs');return {makeMozIconSrcSet:(...args)=>{calls.push(args);return 'native-icon-srcset'}}}};
+ try{const icon=scope.nativeAttachmentIcon(doc,{name:'Report, final.docx',contentType:'application/msword'},32);assert.equal(icon.attrs.srcset,'native-icon-srcset');assert.equal(calls[0][0],'attachment.docx');assert.equal(calls[0][1],32);assert.equal(calls[0][2].contentType,'application/msword');assert.equal(icon.attrs['aria-hidden'],'true');
+ const deleted=scope.nativeAttachmentIcon(doc,{name:'removed.pdf',contentType:'text/x-moz-deleted'});assert.equal(deleted.attrs.src,'chrome://messenger/skin/icons/attachment-deleted.svg');}
+ finally{delete scope.ChromeUtils;}
+});

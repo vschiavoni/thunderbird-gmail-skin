@@ -452,7 +452,8 @@ function installIndependentReader(win) {
     .gm-sent-attachment{position:relative;display:grid;grid-template-columns:1fr 1fr;inline-size:100px;max-inline-size:100%;border:1px solid var(--layout-border-0,#dadce0);border-radius:3px;overflow:hidden;background:var(--layout-background-0,#fff)}
     .gm-sent-attachment .gm-sent-attachment-preview{border:0;border-radius:0;margin:0;padding:0;inline-size:100%;grid-column:1 / -1;order:-1;display:flex;align-items:center;justify-content:center;block-size:60px;background:light-dark(#f8f9fa,#24262a);overflow:hidden}
     .gm-sent-attachment-preview img{inline-size:100%;block-size:100%;object-fit:contain;background:white}
-    .gm-sent-attachment-filetype{font-size:28px;opacity:.45;font-weight:600;color:#697386;letter-spacing:.04em}
+    .gm-sent-attachment-preview .gm-sent-attachment-filetype{inline-size:32px;block-size:32px;object-fit:contain;background:transparent}
+    .gm-sent-attachment-name img{inline-size:16px;block-size:16px;vertical-align:middle;margin-inline-end:5px}
     .gm-sent-attachment[data-kind="pdf"] .gm-sent-attachment-filetype{color:#d93025}
     .gm-attachment-heading{display:flex;align-items:center;gap:12px;margin:18px 0 8px var(--message-inset);border-top:1px solid var(--layout-border-0,#dadce0);padding-top:12px;font-size:.9em;font-weight:600}
     .gm-attachment-heading[hidden]{display:none}
@@ -461,7 +462,7 @@ function installIndependentReader(win) {
     .gm-sent-attachment[data-filetype="sheet"]{--gm-file-color:#188038}
     .gm-sent-attachment[data-filetype="slides"]{--gm-file-color:#e8710a}
     .gm-sent-attachment[data-filetype="pdf"]{--gm-file-color:#d93025}
-    .gm-sent-attachment-name::before{content:attr(data-badge);display:inline-block;margin-inline-end:5px;padding:0 3px;border-radius:2px;background:var(--gm-file-color,#697386);color:white;font-size:.75em;font-weight:600}
+
     .gm-sent-attachment .gm-sent-attachment-filetype{color:var(--gm-file-color,#697386)}
     .gm-sent-attachment-name{grid-column:1 / -1;display:block;padding:4px 6px;font-size:.85em;background:light-dark(#f5f5f5,#303134);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .gm-sent-attachment button{min-inline-size:0;font:inherit;font-size:.75em;color:inherit;background:transparent;border:1px solid var(--layout-border-0,#dadce0);border-radius:16px;padding:3px 4px;margin:3px 2px;cursor:pointer}
@@ -607,9 +608,10 @@ function installIndependentReader(win) {
       let attachmentControls=null;
       if(typeof permanentSentCardsEnabled!=='undefined' && permanentSentCardsEnabled){
         attachmentControls=text('div','gm-sent-attachments','');attachmentControls.hidden=!state.attachments?.length;
-        for(const name of state.attachments || []){const row=text('div','gm-sent-attachment','');row.append(text('span','gm-sent-attachment-name',name));
+        for(const name of state.attachments || []){const row=text('div','gm-sent-attachment',''),filename=text('span','gm-sent-attachment-name',name);filename.insertBefore(nativeAttachmentIcon(doc,{name},16),filename.firstChild || null);row.append(filename);
           for(const label of ['Open','Save']){const button=text('button','',label);button.type='button';button.disabled=true;row.append(button);}
-          row.append(text('span','gm-sent-attachment-status','Available when the saved message finishes loading.'));attachmentControls.append(row);}
+          row.append(text('span','gm-sent-attachment-status','Available when the saved message finishes loading.'));
+          const placeholder=text('button','gm-sent-attachment-preview',''),icon=nativeAttachmentIcon(doc,{name},32);placeholder.type='button';placeholder.disabled=true;icon.className='gm-sent-attachment-filetype';placeholder.append(icon);row.append(placeholder);attachmentControls.append(row);}
 
       }else if(state.attachments?.length)body.append(text('div','address',state.attachments.join(' · ')));
       let savedButton=null,viewControls=null;
@@ -941,9 +943,9 @@ function installIndependentReader(win) {
 
       for(const attachment of attachments){
         const row=text('div','gm-sent-attachment',''),name=String(attachment.name || 'Attachment');region.append(row);
-        const filename=text('span','gm-sent-attachment-name',name);filename.title=name;row.append(filename);
+        const filename=text('span','gm-sent-attachment-name',name);filename.title=name;filename.insertBefore(nativeAttachmentIcon(doc,attachment,16),filename.firstChild || null);row.append(filename);
         const kind=attachmentPreviewKind(attachment),fileType=attachmentFileType(attachment);row.setAttribute('data-kind',kind);row.setAttribute('data-filetype',fileType.kind);filename.setAttribute('data-badge',fileType.label);
-        const previewBox=text('button','gm-sent-attachment-preview',''),filetype=text('span','gm-sent-attachment-filetype',fileType.label);previewBox.type='button';previewBox.setAttribute('aria-label','Open '+name);previewBox.append(filetype);
+        const previewBox=text('button','gm-sent-attachment-preview',''),filetype=nativeAttachmentIcon(doc,attachment,32);filetype.className='gm-sent-attachment-filetype';previewBox.type='button';previewBox.setAttribute('aria-label','Open '+name);previewBox.append(filetype);
         const status=text('span','gm-sent-attachment-status','');status.setAttribute('role','status');
         const buttons=[];
         function available(){return row.parentNode===region && isCurrent() && ready && browser===frame && Array.from(native.currentAttachments || []).includes(attachment) && attachment.hasFile && attachment.isAllowedURL;}
