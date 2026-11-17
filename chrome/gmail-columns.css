@@ -102,20 +102,20 @@
 #threadTree .tree-view-row-select { transform:none !important; }
 #threadTree :is(#selectCol, #flaggedCol, .selectcol-column, .flaggedcol-column) {
   box-sizing:border-box !important;
-  width:28px !important; min-width:28px !important; max-width:28px !important;
-  inline-size:28px !important; min-inline-size:28px !important; max-inline-size:28px !important;
+  width:1.75em !important; min-width:1.75em !important; max-width:1.75em !important;
+  inline-size:1.75em !important; min-inline-size:1.75em !important; max-inline-size:1.75em !important;
   padding-inline:0 !important;
 }
 
 /* Reserve room for the active marker and hover dots before each checkbox. */
-:root { --gm-selection-gutter: 16px; }
+:root { --gm-selection-gutter: 1em; }
 #threadTree :is(#selectCol, .selectcol-column, td.tree-view-row-select) {
-  width: calc(28px + var(--gm-selection-gutter)) !important;
-  min-width: calc(28px + var(--gm-selection-gutter)) !important;
-  max-width: calc(28px + var(--gm-selection-gutter)) !important;
-  inline-size: calc(28px + var(--gm-selection-gutter)) !important;
-  min-inline-size: calc(28px + var(--gm-selection-gutter)) !important;
-  max-inline-size: calc(28px + var(--gm-selection-gutter)) !important;
+  width: calc(1.75em + var(--gm-selection-gutter)) !important;
+  min-width: calc(1.75em + var(--gm-selection-gutter)) !important;
+  max-width: calc(1.75em + var(--gm-selection-gutter)) !important;
+  inline-size: calc(1.75em + var(--gm-selection-gutter)) !important;
+  min-inline-size: calc(1.75em + var(--gm-selection-gutter)) !important;
+  max-inline-size: calc(1.75em + var(--gm-selection-gutter)) !important;
   padding-inline-start: var(--gm-selection-gutter) !important;
 }
 #threadTree tr.table-layout > td.tree-view-row-select {
@@ -126,18 +126,18 @@
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
-  inline-size: 3px;
+  inline-size: .1875em;
   background: light-dark(#4285f4, #8ab4f8);
   pointer-events: none;
 }
 #threadTree .gm-message-drag-handle {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-start: 5px;
-  inline-size: 10px;
-  block-size: 15px;
+  inset-inline-start: .3125em;
+  inline-size: .625em;
+  block-size: .9375em;
   transform: translateY(-50%);
-  background: radial-gradient(circle, currentColor 1.25px, transparent 1.75px) 0 0 / 5px 5px;
+  background: radial-gradient(circle, currentColor .078125em, transparent .109375em) 0 0 / .3125em .3125em;
   opacity: 0;
   cursor: pointer;
 }
@@ -149,7 +149,7 @@
     light-dark(#3c404326, #ffffff29) calc(100% - 1px),
     transparent 100%
   ) !important;
-  background-size: 26px 26px !important;
+  background-size: 1.625em 1.625em !important;
   background-position: center !important;
   background-origin: content-box !important;
   background-repeat: no-repeat !important;
@@ -163,13 +163,13 @@
 }
 
 #threadTree[data-gm-personal-indicators] :is(#flaggedCol, .flaggedcol-column) {
-  width: 46px !important;
-  min-width: 46px !important;
-  max-width: 46px !important;
-  inline-size: 46px !important;
-  min-inline-size: 46px !important;
-  max-inline-size: 46px !important;
-  padding-inline-end: 18px !important;
+  width: 2.875em !important;
+  min-width: 2.875em !important;
+  max-width: 2.875em !important;
+  inline-size: 2.875em !important;
+  min-inline-size: 2.875em !important;
+  max-inline-size: 2.875em !important;
+  padding-inline-end: 1.125em !important;
 }
 #threadTree[data-gm-personal-indicators] .flaggedcol-column {
   position: relative;
@@ -178,11 +178,11 @@
   position: absolute;
   inset-inline-end: 0;
   inset-block: 0;
-  inline-size: 18px;
+  inline-size: 1em;
   display: grid;
   place-items: center;
   color: light-dark(#185abc, #a8c7fa);
-  font: 600 18px/1 sans-serif;
+  font: 600 1.125em/1 sans-serif;
 }
 
 /* Message rows open a conversation when clicked. */
@@ -201,6 +201,24 @@
 
 /* Native tag icons default to pink when the tag has no explicit color.
    Use neutral gray, matching the uncolored message chip, in either icon mode. */
+/* Keep the native tree hit targets and collapsed/RTL rotation, replacing
+ * only the label disclosure artwork with a small filled triangle. */
+#folderTree [data-tag-key] > .container .twisty-icon {
+  content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'/%3E") !important;
+  inline-size: .75em !important;
+  block-size: .75em !important;
+  background-color: currentColor !important;
+  clip-path: polygon(12.5% 31.25%, 87.5% 31.25%, 50% 68.75%) !important;
+}
+
+/* Trim two pixels per label row in each native density mode. */
+#folderTree [data-tag-key] > .container {
+  min-block-size: calc(var(--list-item-min-height) - 2px) !important;
+}
+#folderTree [data-tag-key] > .container > .twisty {
+  block-size: calc(var(--list-item-min-height) - 2px) !important;
+}
+
 #folderTree [data-gm-uncolored-label="true"] > .container > .icon {
   --icon-color: #5f6368 !important;
   color: #5f6368 !important;
@@ -237,4 +255,33 @@
 }
 #threadTree .tree-view-row-select-checkbox[data-gm-selection-checked="true"] {
   fill-opacity: 1 !important;
+}
+
+/* Draw the square in CSS: Gecko does not pass context paint/opacity into
+   data-URL SVGs. Keep checks independent from the always-visible border. */
+#threadTree :is(.tree-view-header-select,.tree-view-row-select) img {
+  content:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'/%3E") !important;
+  box-sizing:border-box !important;
+  inline-size:1.125em !important; block-size:1.125em !important;
+  width:1.125em !important; height:1.125em !important;
+  min-width:0 !important; min-height:0 !important;
+  min-inline-size:0 !important; min-block-size:0 !important;
+  max-width:none !important; max-height:none !important;
+  max-inline-size:none !important; max-block-size:none !important;
+  border:.09375em solid currentColor !important; border-radius:1px !important;
+  background-image:none !important;
+  background-size:contain !important; background-position:center !important; background-repeat:no-repeat !important;
+}
+#threadTree .tree-view-row-select-checkbox[data-gm-selection-checked="true"],
+#threadTree :is(.all-selected .tree-view-header-select,.selected .tree-view-row-select) img:not([data-gm-selection-checked]) {
+  background-image:light-dark(url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m4 10 4 4 8-8' fill='none' stroke='%235f6368' stroke-width='2.3'/%3E%3C/svg%3E"),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m4 10 4 4 8-8' fill='none' stroke='%23e8eaed' stroke-width='2.3'/%3E%3C/svg%3E")) !important;
+}
+#threadTree .some-selected .tree-view-header-select img {
+  background-image:linear-gradient(currentColor,currentColor) !important;
+  background-size:65% 2px !important;
+}
+#threadTree .flaggedcol-column button {
+  font:inherit !important;
+  inline-size:1.75em !important; block-size:1.75em !important;
+  min-inline-size:0 !important; min-block-size:0 !important;
 }

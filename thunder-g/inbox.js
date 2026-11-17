@@ -1295,8 +1295,8 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       position: absolute;
       inset: 0;
       margin: auto;
-      inline-size: 18px;
-      block-size: 18px;
+      inline-size: 1.5em;
+      block-size: 1.5em;
       pointer-events: none;
     }
     #threadTree button[data-gm-star] { position: relative; }

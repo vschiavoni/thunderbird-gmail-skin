@@ -5,7 +5,7 @@ const GM_STAR_MARKERS = [
   ['green-check','✓','#188038'],['blue-info','ℹ','#1967d2'],['purple-question','?','#9334a7'],
 ];
 // Shared geometry gives empty and filled stars the same outer bounds.
-const GM_STAR_PATH='M12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26Z';
+const GM_STAR_PATH='M12 2 14.81 8.63 22 9.24 16.54 13.97 18.18 21 12 17.27 5.82 21 7.46 13.97 2 9.24 9.19 8.63Z';
 function gmStarImage(id) {
   const star=!id || id.endsWith('-star');
   const symbols={
@@ -17,7 +17,7 @@ function gmStarImage(id) {
     'purple-question':'M8 8a4 4 0 1 1 6 3.5c-1 .6-1 1-1 2.5h-2c0-2 .2-3 2-4a2 2 0 1 0-3-2z M11 16h2v2h-2z',
   };
   const shape=star
-    ? `<path d="${GM_STAR_PATH}" fill="${id?'black':'none'}" stroke="black" stroke-width="1.5" stroke-linejoin="round"/>`
+    ? `<path d="${GM_STAR_PATH}" fill="${id?'black':'none'}" stroke="black" stroke-width="1.6" stroke-linejoin="miter"/>`
     : `<path fill="black" d="${symbols[id]}"/>`;
   // Crop each symbol to its visible bounds so it occupies the same 18px
   // icon area as a star, rather than shrinking inside the star's canvas.

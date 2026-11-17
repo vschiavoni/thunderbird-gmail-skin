@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Use small filled disclosure triangles in the label tree and tighten label row spacing.
+
+- Use squarer Gmail-style message checkboxes and sharper star outlines; scale row controls and their gutters with interface font zoom.
+
 - Use Thunderbird’s native attachment icons in sent tiles and filename rows to match the embedded composer.
 
 - Improve attachment groups with counts, Save all, wrapped compact tiles and bounded embedded document thumbnails.
