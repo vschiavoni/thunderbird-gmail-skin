@@ -263,7 +263,7 @@ test('Copy view also copies native columns across accounts and keeps descendant 
  controller.close();assert.equal(pane._applyView,original);
 });
 
-test('list and conversation preview queues share bounded expiring text without duplicate local reads',()=>{
+test('list and conversation preview queues retain bounded successful previews without duplicate local reads',()=>{
  let now=0,sequence=0,reads=0,body='first';scope.Date={now:()=>now};
  const timers=new Map(),win={setTimeout(fn){timers.set(++sequence,fn);return sequence},clearTimeout(id){timers.delete(id)}};
  const flush=()=>{while(timers.size){const [id,fn]=timers.entries().next().value;timers.delete(id);fn()}};
@@ -273,7 +273,12 @@ test('list and conversation preview queues share bounded expiring text without d
  list.get(header,()=>true,()=>{});reader.get(header,()=>true,()=>{});flush();assert.equal(reads,1,'simultaneous consumers read a local body once');
  list.close();assert.equal(reader.get(header,()=>true,()=>{}),'first','closing one consumer preserves the shared cache');
  header.messageId='replacement';body='replacement';assert.equal(reader.get(header,()=>true,()=>{}),'');flush();assert.equal(reads,2,'a reused message key cannot return another message\'s text');
- now=300001;body='fresh';assert.equal(reader.get(header,()=>true,()=>{}),'');flush();assert.equal(reads,3,'positive results expire');
+ now=3600001;body='fresh';header.flags=1;
+ assert.equal(reader.get(header,()=>true,()=>{}),'replacement','time and read-state changes retain the successful preview');
+ flush();assert.equal(reads,2,'returning after an hour does not reparse an unchanged body');
+ header.messageSize=500;assert.equal(reader.get(header,()=>true,()=>{}),'');flush();
+ assert.equal(reads,3,'changed message metadata refreshes the preview');
+ assert.equal(reader.get(header,()=>true,()=>{}),'fresh');
  for(let i=2;i<=302;i++) {reader.get({...header,messageKey:i},()=>true,()=>{});flush()}
  assert.equal(reader.get(header,()=>true,()=>{}),'','least recently used previews are evicted');flush();
  reader.close();const reopened=scope.createPreviewQueue(win);assert.equal(reopened.get(header,()=>true,()=>{}),'','last consumer releases all cached text');reopened.close();

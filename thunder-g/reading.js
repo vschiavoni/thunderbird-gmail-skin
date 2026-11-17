@@ -1035,7 +1035,10 @@ function installReadingMode(win) {
     layout.messagePaneVisible = false;
     // Reader selection can include every member of a collapsed conversation.
     // Returning to the inbox must not retain that implicit bulk selection.
-    if (restorePosition) {clearBulk();tree.invalidate?.();}
+    // Native selection and message-property notifications update affected rows.
+    // Invalidating the whole list here repeats row decoration and expensive
+    // accessibility position calculations just to return to the same view.
+    if (restorePosition) clearBulk();
     if (restorePosition && win.gFolder?.URI === previous.folderURI) {
       tree.scrollTop = previous.scrollTop;
       tree.scrollLeft = previous.scrollLeft;

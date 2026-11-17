@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Retain successful previews in the bounded cache across conversation returns and remove focus-triggered list redraws.
+
+- Avoid full message-list invalidation on conversation return; share label calculations per refresh and retain unchanged label chips.
+
 - Use small filled disclosure triangles in the label tree and tighten label row spacing.
 
 - Use squarer Gmail-style message checkboxes and sharper star outlines; scale row controls and their gutters with interface font zoom.

@@ -266,7 +266,10 @@ function createPreviewQueue(win) {
   const stamp=header=>JSON.stringify([header.messageId || '',header.messageSize || 0,header.dateInSeconds || 0]);
   function lookup(header,key){
     const entry=cache.get(key);
-    if(!entry || entry.stamp!==stamp(header) || entry.expiresAt<=Date.now())return null;
+    // Message bodies are immutable at this identity; read/unread changes and
+    // elapsed time must not turn a warm list into another body-reading queue.
+    // LRU eviction still bounds memory; missing previews retain their retry TTL.
+    if(!entry || entry.stamp!==stamp(header) || (!entry.text && entry.expiresAt<=Date.now()))return null;
     if(!entry.text && (entry.retryAt<=Date.now() || entry.flags!==header.flags))return null;
     cache.delete(key);cache.set(key,entry);return entry;
   }
@@ -1559,12 +1562,12 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     }
     if (wasVisible !== undefined) filter._showFilterBar(wasVisible);
     win.removeEventListener('unload',close);
-    win.removeEventListener('focus',refreshPreviews);
   }
   function refreshPreviews() {
     if (!closed) for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) render(row);
   }
-  win.addEventListener('focus',refreshPreviews);
+  // Native row/property updates handle changed mail. Focus alone changes no
+  // preview content and must not rebuild the list when leaving the reader.
   win.addEventListener('unload',close,{once:true});
   return {close,setPersonalIndicators,setThreadGuides,setPreviewTrimming(value){previewSettings=previewTextSettings(value);refreshPreviews();},setColoredStars:stars.configure,setThreadExpandArrows:threadToggles.setEnabled};
 }
