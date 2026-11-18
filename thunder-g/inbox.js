@@ -627,7 +627,7 @@ function installInboxIdleActions(win,reader=null) {
       :is(.gm-inbox-action):is(:hover,:focus-visible) { background:transparent !important; }
     :is(.gm-inbox-action)::before { transition:transform 180ms cubic-bezier(.2,0,0,1), opacity 120ms ease-out; }
     }
-    .gm-inbox-refresh-notice{position:fixed;inset-block-start:0;inset-inline-start:50%;transform:translateX(-50%);z-index:2147483647;padding:3px 10px;border:1px solid #e6c873;border-radius:0 0 2px 2px;background:#fff1c2;color:#202124;box-shadow:0 1px 4px #0003;font:500 12px/1.4 system-ui,sans-serif;pointer-events:none;}
+    .gm-inbox-refresh-notice{position:fixed;inset-block-start:0;inset-inline-start:50%;transform:translateX(-50%);z-index:2147483647;padding:3px 10px;border:1px solid #e6c873;border-radius:0 0 2px 2px;background:#fff1c2;color:#202124;box-shadow:0 1px 4px #0003;font:500 12px/1.4 var(--gm-ui-font, system-ui,sans-serif);pointer-events:none;}
     .gm-inbox-refresh-notice[hidden]{display:none!important;}
     @keyframes gm-refresh-collapse{from{opacity:1;transform:scale(1);}to{opacity:0;transform:scale(0);}}
     @media(prefers-reduced-motion:no-preference){
@@ -1325,9 +1325,9 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       flex:0 1 auto !important; max-width:65%; min-width:32px;
     }
     #threadTree .gm-message-snippet {
-      flex:1 1 0; min-width:0; margin-inline-start:6px; overflow:hidden;
-      white-space:nowrap; text-overflow:ellipsis; font-weight:400;
-      color:var(--gm-snippet, #9aa0a6) !important;
+      flex:1 1 0; min-width:0; margin-inline-start:4px; overflow:hidden;
+      white-space:nowrap; text-overflow:ellipsis;
+      color:light-dark(#5f6368, #bdc1c6) !important;
       font-weight:400 !important;
     }
     /* Keep centering on the same height when 28px hover actions appear.
@@ -1419,7 +1419,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       line.querySelector('.gm-message-snippet')?.remove();
       const snippet = doc.createElement('div');
       snippet.className = 'gm-message-snippet';
-      snippet.textContent = '— ' + text;
+      snippet.textContent = '- ' + text;
       snippet.title = text;
       line.classList.add('gm-has-snippet');
       const actions = line.querySelector('.gm-snooze-returned, .gm-row-actions');

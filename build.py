@@ -18,6 +18,7 @@ with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
             # unsigned extension jar URIs as untrusted in Thunderbird 153.
             skin = '\n'.join((root / 'chrome' / name).read_text() for name in
                              ['gmail-inspired.css', 'gmail-columns.css'])
+            data += ('\nvar GMAIL_TYPOGRAPHY_CSS = ' + json.dumps((source / 'typography.css').read_text()) + ';\n').encode()
             data += ('\nvar GMAIL_SKIN_CSS = ' + json.dumps(skin) + ';\n').encode()
             data += ('\nvar GMAIL_CONVERSATIONS_CSS = ' + json.dumps((root / 'chrome/gmail-conversations.css').read_text()) + ';\n').encode()
             catalogs = {language: json.loads((source / '_locales' / language / 'messages.json').read_text()) for language in ['en', 'it']}

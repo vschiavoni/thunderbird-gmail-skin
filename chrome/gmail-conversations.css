@@ -10,9 +10,9 @@
     --gm-conversation-surface: light-dark(#fff, #202124);
   }
   body {
+    font-family: var(--gm-ui-font, Roboto, Arial, sans-serif) !important;
     background: var(--application-background-color) !important;
     color: var(--application-foreground-color) !important;
-    font-family: Roboto, Arial, sans-serif !important;
     font-size:14px !important;
   }
   .conversationHeader {
@@ -24,7 +24,7 @@
   }
   .conversationHeaderWrapper { box-shadow:none !important; position:static !important; }
   .subject, :host(linkified-subject) .subject {
-    font-family:Roboto, Arial, sans-serif !important;
+    font-family: var(--gm-ui-font, Roboto, Arial, sans-serif) !important;
     font-size:22px !important; font-weight:400 !important;
     letter-spacing:normal !important;
     height:auto !important; line-height:1.4 !important;
@@ -83,7 +83,7 @@
   .tags li { border-radius:4px !important; padding:0 5px !important; }
   .actions-button { border-radius:50% !important; }
   .actions-button:hover { background:light-dark(#e9eef6, #30343b) !important; }
-  :host(contact-label) .contactName { font-family:Roboto, Arial, sans-serif; }
+  :host(contact-label) .contactName { font-family: var(--gm-ui-font, Roboto, Arial, sans-serif); }
   :host(message-header-options) .date { font-size:12px; }
   @media (max-width:560px) {
     .conversationHeader { padding-inline-start:20px !important; }

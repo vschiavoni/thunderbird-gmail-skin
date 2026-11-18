@@ -185,10 +185,20 @@ function installChangeDrivenAutosave(native,clock,modes=Ci.nsIMsgCompDeliverMode
 }
 function installNativeChangeAutosave(native) {
   const shortcuts=typeof installGmailComposeShortcuts==='function'?installGmailComposeShortcuts(native):null;
-  let controller=null,closed=false;
-  function ready(){if(!closed && !controller && native.gMsgCompose && native.GetCurrentEditor?.())controller=installChangeDrivenAutosave(native,native)}
+  let controller=null,bodySheet=null,closed=false;
+  function ready() {
+    if (closed || controller || !native.gMsgCompose || !native.GetCurrentEditor?.()) return;
+    bodySheet = styleComposeBody(native);
+    controller = installChangeDrivenAutosave(native,native);
+  }
   native.addEventListener('compose-startup-done',ready);ready();
-  return {close(){closed=true;shortcuts?.close();native.removeEventListener('compose-startup-done',ready);controller?.close()}};
+  return {close(){
+    closed=true;
+    shortcuts?.close();
+    native.removeEventListener('compose-startup-done',ready);
+    bodySheet?.close();
+    controller?.close();
+  }};
 }
 
 // Keep the full native compose document alive independently of conversation navigation.
@@ -224,10 +234,10 @@ function createInlineComposeDeck(win, create = createInlineCompose) {
       const pill = win.document.createElement('div');
       pill.style.cssText = 'display:flex;align-items:center;flex:0 0 280px;min-width:0;border-radius:20px;background:light-dark(#f2f6fc,#292a2d);color:light-dark(#16345c,#e8eaed);box-shadow:0 2px 10px #0003;pointer-events:auto;overflow:hidden;';
       const restore = win.document.createElement('button');restore.type='button';restore.textContent=session.title || gmText("New Message");restore.title=restore.textContent;
-      restore.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;color:inherit;text-align:start;padding:12px;cursor:pointer;font:500 13px sans-serif;';
+      restore.style.cssText='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;color:inherit;text-align:start;padding:12px;cursor:pointer;font:500 13px var(--gm-ui-font, sans-serif);';
       restore.addEventListener('click',()=>activate(session));
       const close=win.document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label',gmText("Close message"));
-      close.style.cssText='border:0;background:transparent;color:inherit;padding:10px;cursor:pointer;font:20px sans-serif;';
+      close.style.cssText='border:0;background:transparent;color:inherit;padding:10px;cursor:pointer;font:20px var(--gm-ui-font, sans-serif);';
       close.addEventListener('click',()=>session.saveAndClose?.());pill.append(restore,close);dock.append(pill);
     }
   }
@@ -745,10 +755,12 @@ function watchInlineComposeBodyReady(native) {
   native.addEventListener('compose-window-init',init,true);
   return {get ready(){return ready},close(){if(closed)return;closed=true;native.removeEventListener('compose-window-init',init,true);compose?.UnregisterStateListener(listener);}};
 }
-function styleInlineComposeBody(native) {
+function styleComposeBody(native, inline = false) {
   const utils=native.document.getElementById?.('messageEditor')?.contentWindow?.windowUtils;
   if(!utils)return {close(){}};
-  const css='body{margin:12px 20px;line-height:1.5;}'+(!native.gMsgCompose.composeHTML?'body,body>pre,pre.moz-signature{font-family:Arial,sans-serif!important;font-size:14px!important;line-height:1.5!important;}':'');
+  const typography = 'font:small/1.5 Arial,Helvetica,sans-serif;letter-spacing:normal;';
+  const css = (inline ? 'body{margin:12px 20px;}' : '') + 'body{' + typography + '}' +
+    (native.gMsgCompose.composeHTML ? '' : 'body>pre,pre.moz-signature{' + typography + '}');
   const uri='data:text/css;charset=utf-8,'+encodeURIComponent(css);
   // Sheet loading is presentation-only. Inserting <style> into an editable
   // document marks it modified and can interfere with native startup/autosave.
@@ -1107,7 +1119,7 @@ function createInlineCompose(win,hooks={}) {
         replyLabels?.update(state);
         if(!sendNotice){
           sendNotice=doc.createElement('div');sendNotice.className='gm-send-notice';sendNotice.setAttribute('role','status');sendNotice.setAttribute('aria-live','polite');
-          sendNotice.style.cssText='position:fixed;z-index:10000;bottom:24px;left:24px;max-width:min(440px,calc(100vw - 48px));box-sizing:border-box;padding:8px 10px;border-radius:4px;background:#202124;color:#fff;font:12px/1.35 sans-serif;display:flex;align-items:flex-start;gap:12px;box-shadow:0 4px 16px #0004;';
+          sendNotice.style.cssText='position:fixed;z-index:10000;bottom:24px;left:24px;max-width:min(440px,calc(100vw - 48px));box-sizing:border-box;padding:8px 10px;border-radius:4px;background:#202124;color:#fff;font:12px/1.35 var(--gm-ui-font, sans-serif);display:flex;align-items:flex-start;gap:12px;box-shadow:0 4px 16px #0004;';
           doc.documentElement.append(sendNotice);
         }
         if(noticeTimer!==null)win.clearTimeout(noticeTimer);noticeTimer=null;sendNotice.hidden=false;sendNotice.style.display='flex';
@@ -1116,7 +1128,7 @@ function createInlineCompose(win,hooks={}) {
         if(state.error && !['sending','sent'].includes(state.state))message.textContent+=` ${state.error}`;
         if(state.state==='draft-error' && state.draftError)message.textContent+=gmText(" Draft: $1", state.draftError);
         const dismiss=button('×',hideSendNotice);gmBindAttribute(dismiss, 'aria-label', () => gmText("Dismiss notification"));gmBindValue(dismiss, "title", () => gmText("Dismiss"));
-        dismiss.style.cssText='flex:none;border:0;padding:0 2px;background:transparent;color:#fff;font:18px/1 sans-serif;cursor:pointer;';
+        dismiss.style.cssText='flex:none;border:0;padding:0 2px;background:transparent;color:#fff;font:18px/1 var(--gm-ui-font, sans-serif);cursor:pointer;';
         sendNotice.replaceChildren(message,dismiss);
         // display:none destroys the embedded editor. Thunderbird serializes
         // that editor AFTER compose-send-message, so keep its layout alive.
@@ -1219,7 +1231,7 @@ function createInlineCompose(win,hooks={}) {
           if(browser!==frame)return;
           if(bodyReadyWatcher?.ready && native.gMsgCompose && native.GetCurrentEditor?.()) {
             bodyReadyWatcher.close();bodyReadyWatcher=null;
-            bodySheet=styleInlineComposeBody(native);
+            bodySheet=styleComposeBody(native, true);
             attachmentDrop=installEmbeddedAttachmentDrop(native,panel);
             const replyTo=native.gMsgCompose.compFields.replyTo || '',identity=native.gCurrentIdentity?.email;
             const replyRow=frame.contentDocument.getElementById('addressRowReply');

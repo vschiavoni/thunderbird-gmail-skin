@@ -108,7 +108,7 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
   assert.equal(row.line.children.length,1,'recycled row has only one action group');
   assert.equal(row.line.children[0].children[2].title,'Mark conversation as unread');
   preview='Text <b>only</b>';row.fillRow();
-  assert.equal(row.line.children[0].textContent,'— Text <b>only</b>','preview is literal text, not HTML');
+  assert.equal(row.line.children[0].textContent,'- Text <b>only</b>','preview is literal text, not HTML');
   preview='';row.fillRow();
   assert.equal(row.line.children.length,1,'recycled row clears the preceding message preview');
   row.index=1;row.fillRow();assert.equal(row.dataset.gmThreadGuide,'end');

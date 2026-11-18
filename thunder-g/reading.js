@@ -780,10 +780,10 @@ function installReadingMode(win) {
         sheet.append(header,content,footer);
         const helpStyle=doc.createElement('style');helpStyle.textContent=`
           .gm-shortcut-help::backdrop{background:transparent;}
-          .gm-shortcut-sheet{box-sizing:border-box;display:flex;flex-direction:column;width:min(960px,calc(100vw - 64px));max-height:calc(100vh - 96px);color:#fff;background:transparent;font:14px/1.55 sans-serif;border-radius:16px;overflow:hidden;}
+          .gm-shortcut-sheet{box-sizing:border-box;display:flex;flex-direction:column;width:min(960px,calc(100vw - 64px));max-height:calc(100vh - 96px);color:#fff;background:transparent;font:14px/1.55 var(--gm-ui-font, sans-serif);border-radius:16px;overflow:hidden;}
           .gm-shortcut-sheet header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid #ffffff60;gap:16px;}
           .gm-shortcut-sheet h2{margin:0;font-size:22px;font-weight:600;}
-          .gm-shortcut-sheet header button{appearance:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;min-width:32px;max-width:32px;width:32px;min-height:32px;max-height:32px;height:32px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#f1f3f4;font:26px/1 sans-serif;cursor:pointer;}
+          .gm-shortcut-sheet header button{appearance:none;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;min-width:32px;max-width:32px;width:32px;min-height:32px;max-height:32px;height:32px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#f1f3f4;font:26px/1 var(--gm-ui-font, sans-serif);cursor:pointer;}
           .gm-shortcut-sheet header button:hover{background:#ffffff20;}
           .gm-shortcut-sheet header button:focus-visible{outline:2px solid #a8c7fa;outline-offset:-2px;}
           .gm-shortcut-sections:focus{outline:none;}

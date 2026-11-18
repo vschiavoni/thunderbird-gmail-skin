@@ -71,7 +71,7 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     #threadTree .gm-inline-label {
       display: inline-block; flex: 0 0 auto; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap; max-width: 160px;
-      font: 12px/16px Arial, sans-serif; border-radius: 4px; padding: 1px 5px;
+      font: 12px/16px var(--gm-ui-font, Arial, sans-serif); border-radius: 4px; padding: 1px 5px;
       box-sizing: border-box; text-align: center; text-indent: 0; vertical-align: middle;
       background: var(--gm-chip-bg); color: var(--gm-chip-fg);
     }

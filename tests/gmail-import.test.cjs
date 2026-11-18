@@ -116,7 +116,7 @@ test('native OAuth adapter requests only identity/label scope with PKCE and forg
 });
 test('privileged API returns usable setup errors instead of exposing exceptions or losing their message',async()=>{
  const module={setTimeout,clearTimeout,ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},ExtensionParent:{},ExtensionSupport:{},MailServices:{tags:{getAllTags:()=>[]}},UIFontSize:{}};
- const local=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>module},Services:{},GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:''});
+ const local=require('./localization-context.cjs').createContext({ChromeUtils:{importESModule:()=>module},Services:{},GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',GMAIL_TYPOGRAPHY_CSS:'/* Typography */'});
  vm.runInContext(code,local);vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/experiments/api.js'),'utf8'),local);
  const api=new local.inlineLabels().getAPI({extension:{id:'test'},callOnClose(){}}).inlineLabels;
  const before=JSON.parse(await api.gmailLabelImport('status','{}'));assert.equal(before.ok,true);assert.equal(before.result.connected,false);

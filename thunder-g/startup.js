@@ -53,7 +53,7 @@ function installStartupSplash(win, {logoURI, isStyled, activityManager=null}) {
     #gm-startup { position:fixed; inset:0; z-index:2147483646; display:flex;
       align-items:center; justify-content:center; box-sizing:border-box;
       background:light-dark(#f6f8fc,#202124); color:light-dark(#202124,#e8eaed);
-      font:14px/1.5 system-ui,sans-serif; color-scheme:inherit;
+      font:14px/1.5 var(--gm-ui-font, system-ui,sans-serif); color-scheme:inherit;
       opacity:1; transition:opacity 280ms ease; }
     #gm-startup[hidden] { display:none; }
     #gm-startup.gm-startup-fading { opacity:0; pointer-events:none; }

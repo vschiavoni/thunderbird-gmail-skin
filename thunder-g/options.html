@@ -23,7 +23,7 @@
     <div class="settings-layout">
       <aside>
         <nav aria-label="Settings sections" data-i18n-aria-label="settings_sections_2e7109b">
-          <a id="appearance-nav" href="#appearance" hidden><span data-i18n="settings_appearance">Appearance</span></a>
+          <a id="appearance-nav" href="#appearance"><span data-i18n="settings_appearance">Appearance</span></a>
           <a href="#inbox"><span data-i18n="inbox_44caf74">Inbox</span></a>
           <a href="#conversations"><span data-i18n="conversations_07c59b4">Conversations</span></a>
           <a href="#import-export"><span data-i18n="import_export_title">Import/Export</span></a>
@@ -54,9 +54,21 @@
           <p id="recommended-status" role="status" aria-live="polite" aria-atomic="true"></p>
         </section>
 
-        <section id="appearance" aria-labelledby="appearance-title" hidden>
+        <section id="appearance" aria-labelledby="appearance-title">
           <div class="section-heading"><h2 id="appearance-title" data-i18n="settings_appearance">Appearance</h2></div>
-          <div id="dock-icon-setting">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <label for="google-fonts" data-i18n="use_google_fonts">Use Google fonts</label>
+              <p id="google-fonts-help" data-i18n="google_fonts_help">Install both fonts on your system to use Google Sans for the interface and Google Sans Code for monospaced text.</p>
+              <p>
+                <a href="https://fonts.google.com/specimen/Google+Sans" target="_blank" rel="noopener" data-i18n="download_google_sans">Download Google Sans</a>
+                ·
+                <a href="https://fonts.google.com/specimen/Google+Sans+Code" target="_blank" rel="noopener" data-i18n="download_google_sans_code">Download Google Sans Code</a>
+              </p>
+            </div>
+            <input class="switch" id="google-fonts" type="checkbox" role="switch" aria-describedby="google-fonts-help" disabled>
+          </div>
+          <div id="dock-icon-setting" hidden>
           <div class="setting-row">
             <div class="setting-copy"><label for="dock-icon" data-i18n="use_thunder_g_dock_icon">Use Thunder-G Dock icon</label><p id="dock-icon-help" data-i18n="dock_icon_help">Choose an icon or match it to macOS appearance. The original icon returns when disabled.</p></div>
             <input class="switch" id="dock-icon" type="checkbox" role="switch" aria-describedby="dock-icon-help">

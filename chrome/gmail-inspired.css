@@ -52,7 +52,7 @@
   }
 
   #folderTree, #threadTree {
-    font-family: Roboto, Arial, sans-serif !important;
+    font-family: var(--gm-ui-font, Roboto, Arial, sans-serif) !important;
     font-size: 14px !important;
   }
 

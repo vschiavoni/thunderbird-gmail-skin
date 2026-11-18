@@ -1,4 +1,16 @@
 {
+  "use_google_fonts": {
+    "message": "Use Google fonts"
+  },
+  "google_fonts_help": {
+    "message": "Install both fonts on your system to use Google Sans for the interface and Google Sans Code for monospaced text."
+  },
+  "download_google_sans": {
+    "message": "Download Google Sans"
+  },
+  "download_google_sans_code": {
+    "message": "Download Google Sans Code"
+  },
   "invalid_autosave_snapshot_751f880": {
     "message": "Invalid autosave snapshot",
     "description": "Invalid autosave snapshot"

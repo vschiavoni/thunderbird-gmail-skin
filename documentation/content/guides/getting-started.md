@@ -26,8 +26,12 @@ installer or the old `inline-labels` extension, follow
 [migration instructions](../docs/updates.md#migrating-an-older-installer-managed-profile)
 before installing over that setup.
 
-For the intended sidebar wordmark, you may install Google Sans as a system font.
-It is optional; the extension uses an available fallback and does not download it.
+Install the [Google Sans variable font](https://fonts.google.com/specimen/Google+Sans)
+locally to get the Google Sans Text design in the interface (optical size 17)
+and the Google Sans design in the Thunder-G wordmark (optical size 18).
+The separate Google Sans Text and Google Sans static fonts also work.
+Install [Google Sans Code](https://fonts.google.com/specimen/Google+Sans+Code)
+for monospaced text, then turn on **Appearance → Use Google fonts** in Thunder-G.
 
 ## Check the basic controls
 
