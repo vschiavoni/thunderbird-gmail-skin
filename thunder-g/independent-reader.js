@@ -429,7 +429,7 @@ function installIndependentReader(win) {
     .tags { display:flex; flex-wrap:wrap; gap:.35em; margin:4px 0 4px var(--message-inset); }
     .tags:empty { display:none; }
     .tag { display:inline-flex; align-items:center; gap:4px; max-inline-size:100%;
-      box-sizing:border-box; font:400 .85em/1.25 Arial,sans-serif;
+      box-sizing:border-box; font:400 .85em/1.25 var(--gm-ui-font, Arial,sans-serif);
       border-radius:.35em; padding:2px 6px; }
     .tag-label { display:inline-flex; align-items:center; min-block-size:1.25em; overflow-wrap:anywhere; }
     .tag-remove { appearance:none; display:inline-flex; align-items:center; justify-content:center; flex:none;
@@ -473,7 +473,7 @@ function installIndependentReader(win) {
     .gm-sent-rich-content pre { white-space:pre-wrap; }
     .gm-sent-rich-content table { max-width:100%; }
     .gm-sent-rich-content blockquote { border-inline-start:2px solid #dadce0; padding-inline-start:1em; margin-inline-start:1em; }
-    .gm-pending-text { margin:0 10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; font:1em/1.35 monospace; }
+    .gm-pending-text { margin:0 10px 12px; white-space:pre-wrap; overflow-wrap:anywhere; font:1em/1.35 var(--gm-code-font, monospace); }
     .gm-pending-signature { opacity:.65; }
     article { position:relative; }
 
@@ -492,12 +492,12 @@ function installIndependentReader(win) {
     .body { display:flex; min-height:0; flex-direction:column; margin-inline-start:var(--message-inset); }
     .quote-toggle { align-self:flex-start; min-inline-size:22px; block-size:16px;
       padding:0 5px; margin:4px 0 8px; border:0; border-radius:3px;
-      background:var(--treeitem-background-hover,#e8eaed); color:inherit; font:bold 14px/12px sans-serif; cursor:pointer; }
+      background:var(--treeitem-background-hover,#e8eaed); color:inherit; font:bold 14px/12px var(--gm-ui-font, sans-serif); cursor:pointer; }
     .history-gap { position:relative; display:flex; align-items:center; min-block-size:48px; margin:8px 0; }
     .history-gap::before { content:''; position:absolute; inset-inline:0; inset-block-start:50%; border-block-start:1px solid var(--layout-border-0,#e8eaed); }
     .history-expand { position:relative; display:inline-flex; align-items:center; justify-content:center;
       inline-size:40px; block-size:40px; margin:0; padding:0; border:1px solid var(--layout-border-0,#dadce0);
-      border-radius:50%; background:var(--layout-background-0,#fff); color:inherit; font:600 .9em/1 Arial,sans-serif; cursor:pointer; }
+      border-radius:50%; background:var(--layout-background-0,#fff); color:inherit; font:600 .9em/1 var(--gm-ui-font, Arial,sans-serif); cursor:pointer; }
     .history-expand:hover { background:var(--treeitem-background-hover,#e9eef6); }
     .history-expand:focus-visible { outline:2px solid Highlight; outline-offset:2px; }
     .action-icon { display:inline-block; inline-size:20px; block-size:20px; background:currentColor; flex:none; }

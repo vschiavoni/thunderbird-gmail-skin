@@ -10,7 +10,7 @@ test('native keyword notifications refresh open conversations and unsubscribe on
     ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},ExtensionSupport:support,MailServices:mail,ExtensionParent:{}})},
     Services:{prefs:{addObserver(){},removeObserver(){}}},
     Ci:{nsIDOMWindowUtils:{USER_SHEET:1},nsIMsgFolderNotificationService:{msgPropertyChanged:8}},
-    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',GMAIL_TYPOGRAPHY_CSS:'/* Typography */',
     installGmailSearchStatus:()=>({close(){}}),installGmailSearch:()=>({close(){}}),
     createSnoozeOrder:()=>({close(){}}),
     createNativeSnooze:()=>({close(){}}),
@@ -28,11 +28,26 @@ test('native keyword notifications refresh open conversations and unsubscribe on
   let todayPaneWrites=0;
   const pane={setVisible(){todayPaneWrites++}};
   win.TodayPane={updateDisplay(){todayPaneWrites++},updateSplitterState(){todayPaneWrites++}};
-  win.document={documentURI:'chrome://conversations/content/experiment-api/stub.html',defaultView:win,
+  const attributes=new Set();
+  const documentElement={
+    toggleAttribute(name, enabled){if(enabled)attributes.add(name);else attributes.delete(name);},
+    removeAttribute(name){attributes.delete(name);},
+  };
+  win.document={documentElement,documentURI:'chrome://conversations/content/experiment-api/stub.html',defaultView:win,
     getElementById:id=>id==='today-pane-panel'?pane:null,querySelectorAll:()=>[]};
   windows.onLoadWindow(win);
   assert.equal(todayPaneWrites,0,"attaching the skin preserves the native Today Pane preference");
+  assert.equal(attributes.has('data-gm-google-fonts'),false);
+  await api.inlineLabels.setGoogleFontsEnabled(true);
+  assert.equal(attributes.has('data-gm-google-fonts'),true);
+  await api.inlineLabels.setGoogleFontsEnabled(false);
+  assert.equal(attributes.has('data-gm-google-fonts'),false);
   const originalSheets=sheets.size;
+  assert.ok(sheets.has('data:text/css;charset=utf-8,'+encodeURIComponent(scope.GMAIL_TYPOGRAPHY_CSS)));
+  const messageDocument={nodeType:9,documentURI:'imap://mail.example.test/Inbox#1',defaultView:{
+    windowUtils:{loadSheetUsingURIString(){assert.fail('email content must keep its own typography');}},
+  }};
+  events.get("load")({target:messageDocument});
   events.get("activate")();events.get("activate")();
   assert.equal(sheets.size,originalSheets,"repeated activation does not duplicate styles");
   windows.onUnloadWindow(win);assert.equal(events.size,0);assert.equal(sheets.size,0);
@@ -75,7 +90,7 @@ test('mail-window startup uses the packaged logo, runs once and closes on unload
     ExtensionSupport:{registerWindowListener(id,value){windows=value},unregisterWindowListener(){}},
     MailServices:{mfn:{addListener(){},removeListener(){}}}})},
     Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIDOMWindowUtils:{USER_SHEET:1},nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
-    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',GMAIL_TYPOGRAPHY_CSS:'/* Typography */',
     installGmailSearchStatus:()=>({close(){}}),installGmailSearch:()=>({close(){}}),
     createSnoozeOrder:()=>({close(){}}),
     createNativeSnooze:()=>({close(){}}),
@@ -321,7 +336,7 @@ test('closing a settings API context leaves the background snooze runtime alive'
     ExtensionSupport:{registerWindowListener(){},unregisterWindowListener(){}},
     MailServices:{mfn:{addListener(){},removeListener(){}}}})},
     Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
-    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',GMAIL_TYPOGRAPHY_CSS:'/* Typography */',
     createNativeSnooze(){started++;return service},createSnoozeOrder:()=>({close(){}}),
     installConversationLabelInheritance:()=>({close(){}}),createComposeAutosave:()=>({set(){},close(){}})});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/label-menu.js'),'utf8'),scope);
@@ -345,7 +360,7 @@ test('a late shutdown of an old background cannot close its replacement snooze s
     ExtensionSupport:{registerWindowListener(){},unregisterWindowListener(){}},
     MailServices:{mfn:{addListener(){},removeListener(){}}}})},
     Services:{prefs:{addObserver(){},removeObserver(){}}},Ci:{nsIMsgFolderNotificationService:{msgPropertyChanged:1}},
-    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+    sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',GMAIL_TYPOGRAPHY_CSS:'/* Typography */',
     createNativeSnooze(){const value={closed:0,close(){this.closed++}};services.push(value);return value},
     createSnoozeOrder(){const value={closed:0,close(){this.closed++}};orders.push(value);return value},
     installConversationLabelInheritance:()=>({close(){}}),createComposeAutosave:()=>({set(){},close(){}})});

@@ -1,0 +1,66 @@
+@scope (:root[data-gm-google-fonts]) {
+  :scope {
+    --gm-ui-font: "Google Sans 17pt", "Google Sans Text", "Google Sans", system-ui, sans-serif;
+    --gm-wordmark-font: "Google Sans", "Product Sans", system-ui, sans-serif;
+    --gm-code-font: "Google Sans Code", monospace;
+  }
+
+  :scope, body, :is(button, input, select, textarea, menulist, menu, menuitem, toolbarbutton),
+  :is(#folderTree, #threadTree, global-search-bar, .subject, .contactName) {
+    font-family: var(--gm-ui-font) !important;
+    font-optical-sizing: none;
+    font-variation-settings: "opsz" 17;
+  }
+
+  #threadTree {
+    --gm-ui-font: "Google Sans 17pt", "Google Sans Text", "Google Sans",
+      Roboto, RobotoDraft, Helvetica, Arial, sans-serif;
+    letter-spacing: normal;
+  }
+
+  #threadTree :is(.sendercol-column, .correspondentcol-column, .recipientcol-column) {
+    font-optical-sizing: none;
+    font-variation-settings: "opsz" 17;
+    font-weight: 400 !important;
+  }
+
+  #threadTree .subject-line > :is(span:not(.gm-inline-labels), .gm-message-snippet) {
+    font-family: var(--gm-ui-font) !important;
+    font-optical-sizing: none;
+    font-variation-settings: "opsz" 17;
+    font-weight: 400 !important;
+    font-synthesis-weight: none;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "liga" 0;
+    font-variant-ligatures: no-contextual;
+  }
+
+  #threadTree tr:is([data-properties~="unread"], .children.collapsed[data-properties~="hasUnread"])
+    :is(.sendercol-column, .correspondentcol-column, .recipientcol-column),
+  #threadTree .gm-unread-thread-senders {
+    font-weight: 500 !important;
+  }
+
+  #threadTree tr:is([data-properties~="unread"], .children.collapsed[data-properties~="hasUnread"])
+    .subject-line > span:not(.gm-inline-labels) {
+    font-weight: 600 !important;
+  }
+
+  @media (prefers-contrast: no-preference) {
+    #threadTree tr:not([data-properties~="unread"], .children.collapsed[data-properties~="hasUnread"])
+      .subject-line > span:not(.gm-inline-labels) {
+      color: color-mix(in srgb, currentColor 96%, var(--gm-read, Canvas));
+    }
+  }
+
+  .gm-toolbar-brand, .gm-sidebar-brand {
+    font-family: var(--gm-wordmark-font) !important;
+    font-optical-sizing: none;
+    font-variation-settings: "opsz" 18;
+  }
+
+  :is(pre, code, kbd, samp, .gm-pending-text) {
+    font-family: var(--gm-code-font) !important;
+    font-variation-settings: normal;
+  }
+}

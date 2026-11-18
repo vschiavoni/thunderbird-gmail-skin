@@ -275,7 +275,7 @@ function installNativeSummaryStyle(win, mail = MailServices) {
     #messageList > li { cursor:pointer; }
     #messageList .tags { display:inline-flex; align-items:center; gap:4px; }
     #messageList .tag { display:inline-flex; align-items:center; justify-content:center;
-      box-sizing:border-box; font:400 12px/1.5 Arial,sans-serif; border-radius:4px;
+      box-sizing:border-box; font:400 12px/1.5 var(--gm-ui-font, Arial,sans-serif); border-radius:4px;
       padding:1px 5px; vertical-align:middle;
       background-color:var(--gm-summary-tag-bg) !important;
       color:var(--gm-summary-tag-fg) !important; }

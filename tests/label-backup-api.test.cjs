@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 function fixture(){
  const calls=[];let cleanup,created=0,disposed=0;
- const scope=require('./localization-context.cjs').createContext({sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',
+ const scope=require('./localization-context.cjs').createContext({sentReplyLabelTrackers:new Set(),GMAIL_SKIN_CSS:'',GMAIL_CONVERSATIONS_CSS:'',GMAIL_TYPOGRAPHY_CSS:'/* Typography */',
   ChromeUtils:{importESModule:()=>({ExtensionCommon:{ExtensionAPI:class{},EventManager:class{api(){return {}}}},ExtensionParent:{},MailServices:{}})},
   createNativeLabelBackup(){created++;return {async run(action,data){calls.push([action,data]);if(action==='fail')throw Error('Controlled failure');return {value:1}},close(){disposed++}}}
  });

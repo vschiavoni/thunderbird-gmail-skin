@@ -627,7 +627,7 @@ function installInboxIdleActions(win,reader=null) {
       :is(.gm-inbox-action):is(:hover,:focus-visible) { background:transparent !important; }
     :is(.gm-inbox-action)::before { transition:transform 180ms cubic-bezier(.2,0,0,1), opacity 120ms ease-out; }
     }
-    .gm-inbox-refresh-notice{position:fixed;inset-block-start:0;inset-inline-start:50%;transform:translateX(-50%);z-index:2147483647;padding:3px 10px;border:1px solid #e6c873;border-radius:0 0 2px 2px;background:#fff1c2;color:#202124;box-shadow:0 1px 4px #0003;font:500 12px/1.4 system-ui,sans-serif;pointer-events:none;}
+    .gm-inbox-refresh-notice{position:fixed;inset-block-start:0;inset-inline-start:50%;transform:translateX(-50%);z-index:2147483647;padding:3px 10px;border:1px solid #e6c873;border-radius:0 0 2px 2px;background:#fff1c2;color:#202124;box-shadow:0 1px 4px #0003;font:500 12px/1.4 var(--gm-ui-font, system-ui,sans-serif);pointer-events:none;}
     .gm-inbox-refresh-notice[hidden]{display:none!important;}
     @keyframes gm-refresh-collapse{from{opacity:1;transform:scale(1);}to{opacity:0;transform:scale(0);}}
     @media(prefers-reduced-motion:no-preference){
@@ -1099,52 +1099,124 @@ function installInboxSettingsButton(doc,openSettings) {
   if(!filter || !openSettings)return {close(){}};
   const button=doc.createElement('button');
   button.type='button';
-  button.className='button icon-button unified-toolbar-button gm-inbox-settings';
+  button.className='gm-inbox-settings';
   gmBindAttribute(button,'aria-label',()=>gmText("Thunder-G settings"));
   gmBindAttribute(button,'title',()=>gmText("Thunder-G settings"));
-  button.textContent='⚙';
   button.addEventListener('click',openSettings);
   filter.after(button);
   return {close(){button.removeEventListener('click',openSettings);button.remove();}};
 }
 
 function installInboxEdgeBounce(win, tree) {
-  const reducedMotion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
-  let timer=null;
-  let distance=0;
+  const reducedMotion = win.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const maxOffset = 32;
+  const followTime = 34;
+  const returnTime = 53;
+  const releaseGap = 25;
+  const gestureGap = 130;
+  let frame = null;
+  let lastFrame = 0;
+  let lastWheel = -Infinity;
+  let peakDelta = 0;
+  let lastDelta = 0;
+  let tailEvents = 0;
+  let renewedEvents = 0;
+  let releasing = false;
+  let offset = 0;
+  let target = 0;
+
   function reset() {
-    if(timer!==null)win.clearTimeout(timer);
-    timer=null;
-    distance=0;
-    tree.style.removeProperty('--gm-edge-bounce');
+    if (frame !== null) win.cancelAnimationFrame(frame);
+    frame = null;
+    offset = target = peakDelta = lastDelta = tailEvents = renewedEvents = 0;
+    lastWheel = -Infinity;
+    releasing = false;
+    tree.style.removeProperty('--gm-inbox-edge-translate');
   }
-  function onWheel(event) {
-    if(reducedMotion?.matches || event.ctrlKey || event.metaKey ||
-        event.defaultPrevented || Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
-    const page=tree._gmPageScrollLimits;
-    const min=page?.min ?? 0;
-    const max=page?.max ?? tree.scrollHeight-tree.clientHeight;
-    // Moving the virtual table upward at the bottom exposes its trailing
-    // spacer and can flicker while native pagination clamps the scroll offset.
-    const atEdge=max>min && event.deltaY<0 && tree.scrollTop<=min+1;
-    if(!atEdge){
-      if(timer!==null)reset();
+
+  function animate(now) {
+    const top = tree._gmPageScrollLimits?.min ?? 0;
+    if (reducedMotion?.matches || tree.scrollTop < top - 1) {
+      reset();
       return;
     }
-    const scale=event.deltaMode===0?1:16;
-    distance=Math.max(-16,Math.min(16,distance-event.deltaY*scale*.16));
-    tree.style.setProperty('--gm-edge-bounce',distance+'px');
-    if(timer!==null)win.clearTimeout(timer);
-    timer=win.setTimeout(reset,75);
+
+    if (now - lastWheel >= releaseGap || tree.scrollTop > top + 1) releasing = true;
+    const elapsed = Math.max(0, now - lastFrame);
+    lastFrame = Math.max(lastFrame, now);
+    if (releasing) {
+      offset *= Math.exp(-elapsed / returnTime);
+      if (offset < .1) {
+        // Keep the gesture state so its inertial tail cannot restart it.
+        frame = null;
+        offset = target = 0;
+        tree.style.removeProperty('--gm-inbox-edge-translate');
+        return;
+      }
+    } else {
+      offset += (target - offset) * -Math.expm1(-elapsed / followTime);
+    }
+
+    tree.style.setProperty('--gm-inbox-edge-translate', `0 ${offset}px`);
+    frame = win.requestAnimationFrame(animate);
   }
-  tree.addEventListener('wheel',onWheel,{passive:true});
-  tree.addEventListener('viewchange',reset);
-  tree.addEventListener('gm-page-changed',reset);
-  return {close(){
-    if(timer!==null)reset();
-    tree.removeEventListener('wheel',onWheel);
-    tree.removeEventListener('viewchange',reset);
-    tree.removeEventListener('gm-page-changed',reset);
+
+  function onWheel(event) {
+    if (reducedMotion?.matches || event.ctrlKey || event.metaKey || event.defaultPrevented ||
+        Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    if (event.deltaY > 0) {
+      releasing = true;
+      lastWheel = -Infinity;
+      return;
+    }
+
+    const page = tree._gmPageScrollLimits;
+    const top = page?.min ?? 0;
+    const bottom = page?.max ?? tree.scrollHeight - tree.clientHeight;
+    const distanceToTop = tree.scrollTop - top;
+    if (bottom <= top || distanceToTop < -1) return;
+
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? tree.clientHeight : 1;
+    const overshoot = -event.deltaY * unit - Math.max(0, distanceToTop);
+    if (overshoot <= 0) return;
+
+    const now = win.performance.now();
+    if (releasing) {
+      // Wheel events have no gesture phase. A sustained increase can be a
+      // fresh pull even while smaller momentum events are still arriving.
+      const minRenewedDelta = Math.max(6, peakDelta * .2);
+      const growing = overshoot >= minRenewedDelta &&
+        (renewedEvents ? overshoot >= lastDelta * .85 : overshoot >= lastDelta * 1.6);
+      renewedEvents = growing ? renewedEvents + 1 : 0;
+    }
+    if (now - lastWheel >= gestureGap || renewedEvents >= 2) {
+      peakDelta = tailEvents = renewedEvents = 0;
+      releasing = false;
+      target = offset;
+    }
+    lastWheel = now;
+    lastDelta = overshoot;
+    peakDelta = Math.max(peakDelta, overshoot);
+    tailEvents = overshoot < peakDelta * .7 ? tailEvents + 1 : 0;
+    if (tailEvents >= 2) releasing = true;
+    if (releasing) return;
+
+    const strength = maxOffset * -Math.expm1(-peakDelta / 52);
+    target = Math.max(target, strength);
+    if (frame === null) {
+      lastFrame = now;
+      frame = win.requestAnimationFrame(animate);
+    }
+  }
+
+  tree.addEventListener('wheel', onWheel, {passive:true});
+  tree.addEventListener('viewchange', reset);
+  tree.addEventListener('gm-page-changed', reset);
+  return {close() {
+    if (frame !== null) reset();
+    tree.removeEventListener('wheel', onWheel);
+    tree.removeEventListener('viewchange', reset);
+    tree.removeEventListener('gm-page-changed', reset);
   }};
 }
 
@@ -1169,12 +1241,18 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     if (!cell || (row.dataset.properties || '').split(' ').includes('dummy')) return;
     try {
       const header = win.gDBView?.getMsgHdrAt(row.index);
+      if (!header) return;
       const level = personalRecipientLevel(header, indicatorIdentities, MailServices.headerParser);
-      if (!level) return;
       const indicator = doc.createElement('span');
       indicator.className = 'gm-personal-indicator';
-      indicator.textContent = level === 2 ? '»' : '›';
-      indicator.title = level === 2 ? gmText("Sent only to me") : gmText("Sent to me and others");
+      indicator.dataset.level = String(level);
+      if (level) {
+        indicator.title = level === 2 ? gmText("Sent only to me") : gmText("Sent to me and others");
+        indicator.setAttribute('role', 'img');
+        indicator.setAttribute('aria-label', indicator.title);
+      } else {
+        indicator.setAttribute('aria-hidden', 'true');
+      }
       cell.append(indicator);
     } catch (_) { /* A recycled row can temporarily lose its header. */ }
   }
@@ -1187,7 +1265,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     for (const row of tree.querySelectorAll('tr.table-layout')) renderPersonalIndicator(row);
   }
   setPersonalIndicators(personalIndicators);
-  const edgeBounce=installInboxEdgeBounce(win,tree);
+  const edgeBounce = installInboxEdgeBounce(win, tree);
   const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
@@ -1223,7 +1301,41 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   const style = doc.createElement('style');
   style.textContent = `
     #threadTree[data-gm-hide-thread-arrows] tr:not([data-properties~="dummy"]) .twisty { display: none !important; }
-    .gm-inbox-settings { font-size: 19px; line-height: 1; }
+    .gm-inbox-settings {
+      appearance:none;
+      display:grid;
+      place-items:center;
+      flex:0 0 auto !important;
+      inline-size:32px !important;
+      min-inline-size:32px !important;
+      max-inline-size:32px !important;
+      block-size:32px !important;
+      min-block-size:32px !important;
+      max-block-size:32px !important;
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      border:0;
+      border-radius:50%;
+      background:transparent !important;
+      color:var(--gm-muted, ButtonText);
+      cursor:pointer;
+    }
+    .gm-inbox-settings::before {
+      content:"";
+      inline-size:24px;
+      block-size:24px;
+      background-color:currentColor;
+      mask:url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2224%22%20height=%2224%22%20viewBox=%220%200%2024%2024%22%3E%3Cpath%20d=%22M13.85%2022.25h-3.7c-.74%200-1.36-.54-1.45-1.27l-.27-1.89c-.27-.14-.53-.29-.79-.46l-1.8.72c-.7.26-1.47-.03-1.81-.65L2.2%2015.53c-.35-.66-.2-1.44.36-1.88l1.53-1.19c-.01-.15-.02-.3-.02-.46%200-.15.01-.31.02-.46l-1.52-1.19c-.59-.45-.74-1.26-.37-1.88l1.85-3.19c.34-.62%201.11-.9%201.79-.63l1.81.73c.26-.17.52-.32.78-.46l.27-1.91c.09-.7.71-1.25%201.44-1.25h3.7c.74%200%201.36.54%201.45%201.27l.27%201.89c.27.14.53.29.79.46l1.8-.72c.71-.26%201.48.03%201.82.65l1.84%203.18c.36.66.2%201.44-.36%201.88l-1.52%201.19c.01.15.02.3.02.46s-.01.31-.02.46l1.52%201.19c.56.45.72%201.23.37%201.86l-1.86%203.22c-.34.62-1.11.9-1.8.63l-1.8-.72c-.26.17-.52.32-.78.46l-.27%201.91c-.1.68-.72%201.22-1.46%201.22zm-3.23-2h2.76l.37-2.55.53-.22c.44-.18.88-.44%201.34-.78l.45-.34%202.38.96%201.38-2.4-2.03-1.58.07-.56c.03-.26.06-.51.06-.78s-.03-.53-.06-.78l-.07-.56%202.03-1.58-1.39-2.4-2.39.96-.45-.35c-.42-.32-.87-.58-1.33-.77l-.52-.22-.37-2.55h-2.76l-.37%202.55-.53.21c-.44.19-.88.44-1.34.79l-.45.33-2.38-.95-1.39%202.39%202.03%201.58-.07.56a7%207%200%200%200-.06.79c0%20.26.02.53.06.78l.07.56-2.03%201.58%201.38%202.4%202.39-.96.45.35c.43.33.86.58%201.33.77l.53.22.38%202.55z%22%3E%3C/path%3E%3Ccircle%20cx=%2212%22%20cy=%2212%22%20r=%223.5%22%3E%3C/circle%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    .gm-inbox-settings:hover {
+      background:radial-gradient(circle, var(--gm-hover, ButtonFace) 15px, transparent 16px)
+        center / 32px 32px no-repeat !important;
+    }
+    .gm-inbox-settings:focus-visible { outline:2px solid Highlight; outline-offset:-2px; }
+    @media (forced-colors:active) {
+      .gm-inbox-settings::before { forced-color-adjust:none; background-color:ButtonText; }
+    }
     .gm-folder-pane-toggle {
       position: absolute;
       inset-block-start: 5px;
@@ -1288,20 +1400,34 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     body[data-gm-folder-pane-closed] #folderTree .container > :not(.icon) { display: none !important; }
     body[data-gm-folder-pane-closed] #folderTree .container > .icon { margin: 0 !important; }
 
-    #threadTree button[data-gm-star] { background-image: none !important; }
-    #threadTree button[data-gm-star] img { visibility: hidden; }
-    #threadTree button[data-gm-star]::after {
+    #threadTree tr:not([data-properties~="flagged"]) .flaggedcol-column button:not([data-gm-star]) {
+      --gm-star-image: ${gmStarImage()};
+    }
+    #threadTree button[data-gm-star],
+    #threadTree tr:not([data-properties~="flagged"]) .flaggedcol-column button:not([data-gm-star]) {
+      background-image: none !important;
+      position: relative;
+    }
+    #threadTree button[data-gm-star] img,
+    #threadTree tr:not([data-properties~="flagged"]) .flaggedcol-column button:not([data-gm-star]) img {
+      visibility: hidden;
+    }
+    #threadTree button[data-gm-star]::after,
+    #threadTree tr:not([data-properties~="flagged"]) .flaggedcol-column button:not([data-gm-star])::after {
       content: '';
       background-color: var(--gm-star-color,var(--gm-muted));
       mask: var(--gm-star-image) center / contain no-repeat;
       position: absolute;
       inset: 0;
       margin: auto;
-      inline-size: 1.5em;
-      block-size: 1.5em;
+      inline-size: var(--gm-row-star-size);
+      block-size: var(--gm-row-star-size);
       pointer-events: none;
     }
-    #threadTree button[data-gm-star] { position: relative; }
+    #threadTree tr:not(.selected, :hover) button[data-gm-star="☆"]::after,
+    #threadTree tr:not(.selected, :hover, [data-properties~="flagged"]) .flaggedcol-column button:not([data-gm-star])::after {
+      background-color: color-mix(in srgb, var(--gm-muted) 48%, transparent);
+    }
     #quick-filter-bar .quickFilterButtons {
       gap:6px; flex-wrap:wrap; border:0 !important; box-shadow:none !important;
     }
@@ -1325,9 +1451,9 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       flex:0 1 auto !important; max-width:65%; min-width:32px;
     }
     #threadTree .gm-message-snippet {
-      flex:1 1 0; min-width:0; margin-inline-start:6px; overflow:hidden;
-      white-space:nowrap; text-overflow:ellipsis; font-weight:400;
-      color:var(--gm-snippet, #9aa0a6) !important;
+      flex:1 1 0; min-width:0; margin-inline-start:4px; overflow:hidden;
+      white-space:nowrap; text-overflow:ellipsis;
+      color:light-dark(#5f6368, #bdc1c6) !important;
       font-weight:400 !important;
     }
     /* Keep centering on the same height when 28px hover actions appear.
@@ -1419,7 +1545,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       line.querySelector('.gm-message-snippet')?.remove();
       const snippet = doc.createElement('div');
       snippet.className = 'gm-message-snippet';
-      snippet.textContent = '— ' + text;
+      snippet.textContent = '- ' + text;
       snippet.title = text;
       line.classList.add('gm-has-snippet');
       const actions = line.querySelector('.gm-snooze-returned, .gm-row-actions');
@@ -1526,6 +1652,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   function close() {
     if (closed) return;
     closed = true;
+    edgeBounce.close();
     tree.removeEventListener('dragstart',dragStarted);
     for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);
     dragEnded();
@@ -1544,7 +1671,6 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     previews.close();
     reader?.setDraftOpener?.(null);
     setPersonalIndicators(false);
-    edgeBounce.close();
     settingsButton.close();
     folderToggle.close();
     stars.close();

@@ -175,6 +175,12 @@
         "parameters": [{"name":"enabled","type":"boolean"}]
       },
       {
+        "name": "setGoogleFontsEnabled",
+        "type": "function",
+        "async": true,
+        "parameters": [{"name": "enabled", "type": "boolean"}]
+      },
+      {
         "name": "setThreadGuides",
         "type": "function",
         "async": true,

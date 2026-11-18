@@ -104,7 +104,7 @@ function createSnoozeTimePicker(doc,panel,date,locale,onChange=()=>{}){
 }
 
 var SNOOZE_PICKER_CSS=`
-.gm-snooze-menu,.gm-snooze-calendar-dialog{font:14px/20px Arial,sans-serif;color:#202124;background:#fff;border:0;box-sizing:border-box}
+.gm-snooze-menu,.gm-snooze-calendar-dialog{font:14px/20px var(--gm-ui-font, Arial,sans-serif);color:#202124;background:#fff;border:0;box-sizing:border-box}
 .gm-snooze-menu{position:fixed;inset:auto;margin:0;width:264px;padding:8px 0 0;border-radius:4px;box-shadow:0 8px 10px 1px #00000024,0 3px 14px 2px #0000001f,0 5px 5px -3px #0003;max-height:calc(100vh - 16px);overflow:auto}
 .gm-snooze-sync-note{margin:8px 24px 4px;padding-top:8px;border-top:1px solid #8884;color:var(--layout-color,CanvasText);font-size:11px;line-height:16px;white-space:normal;max-width:260px;opacity:.8}
 .gm-snooze-menu-heading{height:32px;box-sizing:border-box;padding:8px 24px 4px;color:#5f6368;font-weight:500}
@@ -116,7 +116,7 @@ var SNOOZE_PICKER_CSS=`
 .gm-snooze-custom svg,.gm-snooze-unsnooze svg{width:20px;height:20px;fill:#5f6368;flex-shrink:0}
 .gm-snooze-calendar-dialog{width:560px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:visible;margin:auto;padding:24px;border-radius:28px;box-shadow:none}
 .gm-snooze-calendar-dialog::backdrop{background:rgba(32,33,36,.38)}
-.gm-snooze-calendar-dialog h2{font:400 24px/32px Arial,sans-serif;margin:0 0 32px}
+.gm-snooze-calendar-dialog h2{font:400 24px/32px var(--gm-ui-font, Arial,sans-serif);margin:0 0 32px}
 .gm-snooze-calendar-content{display:grid;grid-template-columns:224px minmax(0,1fr);gap:40px}
 .gm-snooze-month{height:40px;display:flex;align-items:center;gap:8px}
 .gm-snooze-month>span{flex:1;white-space:nowrap}
@@ -158,7 +158,7 @@ var SNOOZE_PICKER_CSS=`
 .gm-snooze-calendar-dialog .gm-snooze-time-done{grid-column:1/-1;justify-self:end;height:32px;margin:4px 0 0;padding:0 16px;border:0;border-radius:16px;background:transparent;color:#0b57d0;font-weight:600}
 .gm-snooze-calendar-dialog .gm-snooze-time-done:hover{background:#e8f0fe}
 .gm-snooze-status{position:fixed;bottom:24px;left:24px;z-index:2147483647;display:flex;align-items:center;gap:24px;box-sizing:border-box;max-width:calc(100vw - 48px);padding:8px 12px 8px 24px;border-radius:4px;background:#323232;color:#fff;box-shadow:0 2px 8px #0003;font:14px/20px Arial,sans-serif}
-.gm-snooze-status button{appearance:none;min-inline-size:0;min-block-size:0;margin:0;padding:8px 12px;border:0;border-radius:4px;background:transparent;color:#a8c7fa;font:600 14px/20px Arial,sans-serif;cursor:pointer}
+.gm-snooze-status button{appearance:none;min-inline-size:0;min-block-size:0;margin:0;padding:8px 12px;border:0;border-radius:4px;background:transparent;color:#a8c7fa;font:600 14px/20px var(--gm-ui-font, Arial,sans-serif);cursor:pointer}
 .gm-snooze-status button:hover{background:#ffffff18}
 @media(max-width:560px){.gm-snooze-calendar-content{grid-template-columns:1fr;gap:16px}.gm-snooze-calendar{justify-self:center}.gm-snooze-fields{gap:16px}}
 `;

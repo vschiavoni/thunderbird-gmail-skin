@@ -245,6 +245,18 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     let dockIcon=null;
     let settingsFire;
     const skinWindows = new Map(),gmailSearchWindows=new Map();
+    const typographyWindows = new Map();
+    let googleFontsEnabled = false;
+    const typographyDocuments = new Set([
+      "about:3pane", "about:message", "about:addressbook", "about:preferences",
+      "about:accountsettings", "about:addons",
+      "chrome://messenger/content/messenger.xhtml",
+      "chrome://messenger/content/messageWindow.xhtml",
+      "chrome://messenger/content/messengercompose/messengercompose.xhtml",
+      "chrome://messenger/content/multimessageview.xhtml",
+      "chrome://messenger/content/glodaFacetView.xhtml",
+      "chrome://conversations/content/experiment-api/stub.html",
+    ]);
     let hideTodayPane = false, showColumnHeaders = false, searchResultsAsList=true,inPlaceSearch=false;
     const searchViews=new Map();
     let messagesPerPage = 0, independentReader = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, coloredStars=null,previewTrimming=null;
@@ -262,6 +274,24 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
         win.windowUtils.removeSheetUsingURIString(cssURI,Ci.nsIDOMWindowUtils.USER_SHEET);
         win.windowUtils.loadSheetUsingURIString(cssURI,Ci.nsIDOMWindowUtils.USER_SHEET);
       }
+    }
+    const typographyURI = 'data:text/css;charset=utf-8,' + encodeURIComponent(GMAIL_TYPOGRAPHY_CSS);
+    function unloadTypography(win) {
+      const onUnload = typographyWindows.get(win);
+      if (!typographyWindows.delete(win)) return;
+      win.removeEventListener("unload", onUnload);
+      win.document?.documentElement?.removeAttribute("data-gm-google-fonts");
+      try { win.windowUtils.removeSheetUsingURIString(typographyURI, Ci.nsIDOMWindowUtils.USER_SHEET); }
+      catch (_) { /* Closed windows already discarded the sheet. */ }
+    }
+    function loadTypography(doc) {
+      const win = doc?.defaultView;
+      if (!win || !typographyDocuments.has(doc.documentURI) || typographyWindows.has(win)) return;
+      loadWindowSheet(win, typographyURI);
+      doc.documentElement?.toggleAttribute("data-gm-google-fonts", googleFontsEnabled);
+      const onUnload = () => unloadTypography(win);
+      win.addEventListener("unload", onUnload, {once:true});
+      typographyWindows.set(win, onUnload);
     }
     function applyTodayPane(win) {
       if (hideTodayPane && !todayWindows.has(win)) {
@@ -291,6 +321,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     let started = false;
     let closed = false;
     const attach = doc => {
+      if (!closed) loadTypography(doc);
       if(!closed && ['about:3pane','about:message'].includes(doc?.documentURI) && doc.defaultView?.commandController && !labelCommandDocuments.has(doc)){
         const controller=installConversationLabelCommands(doc.defaultView);labelCommandDocuments.set(doc,controller);
         doc.defaultView.addEventListener('unload',()=>{controller.close();labelCommandDocuments.delete(doc);},{once:true});
@@ -375,6 +406,18 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
     const loadWindow = win => {
       if (closed || win.closed) return;
       if (windows.has(win)) { scan(win.document); return; }
+      loadTypography(win.document);
+      if (win.document.documentURI === "chrome://messenger/content/messageWindow.xhtml") {
+        const onLoad = event => {
+          if (!closed && event.target?.nodeType === 9) loadTypography(event.target);
+        };
+        win.addEventListener("load", onLoad, true);
+        windows.set(win, {listener:onLoad});
+        for (const browser of win.document.querySelectorAll("browser")) {
+          loadTypography(browser.contentDocument);
+        }
+        return;
+      }
       if(win.document.documentURI==='chrome://messenger/content/messengercompose/messengercompose.xhtml'){
         nativeComposeAutosaves.set(win,installNativeChangeAutosave(win));return;
       }
@@ -450,7 +493,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       MailServices.mfn.removeListener(tagChanges);
       for (const [win, handlers] of windows) {
         win.removeEventListener("load", handlers.listener, true);
-        win.removeEventListener("activate", handlers.activate);
+        if (handlers.activate) win.removeEventListener("activate", handlers.activate);
       }
       for (const controller of startupWindows.values()) controller.close(); startupWindows.clear();
       for (const controller of pendingDocuments.values()) controller.close();
@@ -463,6 +506,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       for (const zoom of zoomWindows.values()) zoom.close(); zoomWindows.clear();
       for(const search of gmailSearchWindows.values())search.close();gmailSearchWindows.clear();
       for (const win of skinWindows.keys()) unloadSkin(win);
+      for (const win of typographyWindows.keys()) unloadTypography(win);
       for (const win of todayWindows) removeTodayPaneStyle(win);
       for(const watcher of tabWatchers.values())watcher.close();tabWatchers.clear();
       for(const controller of searchViews.values())controller.close();searchViews.clear();
@@ -520,6 +564,12 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       async setShowNewMessageSymbol(enabled){showNewMessageSymbol=enabled===true;for(const doc of documents.keys())doc.documentElement.toggleAttribute("data-gm-new-message-symbol",showNewMessageSymbol);},
       async setPersonalIndicators(enabled){personalIndicators=enabled===true;for(const controller of documents.values())controller.setPersonalIndicators(personalIndicators);},
       async setThreadExpandArrows(enabled){threadExpandArrows=enabled===true;for(const controller of documents.values())controller.setThreadExpandArrows?.(threadExpandArrows);},
+      async setGoogleFontsEnabled(enabled) {
+        googleFontsEnabled = enabled === true;
+        for (const win of typographyWindows.keys()) {
+          win.document?.documentElement?.toggleAttribute("data-gm-google-fonts", googleFontsEnabled);
+        }
+      },
       async setThreadGuides(enabled){threadGuides=enabled===true;for(const controller of documents.values())controller.setThreadGuides(threadGuides);},
       async setGmailShortcuts(enabled){gmailShortcutsEnabled=enabled===true;},
       async setDefaultReplyBehavior(value){setThunderGDefaultReplyBehavior(value);},
@@ -570,7 +620,7 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
       Services.prefs.addObserver(HIDDEN_MESSAGE_LABELS_PREF, observer);
       MailServices.mfn.addListener(tagChanges, Ci.nsIMsgFolderNotificationService.msgPropertyChanged);
       ExtensionSupport.registerWindowListener(id, {
-        chromeURLs: ["chrome://messenger/content/messenger.xhtml","chrome://messenger/content/messengercompose/messengercompose.xhtml"],
+        chromeURLs: ["chrome://messenger/content/messenger.xhtml","chrome://messenger/content/messageWindow.xhtml","chrome://messenger/content/messengercompose/messengercompose.xhtml"],
         onLoadWindow: loadWindow,
         onUnloadWindow(win) {
           gmailSearchWindows.get(win)?.close();gmailSearchWindows.delete(win);
@@ -580,10 +630,11 @@ var inlineLabels = class extends ExtensionCommon.ExtensionAPI {
           zoomWindows.get(win)?.close(); zoomWindows.delete(win);
           removeTodayPaneStyle(win);
           unloadSkin(win);
+          unloadTypography(win);
           const handlers = windows.get(win);
           if (handlers) {
             win.removeEventListener("load", handlers.listener, true);
-            win.removeEventListener("activate", handlers.activate);
+            if (handlers.activate) win.removeEventListener("activate", handlers.activate);
           }
           for (const [doc, pending] of pendingDocuments) {
             if (doc.defaultView?.top === win || doc.defaultView?.closed) pending.close();

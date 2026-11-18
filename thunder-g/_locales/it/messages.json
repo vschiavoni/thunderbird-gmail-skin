@@ -1,4 +1,16 @@
 {
+  "use_google_fonts": {
+    "message": "Usa i font Google"
+  },
+  "google_fonts_help": {
+    "message": "Installa entrambi i font sul sistema per usare Google Sans nell’interfaccia e Google Sans Code per il testo a larghezza fissa."
+  },
+  "download_google_sans": {
+    "message": "Scarica Google Sans"
+  },
+  "download_google_sans_code": {
+    "message": "Scarica Google Sans Code"
+  },
   "invalid_autosave_snapshot_751f880": {
     "message": "Stato del salvataggio automatico non valido",
     "description": "Invalid autosave snapshot"

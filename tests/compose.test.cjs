@@ -412,7 +412,17 @@ test('inline composer readiness waits for native signature/body completion and u
 test('composer body styling uses a native sheet without editing document content',()=>{
  const calls=[],utils={USER_SHEET:1,loadSheetUsingURIString(...args){calls.push(['load',...args])},removeSheetUsingURIString(...args){calls.push(['remove',...args])}};
  const native={gMsgCompose:{composeHTML:false},document:{getElementById:()=>({contentWindow:{windowUtils:utils}})}};
- const style=scope.styleInlineComposeBody(native);assert.equal(calls[0][0],'load');assert.equal(calls[0][2],1);style.close();assert.equal(calls[1][0],'remove');assert.equal(calls[0][1],calls[1][1]);
+ const style=scope.styleComposeBody(native,true);
+ assert.equal(calls[0][0],'load');assert.equal(calls[0][2],1);
+ const inlineCSS=decodeURIComponent(calls[0][1].split(',').slice(1).join(','));
+ assert.match(inlineCSS,/body\{margin:12px 20px;/);
+ assert.match(inlineCSS,/body>pre,pre\.moz-signature\{font:small\/1\.5 Arial,Helvetica,sans-serif;letter-spacing:normal;/);
+ style.close();assert.equal(calls[1][0],'remove');assert.equal(calls[0][1],calls[1][1]);
+ native.gMsgCompose.composeHTML=true;
+ const classic=scope.styleComposeBody(native);
+ const classicCSS=decodeURIComponent(calls[2][1].split(',').slice(1).join(','));
+ assert.equal(classicCSS,'body{font:small/1.5 Arial,Helvetica,sans-serif;letter-spacing:normal;}');
+ classic.close();assert.equal(calls[3][1],calls[2][1]);
 });
 
 test('embedded compose content resolves the native editor window before signature initialization',()=>{

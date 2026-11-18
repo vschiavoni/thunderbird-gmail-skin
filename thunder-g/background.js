@@ -12,9 +12,10 @@ async function startThunderG() {
   // Optional settings must never prevent the companion from starting.
   let previewTrimming=null,inPlaceSearch=false;
   let coloredStars=null,dockIconEnabled=false,dockIconPreferences={};
+  let googleFontsEnabled = false;
   let defaultReplyBehavior='reply',gmailShortcuts=false, compactConversations=true, searchResultsAsList=true, showColumnHeaders = false, threadGuides = true, threadExpandArrows=false, personalIndicators=false, gmailLabelIcons=false, showNewMessageSymbol=false, independentReader = false, hideTodayPane = false, messagesPerPage = 0, composeAutosave = true, composeAutosaveMinutes = 1, composeAutosaveMode = 'auto', bimiEnabled = false, inlineReplyEnabled = false, inlineNewMessageEnabled = false;
   try {
-    const settings = await browser.storage.local.get({defaultReplyBehavior:'reply',inPlaceSearch:false,previewTrimming:null,dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,personalIndicators:false,gmailLabelIcons:false,showNewMessageSymbol:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
+    const settings = await browser.storage.local.get({googleFontsEnabled:false,defaultReplyBehavior:'reply',inPlaceSearch:false,previewTrimming:null,dockIconPreferences:{},dockIconEnabled:false,coloredStars:null,gmailShortcuts:false,compactConversations:true,searchResultsAsList:true,showColumnHeaders:false,threadGuides:true,threadExpandArrows:false,personalIndicators:false,gmailLabelIcons:false,showNewMessageSymbol:false,independentReader:false,hideTodayPane:false,messagesPerPage:0,composeAutosave:true,composeAutosaveMinutes:1,composeAutosaveMode:'auto',bimiEnabled:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false});
     searchResultsAsList=settings.searchResultsAsList!==false;
     inPlaceSearch=settings.inPlaceSearch===true;
     coloredStars=settings.coloredStars;
@@ -26,6 +27,7 @@ async function startThunderG() {
     gmailLabelIcons=settings.gmailLabelIcons===true;
     showNewMessageSymbol=settings.showNewMessageSymbol===true;
     showColumnHeaders = settings.showColumnHeaders === true;
+    googleFontsEnabled = settings.googleFontsEnabled === true;
     threadGuides = settings.threadGuides !== false;
     bimiEnabled = settings.bimiEnabled === true;
     gmailShortcuts=settings.gmailShortcuts===true;
@@ -50,6 +52,7 @@ async function startThunderG() {
   await browser.inlineLabels.setPersonalIndicators?.(personalIndicators);
   await browser.inlineLabels.setGmailLabelIcons?.(gmailLabelIcons);
   await browser.inlineLabels.setShowNewMessageSymbol?.(showNewMessageSymbol);
+  await browser.inlineLabels.setGoogleFontsEnabled?.(googleFontsEnabled);
   await browser.inlineLabels.setThreadGuides?.(threadGuides);
   await browser.inlineLabels.setHideTodayPane(hideTodayPane);
   await browser.inlineLabels.setComposeAutosave(composeAutosave,composeAutosaveMinutes || 1,composeAutosaveMode);
@@ -76,6 +79,7 @@ async function startThunderG() {
     if(area==='local' && changes.showNewMessageSymbol)browser.inlineLabels.setShowNewMessageSymbol?.(changes.showNewMessageSymbol.newValue===true)?.catch(console.error);
     if(area==='local' && changes.personalIndicators)browser.inlineLabels.setPersonalIndicators?.(changes.personalIndicators.newValue===true)?.catch(console.error);
     if(area==='local' && changes.threadExpandArrows)browser.inlineLabels.setThreadExpandArrows?.(changes.threadExpandArrows.newValue===true)?.catch(console.error);
+    if(area==='local' && changes.googleFontsEnabled)browser.inlineLabels.setGoogleFontsEnabled(changes.googleFontsEnabled.newValue===true).catch(console.error);
     if(area==='local' && changes.threadGuides)browser.inlineLabels.setThreadGuides(changes.threadGuides.newValue!==false).catch(console.error);
     if (area === 'local' && (changes.composeAutosave || changes.composeAutosaveMinutes || changes.composeAutosaveMode)) {
       if(changes.composeAutosaveMode)composeAutosaveMode=changes.composeAutosaveMode.newValue==='fixed'?'fixed':'auto';

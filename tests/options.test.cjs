@@ -10,7 +10,7 @@ test('settings confirmations expire, newer feedback replaces timers, and errors 
   };
   const scope=require('./localization-context.cjs').createContext({
     document:{getElementById:element,querySelectorAll:()=>[]},window:{addEventListener:(name,fn)=>events[name]=fn},
-    browser:{runtime:{getPlatformInfo:async()=>({os:'mac'}),getManifest:()=>({version:'test'})},storage:{local:{get:()=>new Promise(()=>{})}}},
+    browser:{runtime:{getPlatformInfo:async()=>({os:'mac'}),getManifest:()=>({version:'test'})},storage:{onChanged:{addListener(){}},local:{get:()=>new Promise(()=>{})}}},
     setTimeout(fn,delay){timers.set(++sequence,{fn,delay});return sequence},
     clearTimeout:id=>timers.delete(id)
   });
@@ -35,18 +35,20 @@ test('settings confirmations expire, newer feedback replaces timers, and errors 
 
 for(const fail of [false,true])test(`recommended preset updates settings atomically and preserves unrelated choices (save failure: ${fail})`,async()=>{
  const elements=new Map(),writes=[];
+ const fonts=new Set();let onStorageChanged;
  const settings={interfaceLanguage:'it',bimiEnabled:true,hideTodayPane:false,independentReader:false,inlineReplyEnabled:false,inlineNewMessageEnabled:false,messagesPerPage:0,composeAutosave:false,composeAutosaveMinutes:10};
  const element=id=>{
   if(!elements.has(id))elements.set(id,{dataset:{},textContent:'',disabled:false,events:{},addEventListener(name,fn){this.events[name]=fn}});
   return elements.get(id);
  };
- const scope=require('./localization-context.cjs').createContext({document:{getElementById:element,querySelectorAll:()=>[]},window:{addEventListener(){}},
- browser:{runtime:{getPlatformInfo:async()=>({os:'mac'}),getManifest:()=>({version:'test'})},storage:{local:{get:async defaults=>({...defaults,...settings}),set:async values=>{writes.push(values);if(fail)throw Error('storage failure')}}}},setTimeout(){},clearTimeout(){}});
+ const scope=require('./localization-context.cjs').createContext({document:{getElementById:element,querySelectorAll:()=>[],documentElement:{toggleAttribute(name,enabled){if(enabled)fonts.add(name);else fonts.delete(name)}}},window:{addEventListener(){}},
+ browser:{runtime:{getPlatformInfo:async()=>({os:'mac'}),getManifest:()=>({version:'test'})},storage:{onChanged:{addListener(fn){onStorageChanged=fn}},local:{get:async defaults=>({...defaults,...settings}),set:async values=>{writes.push(values);if(fail)throw Error('storage failure')}}}},setTimeout(){},clearTimeout(){}});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/options.js'),'utf8'),scope);
  await Promise.resolve();await Promise.resolve();
  await element('apply-recommended').events.click();
  assert.equal(writes.length,1);assert.equal(Object.hasOwn(writes[0],'interfaceLanguage'),false);assert.equal(Object.hasOwn(writes[0],'bimiEnabled'),false);
  assert.equal(Object.hasOwn(writes[0],'gmail'),false);
+ assert.equal(Object.hasOwn(writes[0],'googleFontsEnabled'),false);
  assert.equal(element('bimi-enabled').checked,true);assert.equal(element('interface-language').value,'it');
  assert.equal(element('apply-recommended').disabled,false);
  if(fail){
@@ -57,4 +59,15 @@ for(const fail of [false,true])test(`recommended preset updates settings atomica
   assert.equal(element('messages-per-page').value,'50');assert.equal(element('compose-autosave-timing').value,'auto');assert.equal(element('compose-autosave-timing').disabled,false);
   assert.equal(element('show-column-headers').checked,false);assert.equal(element('recommended-status').dataset.kind,'success');
  }
+ const googleFonts=element('google-fonts');
+ assert.equal(googleFonts.checked,false);
+ googleFonts.checked=true;
+ await googleFonts.events.change();
+ assert.equal(writes[1].googleFontsEnabled,true);
+ assert.equal(googleFonts.checked,!fail);
+ assert.equal(fonts.has('data-gm-google-fonts'),!fail);
+ onStorageChanged({googleFontsEnabled:{newValue:false}}, 'local');
+ assert.equal(googleFonts.checked,false);
+ assert.equal(fonts.size,0);
+
 });

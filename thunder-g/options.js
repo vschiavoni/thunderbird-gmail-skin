@@ -329,6 +329,33 @@ gmailShortcuts.addEventListener('change',async()=>{
  finally{gmailShortcuts.disabled=false;}
 });
 
+const googleFonts = document.getElementById('google-fonts');
+function renderGoogleFonts(enabled) {
+  googleFonts.checked = enabled;
+  document.documentElement.toggleAttribute('data-gm-google-fonts', enabled);
+}
+browser.storage.local.get({googleFontsEnabled:false}).then(settings => {
+  renderGoogleFonts(settings.googleFontsEnabled === true);
+  googleFonts.disabled = false;
+}).catch(() => reportStatus(gmText("Unable to load settings.")));
+googleFonts.addEventListener('change', async () => {
+  const enabled = googleFonts.checked;
+  googleFonts.disabled = true;
+  try {
+    await browser.storage.local.set({googleFontsEnabled:enabled});
+    renderGoogleFonts(enabled);
+    reportStatus(gmText("Saved."));
+  } catch (_) {
+    renderGoogleFonts(!enabled);
+    reportStatus(gmText("Unable to save. Please try again."));
+  } finally {
+    googleFonts.disabled = false;
+  }
+});
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.googleFontsEnabled) renderGoogleFonts(changes.googleFontsEnabled.newValue === true);
+});
+
 const dockIconSwitch=document.getElementById('dock-icon');
 const dockIconMode=document.getElementById('dock-icon-mode'),dockIconLight=document.getElementById('dock-icon-light'),dockIconDark=document.getElementById('dock-icon-dark');
 let savedDockIcon={enabled:false,preferences:{mode:'auto',light:'light',dark:'dark'}};
@@ -340,8 +367,7 @@ function renderDockIcon(){
 }
 Promise.all([browser.runtime.getPlatformInfo(),browser.storage.local.get({dockIconEnabled:false,dockIconPreferences:{}})]).then(([platform,settings])=>{
   if(platform.os!=='mac')return;
-  document.getElementById('appearance').hidden=false;
-  document.getElementById('appearance-nav').hidden=false;
+  document.getElementById('dock-icon-setting').hidden=false;
   const preferences=settings.dockIconPreferences||{},valid=value=>['light','dark'].includes(value);
   savedDockIcon={enabled:settings.dockIconEnabled===true,preferences:{mode:valid(preferences.mode)?preferences.mode:'auto',light:valid(preferences.light)?preferences.light:'light',dark:valid(preferences.dark)?preferences.dark:'dark'}};
   renderDockIcon();
