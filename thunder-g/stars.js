@@ -17,7 +17,7 @@ function gmStarImage(id) {
     'purple-question':'M8 8a4 4 0 1 1 6 3.5c-1 .6-1 1-1 2.5h-2c0-2 .2-3 2-4a2 2 0 1 0-3-2z M11 16h2v2h-2z',
   };
   const shape=star
-    ? `<path d="${GM_STAR_PATH}" fill="${id?'black':'none'}" stroke="black" stroke-width="1.6" stroke-linejoin="miter"/>`
+    ? `<path d="${GM_STAR_PATH}" fill="${id?'black':'none'}" stroke="black" stroke-width="${id?1.6:2.2}" stroke-linejoin="miter"/>`
     : `<path fill="black" d="${symbols[id]}"/>`;
   // Crop each symbol to its visible bounds so it occupies the same 18px
   // icon area as a star, rather than shrinking inside the star's canvas.

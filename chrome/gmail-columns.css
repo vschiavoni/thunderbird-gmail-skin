@@ -108,7 +108,13 @@
 }
 
 /* Reserve room for the active marker and hover dots before each checkbox. */
-:root { --gm-selection-gutter: 1em; }
+:root {
+  --gm-selection-gutter: 1em;
+  --gm-row-star-track: 2.125em;
+  --gm-row-indicator-track: 1.75em;
+  --gm-row-star-size: 1.125em;
+  --gm-row-muted-icon-hover: light-dark(#5f6368, #c5c9ce);
+}
 #threadTree :is(#selectCol, .selectcol-column, td.tree-view-row-select) {
   width: calc(1.75em + var(--gm-selection-gutter)) !important;
   min-width: calc(1.75em + var(--gm-selection-gutter)) !important;
@@ -162,14 +168,17 @@
   }
 }
 
+#threadTree :is(#flaggedCol, .flaggedcol-column) {
+  width: var(--gm-row-star-track) !important;
+  min-width: var(--gm-row-star-track) !important;
+  max-width: var(--gm-row-star-track) !important;
+  inline-size: var(--gm-row-star-track) !important;
+  min-inline-size: var(--gm-row-star-track) !important;
+  max-inline-size: var(--gm-row-star-track) !important;
+}
 #threadTree[data-gm-personal-indicators] :is(#flaggedCol, .flaggedcol-column) {
-  width: 2.875em !important;
-  min-width: 2.875em !important;
-  max-width: 2.875em !important;
-  inline-size: 2.875em !important;
-  min-inline-size: 2.875em !important;
-  max-inline-size: 2.875em !important;
-  padding-inline-end: 1.125em !important;
+  --gm-row-star-track: calc(2.125em + var(--gm-row-indicator-track));
+  padding-inline-end: var(--gm-row-indicator-track) !important;
 }
 #threadTree[data-gm-personal-indicators] .flaggedcol-column {
   position: relative;
@@ -178,11 +187,29 @@
   position: absolute;
   inset-inline-end: 0;
   inset-block: 0;
-  inline-size: 1em;
+  inline-size: var(--gm-row-indicator-track);
   display: grid;
   place-items: center;
-  color: light-dark(#185abc, #a8c7fa);
-  font: 600 1.125em/1 sans-serif;
+  color: light-dark(#0b57d0, #a8c7fa);
+}
+#threadTree .gm-personal-indicator::before {
+  content: "";
+  inline-size: 14px;
+  block-size: 14px;
+  background-color: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='m2 2 4 5-4 5m5-10 4 5-4 5' fill='none' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+#threadTree .gm-personal-indicator[data-level="1"]::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='m5 2 4 5-4 5' fill='none' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E");
+}
+#threadTree .gm-personal-indicator[data-level="0"] {
+  color: light-dark(#b1b7bd, #89929b);
+}
+#threadTree tr:hover .gm-personal-indicator[data-level="0"] {
+  color: var(--gm-row-muted-icon-hover);
+}
+#threadTree .gm-personal-indicator:dir(rtl)::before {
+  scale: -1 1;
 }
 
 /* Message rows open a conversation when clicked. */
@@ -262,8 +289,8 @@
 #threadTree :is(.tree-view-header-select,.tree-view-row-select) img {
   content:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'/%3E") !important;
   box-sizing:border-box !important;
-  inline-size:1.125em !important; block-size:1.125em !important;
-  width:1.125em !important; height:1.125em !important;
+  inline-size:1em !important; block-size:1em !important;
+  width:1em !important; height:1em !important;
   min-width:0 !important; min-height:0 !important;
   min-inline-size:0 !important; min-block-size:0 !important;
   max-width:none !important; max-height:none !important;
@@ -282,6 +309,19 @@
 }
 #threadTree .flaggedcol-column button {
   font:inherit !important;
+  border-radius:50% !important;
   inline-size:1.75em !important; block-size:1.75em !important;
   min-inline-size:0 !important; min-block-size:0 !important;
+}
+#threadTree .flaggedcol-column button img {
+  inline-size: var(--gm-row-star-size) !important;
+  block-size: var(--gm-row-star-size) !important;
+}
+#threadTree .flaggedcol-column button:hover {
+  background-color: light-dark(#3c404326, #ffffff29) !important;
+}
+
+#threadTree tr:hover button[data-gm-star="☆"]::after,
+#threadTree tr:hover:not([data-properties~="flagged"]) .flaggedcol-column button:not([data-gm-star])::after {
+  background-color: var(--gm-row-muted-icon-hover) !important;
 }
