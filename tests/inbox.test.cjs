@@ -999,3 +999,28 @@ test('compact sidebar unread dots follow native folder and label state without a
  assert.match(style,/inset-inline-start:/,'placement supports either UI direction');
  assert.match(style,/pointer-events:\s*none/,'the dot cannot intercept folder navigation');
 });
+
+test('adjacent Inbox roots share a native accessibility scan only within a stable paint',()=>{
+  const levels=[0,1,0,0,0],view={rowCount:5,getLevel:i=>levels[i]};
+  let scans=0;
+  const native=function(row){
+    scans++;
+    const level=levels[row.index];
+    row.ariaRowIndex=row.index+1;row.ariaLevel=level+1;
+    row.ariaSetSize=levels.filter(value=>value===level).length;
+    row.ariaPosInSet=levels.slice(0,row.index+1).filter(value=>value===level).length;
+  };
+  const tree={view,_setRowAriaAttributes:native,invalidateRange(){},invalidateRow(){}};
+  const win={document:{timeline:{currentTime:1}},Services:{appinfo:{accessibilityEnabled:true}}};
+  const restore=scope.installInboxRowPositions(win,tree);
+  function check(index,position,size){
+    const row={index};tree._setRowAriaAttributes(row);
+    assert.deepEqual([row.ariaRowIndex,row.ariaLevel,row.ariaPosInSet,row.ariaSetSize],[index+1,levels[index]+1,position,size]);
+  }
+  check(1,1,1);check(2,2,4);check(3,3,4);check(4,4,4);check(3,3,4);
+  assert.equal(scans,2);
+  levels[1]=0;tree.invalidateRange(0,4);check(4,5,5);
+  win.document.timeline.currentTime++;check(3,4,5);
+  assert.equal(scans,4);
+  restore();assert.equal(tree._setRowAriaAttributes,native);
+});

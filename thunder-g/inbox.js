@@ -1229,6 +1229,45 @@ function personalRecipientLevel(header, identities, parser) {
   return recipients.size === 1 ? 2 : 1;
 }
 
+// Thunderbird scans the view in both directions to count a row's siblings.
+// Adjacent roots in the same paint share a set size and consecutive positions.
+function installInboxRowPositions(win,tree) {
+  const original=tree._setRowAriaAttributes;
+  if(typeof original!=='function')return ()=>{};
+  let previous=null;
+  const invalidators=['invalidateRange','invalidateRow'];
+  const restores=[];
+  function replace(name,method){
+    const own=Object.getOwnPropertyDescriptor(tree,name);
+    tree[name]=method;
+    restores.push(()=>{if(tree[name]===method){if(own)Object.defineProperty(tree,name,own);else delete tree[name];}});
+  }
+  for(const name of invalidators){
+    const native=tree[name];
+    if(typeof native==='function')replace(name,function(...args){previous=null;return native.apply(this,args);});
+  }
+  replace('_setRowAriaAttributes',function(row){
+    const view=this.view,frame=win.document.timeline?.currentTime,index=row.index;
+    if(frame==null || !view || view.rowAt || !(win.Services ?? globalThis.Services)?.appinfo?.accessibilityEnabled ||
+        view.getLevel(index)!==0){
+      previous=null;
+      return original.call(this,row);
+    }
+    const delta=index-(previous?.index ?? index);
+    if(previous && previous.view===view && previous.frame===frame && previous.count===view.rowCount &&
+        Math.abs(delta)===1){
+      row.ariaRowIndex=index+1;
+      row.ariaLevel=1;
+      row.ariaSetSize=previous.size;
+      row.ariaPosInSet=previous.position+delta;
+    }else{
+      original.call(this,row);
+    }
+    previous={view,frame,count:view.rowCount,index,size:row.ariaSetSize,position:Number(row.ariaPosInSet)};
+  });
+  return ()=>{previous=null;for(const restore of restores)restore();};
+}
+
 function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,personalIndicators=false,coloredStars=null,previewTrimming=null,reader=null,openSettings=null}={}) {
   const doc = win.document;
   const tree = doc.getElementById('threadTree');
@@ -1265,6 +1304,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     for (const row of tree.querySelectorAll('tr.table-layout')) renderPersonalIndicator(row);
   }
   setPersonalIndicators(personalIndicators);
+  const restoreRowPositions=installInboxRowPositions(win,tree);
   const edgeBounce = installInboxEdgeBounce(win, tree);
   const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
@@ -1652,6 +1692,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   function close() {
     if (closed) return;
     closed = true;
+    restoreRowPositions();
     edgeBounce.close();
     tree.removeEventListener('dragstart',dragStarted);
     for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);
