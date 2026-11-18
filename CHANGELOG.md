@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.32.1
+
+- Add an opt-in Google fonts setting using locally installed Google Sans for the interface and Google Sans Code for monospaced text, with download links in Settings. Keep composer body text in Arial.
+- Refine Inbox typography, spacing, stars, personal level indicators and the settings gear; consecutive checked rows share a continuous selection highlight.
+- Smooth trackpad rebound at the top of the Inbox and allow a fresh gesture while the list is still returning.
+- Make label-change notifications more compact while keeping Undo and Dismiss available.
+
 ## 0.32.0
 
 - Keep newly sent messages in permanent conversation cards, preserving safe rich formatting, links and inline images while the saved Sent copy supplies native actions and metadata.
