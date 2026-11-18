@@ -1108,42 +1108,115 @@ function installInboxSettingsButton(doc,openSettings) {
 }
 
 function installInboxEdgeBounce(win, tree) {
-  const reducedMotion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
-  let timer=null;
-  let distance=0;
+  const reducedMotion = win.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const maxOffset = 32;
+  const followTime = 34;
+  const returnTime = 53;
+  const releaseGap = 25;
+  const gestureGap = 130;
+  let frame = null;
+  let lastFrame = 0;
+  let lastWheel = -Infinity;
+  let peakDelta = 0;
+  let lastDelta = 0;
+  let tailEvents = 0;
+  let renewedEvents = 0;
+  let releasing = false;
+  let offset = 0;
+  let target = 0;
+
   function reset() {
-    if(timer!==null)win.clearTimeout(timer);
-    timer=null;
-    distance=0;
-    tree.style.removeProperty('--gm-edge-bounce');
+    if (frame !== null) win.cancelAnimationFrame(frame);
+    frame = null;
+    offset = target = peakDelta = lastDelta = tailEvents = renewedEvents = 0;
+    lastWheel = -Infinity;
+    releasing = false;
+    tree.style.removeProperty('--gm-inbox-edge-translate');
   }
-  function onWheel(event) {
-    if(reducedMotion?.matches || event.ctrlKey || event.metaKey ||
-        event.defaultPrevented || Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
-    const page=tree._gmPageScrollLimits;
-    const min=page?.min ?? 0;
-    const max=page?.max ?? tree.scrollHeight-tree.clientHeight;
-    // Moving the virtual table upward at the bottom exposes its trailing
-    // spacer and can flicker while native pagination clamps the scroll offset.
-    const atEdge=max>min && event.deltaY<0 && tree.scrollTop<=min+1;
-    if(!atEdge){
-      if(timer!==null)reset();
+
+  function animate(now) {
+    const top = tree._gmPageScrollLimits?.min ?? 0;
+    if (reducedMotion?.matches || tree.scrollTop < top - 1) {
+      reset();
       return;
     }
-    const scale=event.deltaMode===0?1:16;
-    distance=Math.max(-16,Math.min(16,distance-event.deltaY*scale*.16));
-    tree.style.setProperty('--gm-edge-bounce',distance+'px');
-    if(timer!==null)win.clearTimeout(timer);
-    timer=win.setTimeout(reset,75);
+
+    if (now - lastWheel >= releaseGap || tree.scrollTop > top + 1) releasing = true;
+    const elapsed = Math.max(0, now - lastFrame);
+    lastFrame = Math.max(lastFrame, now);
+    if (releasing) {
+      offset *= Math.exp(-elapsed / returnTime);
+      if (offset < .1) {
+        // Keep the gesture state so its inertial tail cannot restart it.
+        frame = null;
+        offset = target = 0;
+        tree.style.removeProperty('--gm-inbox-edge-translate');
+        return;
+      }
+    } else {
+      offset += (target - offset) * -Math.expm1(-elapsed / followTime);
+    }
+
+    tree.style.setProperty('--gm-inbox-edge-translate', `0 ${offset}px`);
+    frame = win.requestAnimationFrame(animate);
   }
-  tree.addEventListener('wheel',onWheel,{passive:true});
-  tree.addEventListener('viewchange',reset);
-  tree.addEventListener('gm-page-changed',reset);
-  return {close(){
-    if(timer!==null)reset();
-    tree.removeEventListener('wheel',onWheel);
-    tree.removeEventListener('viewchange',reset);
-    tree.removeEventListener('gm-page-changed',reset);
+
+  function onWheel(event) {
+    if (reducedMotion?.matches || event.ctrlKey || event.metaKey || event.defaultPrevented ||
+        Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    if (event.deltaY > 0) {
+      releasing = true;
+      lastWheel = -Infinity;
+      return;
+    }
+
+    const page = tree._gmPageScrollLimits;
+    const top = page?.min ?? 0;
+    const bottom = page?.max ?? tree.scrollHeight - tree.clientHeight;
+    const distanceToTop = tree.scrollTop - top;
+    if (bottom <= top || distanceToTop < -1) return;
+
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? tree.clientHeight : 1;
+    const overshoot = -event.deltaY * unit - Math.max(0, distanceToTop);
+    if (overshoot <= 0) return;
+
+    const now = win.performance.now();
+    if (releasing) {
+      // Wheel events have no gesture phase. A sustained increase can be a
+      // fresh pull even while smaller momentum events are still arriving.
+      const minRenewedDelta = Math.max(6, peakDelta * .2);
+      const growing = overshoot >= minRenewedDelta &&
+        (renewedEvents ? overshoot >= lastDelta * .85 : overshoot >= lastDelta * 1.6);
+      renewedEvents = growing ? renewedEvents + 1 : 0;
+    }
+    if (now - lastWheel >= gestureGap || renewedEvents >= 2) {
+      peakDelta = tailEvents = renewedEvents = 0;
+      releasing = false;
+      target = offset;
+    }
+    lastWheel = now;
+    lastDelta = overshoot;
+    peakDelta = Math.max(peakDelta, overshoot);
+    tailEvents = overshoot < peakDelta * .7 ? tailEvents + 1 : 0;
+    if (tailEvents >= 2) releasing = true;
+    if (releasing) return;
+
+    const strength = maxOffset * -Math.expm1(-peakDelta / 52);
+    target = Math.max(target, strength);
+    if (frame === null) {
+      lastFrame = now;
+      frame = win.requestAnimationFrame(animate);
+    }
+  }
+
+  tree.addEventListener('wheel', onWheel, {passive:true});
+  tree.addEventListener('viewchange', reset);
+  tree.addEventListener('gm-page-changed', reset);
+  return {close() {
+    if (frame !== null) reset();
+    tree.removeEventListener('wheel', onWheel);
+    tree.removeEventListener('viewchange', reset);
+    tree.removeEventListener('gm-page-changed', reset);
   }};
 }
 
@@ -1192,7 +1265,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     for (const row of tree.querySelectorAll('tr.table-layout')) renderPersonalIndicator(row);
   }
   setPersonalIndicators(personalIndicators);
-  const edgeBounce=installInboxEdgeBounce(win,tree);
+  const edgeBounce = installInboxEdgeBounce(win, tree);
   const settingsButton=installInboxSettingsButton(doc,openSettings);
   const folderToggle=installFolderPaneToggle(win);
   const stars=installColoredStars(win,coloredStars);
@@ -1579,6 +1652,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   function close() {
     if (closed) return;
     closed = true;
+    edgeBounce.close();
     tree.removeEventListener('dragstart',dragStarted);
     for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);
     dragEnded();
@@ -1597,7 +1671,6 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     previews.close();
     reader?.setDraftOpener?.(null);
     setPersonalIndicators(false);
-    edgeBounce.close();
     settingsButton.close();
     folderToggle.close();
     stars.close();

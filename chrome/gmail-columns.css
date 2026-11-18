@@ -163,8 +163,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   #threadTree tbody {
-    translate: 0 var(--gm-edge-bounce, 0px);
-    transition: translate 180ms ease-out;
+    translate: var(--gm-inbox-edge-translate, none);
   }
 }
 

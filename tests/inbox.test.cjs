@@ -859,25 +859,73 @@ test('personal indicators distinguish sole recipients, shared recipients, and ma
   assert.equal(level('me@example.org','','list.example.org'),0);
 });
 
-test('edge bounce stays at the top and never exposes the virtual list bottom',()=>{
-  const events={},properties=new Map(),timers=new Map();let id=0;
-  const tree={scrollTop:0,scrollHeight:1000,clientHeight:200,
-    style:{setProperty:(key,value)=>properties.set(key,value),removeProperty:key=>properties.delete(key)},
-    addEventListener:(name,fn)=>events[name]=fn,removeEventListener:name=>delete events[name]};
-  const win={matchMedia:()=>({matches:false}),setTimeout(fn){timers.set(++id,fn);return id},clearTimeout:id=>timers.delete(id)};
+test('Inbox rebound starts and settles continuously at the top edge',()=>{
+  const events=new Map(), frames=new Map(), styles=new Map();
+  let time=0, nextFrame=0;
+  const motion={matches:false};
+  const tree={scrollTop:0,scrollHeight:900,clientHeight:300,
+    addEventListener(name,fn){events.set(name,fn)},removeEventListener(name){events.delete(name)},
+    style:{setProperty(name,value){styles.set(name,value)},removeProperty(name){styles.delete(name)}},
+  };
+  const win={matchMedia:()=>motion,performance:{now:()=>time},
+    requestAnimationFrame(fn){frames.set(++nextFrame,fn);return nextFrame},
+    cancelAnimationFrame(id){frames.delete(id)},
+  };
   const bounce=scope.installInboxEdgeBounce(win,tree);
-  events.wheel({deltaX:0,deltaY:-40,deltaMode:0});
-  assert.ok(parseFloat(properties.get('--gm-edge-bounce'))>0);
-  tree.scrollTop=800;events.wheel({deltaX:0,deltaY:40,deltaMode:0});
-  assert.equal(properties.has('--gm-edge-bounce'),false);
-  tree._gmPageScrollLimits={min:200,max:400};
-  tree.scrollTop=200;events.wheel({deltaX:0,deltaY:-40,deltaMode:0});
-  assert.ok(parseFloat(properties.get('--gm-edge-bounce'))>0);
-  tree.scrollTop=400;events.wheel({deltaX:0,deltaY:40,deltaMode:0});
-  assert.equal(properties.has('--gm-edge-bounce'),false);
-  bounce.close();assert.equal(timers.size,0);
-});
+  const wheel=deltaY=>events.get('wheel')({deltaX:0,deltaY,deltaMode:0});
+  const step=()=>{
+    time+=1000/60;
+    const [id,fn]=frames.entries().next().value;
+    frames.delete(id);
+    fn(time);
+  };
+  const offset=()=>parseFloat(styles.get('--gm-inbox-edge-translate')?.split(' ')[1]||0);
+  wheel(-80);
+  assert.equal(offset(),0,'wheel handlers do not render outside animation frames');
+  step();const peak=offset();
+  assert.ok(peak>8,'the first frame stretches the list');
+  step();assert.ok(offset()>0&&offset()<peak,'the return begins on the next frame without new input');
+  for(let i=0;i<14&&frames.size;i++)step();
+  assert.ok(offset()<1,'the rebound is within one pixel of rest by 267 ms');
+  for(let i=0;i<30&&frames.size;i++)step();
+  assert.equal(offset(),0);
+  assert.equal(frames.size,0);
 
+  let previous=0;
+  for(let i=0;i<8;i++) {
+    wheel(-18);wheel(-18);
+    assert.equal(frames.size,1,'trackpad events share a frame');
+    step();
+    assert.ok(offset()>=previous&&offset()<32,'active input moves outward smoothly within the limit');
+    previous=offset();
+  }
+  wheel(-9);wheel(-6);step();
+  assert.ok(offset()<previous,'falling wheel deltas trigger the return');
+  const returning = offset();
+  wheel(-14);step();
+  assert.ok(offset()<returning,'a late momentum pulse cannot stretch the list again');
+  wheel(-4);step();
+  const beforeRenewedPull=offset();
+  wheel(-16);step();
+  const afterFirstImpulse=offset();
+  assert.ok(afterFirstImpulse<beforeRenewedPull,'one renewed impulse is treated as possible momentum');
+  wheel(-21);step();
+  assert.ok(offset()>afterFirstImpulse,'a fresh pull can rebound during the previous return');
+  const beforeReverse=offset();
+  wheel(20);
+  assert.equal(offset(),beforeReverse,'reversing the scroll does not snap the list');
+  step();assert.ok(offset()>0&&offset()<beforeReverse);
+  events.get('viewchange')();
+
+  tree._gmPageScrollLimits={min:200,max:400};
+  tree.scrollTop=400;wheel(-80);assert.equal(frames.size,0);
+  tree.scrollTop=240;wheel(-80);
+  assert.equal(offset(),0,'the list has not reached the edge yet');
+  tree.scrollTop=200;step();assert.ok(offset()>0,'the unused part of the same gesture produces the rebound');
+  events.get('gm-page-changed')();assert.equal(offset(),0);
+  motion.matches=true;wheel(-80);assert.equal(frames.size,0);
+  bounce.close();assert.equal(events.size,0);
+});
 
 test('refresh completion waits for every URL, handles offline cancellation and ignores duplicate stops',()=>{
  const callbacks=[];let finished=0;
