@@ -13,6 +13,7 @@
     --gm-surface: #ffffff;
     --gm-muted: #444746;
     --gm-border: #e3e7ed;
+    --gm-row-separator: #cdd4dc;
     --gm-hover: #e9eef6;
     --gm-compose: #c2e7ff;
     --gm-neutral-chip: #e0e5e9;
@@ -195,7 +196,7 @@
   #threadTree tbody > tr.table-layout {
     background: var(--gm-read) !important;
     color: var(--gm-ink) !important;
-    box-shadow: inset 0 -1px var(--gm-border) !important;
+    box-shadow: inset 0 -1px var(--gm-row-separator) !important;
   }
 
   #threadTree tbody > tr.table-layout:is([data-properties~="unread"], :where(.children.collapsed)[data-properties~="hasUnread"]) {
@@ -211,7 +212,7 @@
     position: relative;
     z-index: 1;
     box-shadow: 0 -1px 3px var(--gm-shadow),
-      0 2px 4px var(--gm-shadow), inset 0 -1px var(--gm-border) !important;
+      0 2px 4px var(--gm-shadow), inset 0 -1px var(--gm-row-separator) !important;
   }
 
   #threadTree tbody > tr.table-layout.selected {
@@ -221,7 +222,7 @@
 
   /* Join consecutive selected rows without losing the boundary to unselected rows. */
   #threadTree tbody > tr.table-layout.selected + tr.table-layout.selected {
-    box-shadow: inset 0 -1px var(--gm-border) !important;
+    box-shadow: inset 0 -1px var(--gm-row-separator) !important;
   }
 
   #threadTree tbody > tr.table-layout.selected:has(+ tr.table-layout.selected) {
@@ -314,6 +315,7 @@
     --gm-surface: #25272c;
     --gm-muted: #bdc1c6;
     --gm-border: #41454d;
+    --gm-row-separator: #535861;
     --gm-hover: #30343b;
     --gm-compose: #304969;
     --gm-neutral-chip: #41454d;
