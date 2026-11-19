@@ -1229,6 +1229,42 @@ function personalRecipientLevel(header, identities, parser) {
   return recipients.size === 1 ? 2 : 1;
 }
 
+// Native range invalidations schedule one animation callback per row. Merge
+// overlapping notifications before scheduling that work, using the latest view.
+function installInboxRangeUpdates(win,tree) {
+  const original=tree.invalidateRange;
+  if(typeof original!=='function')return ()=>{};
+  const own=Object.getOwnPropertyDescriptor(tree,'invalidateRange');
+  let pending=null,frame=null;
+  function cancel(){
+    if(frame!==null)win.cancelAnimationFrame(frame);
+    frame=null;pending=null;
+  }
+  function flush(){
+    frame=null;
+    const range=pending;pending=null;
+    if(range && range.view===tree.view)original.call(tree,range.start,range.end);
+  }
+  function invalidateRange(start,end){
+    const view=this.view;
+    if(pending?.view!==view)cancel();
+    if(pending){
+      pending.start=Math.min(pending.start,start);
+      pending.end=Math.max(pending.end,end);
+    }else pending={view,start,end};
+    if(frame===null)frame=win.requestAnimationFrame(flush);
+  }
+  tree.invalidateRange=invalidateRange;
+  tree.addEventListener('viewchange',cancel);
+  return ()=>{
+    if(frame!==null){win.cancelAnimationFrame(frame);flush();}
+    tree.removeEventListener('viewchange',cancel);
+    if(tree.invalidateRange===invalidateRange){
+      if(own)Object.defineProperty(tree,'invalidateRange',own);else delete tree.invalidateRange;
+    }
+  };
+}
+
 // Thunderbird scans the view in both directions to count a row's siblings.
 // Adjacent roots in the same paint share a set size and consecutive positions.
 function installInboxRowPositions(win,tree) {
@@ -1304,6 +1340,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     for (const row of tree.querySelectorAll('tr.table-layout')) renderPersonalIndicator(row);
   }
   setPersonalIndicators(personalIndicators);
+  const restoreRangeUpdates=installInboxRangeUpdates(win,tree);
   const restoreRowPositions=installInboxRowPositions(win,tree);
   const edgeBounce = installInboxEdgeBounce(win, tree);
   const settingsButton=installInboxSettingsButton(doc,openSettings);
@@ -1693,6 +1730,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     if (closed) return;
     closed = true;
     restoreRowPositions();
+    restoreRangeUpdates();
     edgeBounce.close();
     tree.removeEventListener('dragstart',dragStarted);
     for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);

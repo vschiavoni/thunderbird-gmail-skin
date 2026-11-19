@@ -1024,3 +1024,22 @@ test('adjacent Inbox roots share a native accessibility scan only within a stabl
   assert.equal(scans,4);
   restore();assert.equal(tree._setRowAriaAttributes,native);
 });
+
+test('Inbox range updates merge notifications and discard replaced views',()=>{
+  let next=0;const frames=new Map(),events={},calls=[];
+  const native=function(start,end){calls.push([this.view,start,end]);};
+  const tree={view:{},invalidateRange:native,
+    addEventListener(name,fn){events[name]=fn},removeEventListener(name){delete events[name]}};
+  const win={requestAnimationFrame(fn){frames.set(++next,fn);return next},
+    cancelAnimationFrame(id){frames.delete(id)}};
+  const flush=()=>{const jobs=[...frames.values()];frames.clear();jobs.forEach(fn=>fn());};
+  const restore=scope.installInboxRangeUpdates(win,tree),view=tree.view;
+  tree.invalidateRange(12,80);tree.invalidateRange(10,90);
+  assert.equal(calls.length,0);assert.equal(frames.size,1);
+  flush();assert.deepEqual(calls,[[view,10,90]]);
+  tree.invalidateRange(0,90);tree.view={};events.viewchange();flush();
+  assert.equal(calls.length,1);
+  tree.invalidateRange(4,8);restore();
+  assert.deepEqual(calls[1],[tree.view,4,8]);
+  assert.equal(tree.invalidateRange,native);assert.equal(frames.size,0);
+});
