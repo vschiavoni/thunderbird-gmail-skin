@@ -930,6 +930,12 @@ test('Inbox rebound starts and settles continuously at the top edge',()=>{
   assert.equal(offset(),0,'the list has not reached the edge yet');
   tree.scrollTop=200;step();assert.ok(offset()>0,'the unused part of the same gesture produces the rebound');
   events.get('gm-page-changed')();assert.equal(offset(),0);
+  tree.scrollTop=400;wheel(80);step();
+  assert.ok(offset()<0,'the bottom edge stretches upward without scrolling into the next page');
+  assert.equal(tree.scrollTop,400);
+  for(let i=0;i<40&&frames.size;i++)step();
+  assert.equal(offset(),0,'bottom rebound settles completely');
+  events.get('gm-page-changed')();
   motion.matches=true;wheel(-80);assert.equal(frames.size,0);
   bounce.close();assert.equal(events.size,0);
 });

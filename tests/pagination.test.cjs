@@ -72,6 +72,20 @@ for (const collapsed of [false,true,'short-last','threaded']) test(`native pagin
   const selections=[];
   const pages=scope.installNativePagination(win,{selectIndices(indices){tree.selectedIndices=indices;selections.push(indices)}});
   assert.equal(quickFilter.pagination,tree.bar,'pager is placed directly beside Quick Filter');
+  pages.setSize(50);
+  const boundary=tree._gmPageScrollLimits.max;
+  tree.scrollTop=boundary;
+  let prevented=false;
+  tree.events.wheel({deltaY:80,deltaX:0,preventDefault(){prevented=true}});
+  assert.equal(prevented,true,'outward momentum is stopped before it crosses the page boundary');
+  assert.equal(tree.scrollTop,boundary);
+  tree.scrollTop=0;
+  prevented=false;
+  tree.events.wheel({deltaY:1,deltaX:0,preventDefault(){prevented=true}});
+  assert.equal(prevented,false,'normal scrolling within a page stays native');
+  scrolls.length=0;
+  pages.setSize(0);
+
   if(collapsed==='short-last') {
     pages.setSize(100);
     assert.equal(tree.children[0].style.height,'0px','full pages need no extra blank scroll room');

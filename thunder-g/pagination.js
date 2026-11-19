@@ -184,6 +184,20 @@ function installNativePagination(win, reader) {
       row.toggleAttribute('data-gm-outside-page',row.index<range.rowStart || row.index>=range.rowEnd);
     }
   }
+  function pageWheel(event){
+    const limits=tree._gmPageScrollLimits;
+    if(!size || closed || !limits || event.defaultPrevented || event.ctrlKey || event.metaKey ||
+        Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
+    const unit=event.deltaMode===1?16:event.deltaMode===2?tree.clientHeight:1;
+    const proposed=tree.scrollTop+event.deltaY*unit;
+    const clamped=Math.min(limits.max,Math.max(limits.min,proposed));
+    if(proposed===clamped)return;
+    // Stop native momentum entering the following page before paint clamps it
+    // back. The edge effect translates content without changing row indices.
+    event.preventDefault();
+    if(Math.abs(tree.scrollTop-clamped)>.5)tree.scrollTo({top:clamped,behavior:'instant'});
+  }
+  tree.addEventListener('wheel',pageWheel,{passive:false});
   function scrollPage(){
     if(!size || closed || pageScroll.hidden)return;
     const range=bounds(),height=rowHeight();
@@ -264,7 +278,7 @@ function installNativePagination(win, reader) {
       }
     },
     close(){
-      closed=true;tree.removeEventListener('gm-shortcut-page',shortcutPage);clear();delete tree._gmPageSelectionBounds;
+      closed=true;tree.removeEventListener('wheel',pageWheel);tree.removeEventListener('gm-shortcut-page',shortcutPage);clear();delete tree._gmPageSelectionBounds;
       tree.removeEventListener('scroll',schedule);tree.removeEventListener('viewchange',viewChanged);tree.removeEventListener('select',selectionChanged);
       for(const name of ['rowcountchange','expanded','collapsed'])tree.removeEventListener(name,structureChanged);
       tree.removeEventListener('gm-select-page',selectPage);tree.removeEventListener('click',selectPage,true);tree.removeEventListener('keydown',selectPage,true);

@@ -1124,6 +1124,7 @@ function installInboxEdgeBounce(win, tree) {
   let releasing = false;
   let offset = 0;
   let target = 0;
+  let edge = 1;
 
   function reset() {
     if (frame !== null) win.cancelAnimationFrame(frame);
@@ -1136,12 +1137,13 @@ function installInboxEdgeBounce(win, tree) {
 
   function animate(now) {
     const top = tree._gmPageScrollLimits?.min ?? 0;
-    if (reducedMotion?.matches || tree.scrollTop < top - 1) {
+    const bottom=tree._gmPageScrollLimits?.max ?? tree.scrollHeight-tree.clientHeight;
+    if (reducedMotion?.matches || tree.scrollTop < top - 1 || tree.scrollTop > bottom + 1) {
       reset();
       return;
     }
 
-    if (now - lastWheel >= releaseGap || tree.scrollTop > top + 1) releasing = true;
+    if (now - lastWheel >= releaseGap || (edge===1 ? tree.scrollTop > top + 1 : tree.scrollTop < bottom - 1)) releasing = true;
     const elapsed = Math.max(0, now - lastFrame);
     lastFrame = Math.max(lastFrame, now);
     if (releasing) {
@@ -1157,28 +1159,27 @@ function installInboxEdgeBounce(win, tree) {
       offset += (target - offset) * -Math.expm1(-elapsed / followTime);
     }
 
-    tree.style.setProperty('--gm-inbox-edge-translate', `0 ${offset}px`);
+    tree.style.setProperty('--gm-inbox-edge-translate', `0 ${edge*offset}px`);
     frame = win.requestAnimationFrame(animate);
   }
 
   function onWheel(event) {
-    if (reducedMotion?.matches || event.ctrlKey || event.metaKey || event.defaultPrevented ||
+    if (reducedMotion?.matches || event.ctrlKey || event.metaKey || (event.defaultPrevented && !tree._gmPageScrollLimits) ||
         Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    if (event.deltaY > 0) {
-      releasing = true;
-      lastWheel = -Infinity;
-      return;
-    }
-
     const page = tree._gmPageScrollLimits;
     const top = page?.min ?? 0;
     const bottom = page?.max ?? tree.scrollHeight - tree.clientHeight;
-    const distanceToTop = tree.scrollTop - top;
+    const direction=event.deltaY<0?1:-1;
+    const distanceToTop = direction===1 ? tree.scrollTop-top : bottom-tree.scrollTop;
     if (bottom <= top || distanceToTop < -1) return;
 
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? tree.clientHeight : 1;
-    const overshoot = -event.deltaY * unit - Math.max(0, distanceToTop);
-    if (overshoot <= 0) return;
+    const overshoot = Math.abs(event.deltaY) * unit - Math.max(0, distanceToTop);
+    if (overshoot <= 0) {
+      if(direction!==edge){releasing=true;lastWheel=-Infinity;}
+      return;
+    }
+    if(direction!==edge){reset();edge=direction;}
 
     const now = win.performance.now();
     if (releasing) {
