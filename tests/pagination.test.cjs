@@ -273,3 +273,19 @@ test('menu and native wheel zoom share conversation scope and retain native beha
  reading=false;assert.equal(fire('command','cmd_fullZoomEnlarge').stopped,undefined);assert.equal(fire('DoZoomReduce').stopped,undefined);
  control.close();assert.deepEqual(events,{});
 });
+
+test('interface zoom scales existing embedded editors and initializes future frames',()=>{
+  const listeners={},editor={docShell:{contentViewer:{fullZoom:1}},frames:[]};
+  const root={docShell:{contentViewer:{fullZoom:1}},frames:[editor],
+    addEventListener(name,fn){listeners[name]=fn},dispatchEvent(){},
+    Event:class{constructor(type){this.type=type}}};
+  assert.equal(scope.zoomMailInterface({top:root},'increaseSize'),true);
+  assert.equal(root.docShell.contentViewer.fullZoom,1.1);
+  assert.equal(editor.docShell.contentViewer.fullZoom,1.1);
+  const later={docShell:{contentViewer:{fullZoom:1}}};
+  listeners.load({target:{defaultView:later}});
+  assert.equal(later.docShell.contentViewer.fullZoom,1.1);
+  scope.zoomMailInterface({top:root},'resetSize');
+  assert.equal(editor.docShell.contentViewer.fullZoom,1);
+  assert.equal(scope.mailZoomAction({ctrlKey:true,key:'+',target:{isContentEditable:true}},true),'increaseSize');
+});

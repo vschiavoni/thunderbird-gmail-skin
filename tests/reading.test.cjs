@@ -351,11 +351,14 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     assert.equal(nodes.find(n=>n.className==='gm-label-scope').hidden,true,'scope remains in the accessible panel name');
     assert.equal(nodes.find(n=>n.name==='panel').getAttribute('aria-label'),'Label as — entire conversation, 3 messages, includes sent replies');
     const checkbox=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');checkbox.checked=true;checkbox.events.change[0]();
+    assert.equal(calls.length,0,'checking a label stages it until Enter');
+    const enter=()=>nodes.find(n=>n.className==='gm-label-picker').events.keydown[0]({key:'Enter',target:checkbox,preventDefault(){},stopPropagation(){}});
+    enter();
     assert.deepEqual(JSON.parse(JSON.stringify(calls)),[['add','inbox',[2],'one'],['add','Sent',[1],'one']]);
     assert.ok(nodes.some(n=>n.textContent==='Conversation added to Project One'));
     nodes.find(n=>n.textContent==='Undo').events.click[0]();
     assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(2))),[['remove','inbox',[2],'one'],['remove','Sent',[1],'one']]);
-    checkbox.checked=false;checkbox.events.change[0]();
+    checkbox.checked=false;checkbox.events.change[0]();enter();
     assert.deepEqual(JSON.parse(JSON.stringify(calls.slice(4))),[['remove','inbox',[1],'one']]);
     assert.equal(refreshes,3,'message chips and title labels refresh after a conversation-wide write');
     const sentCopy=conversationMessages.at(-1);
@@ -371,7 +374,7 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
     windowEvents['gm-conversation-messages-changed']();
     assert.equal(nodes.find(n=>n.type==='search').disabled,false);
     const fresh=nodes.filter(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One').at(-1);
-    fresh.checked=true;fresh.events.change[0]();assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))),['add','Sent',[1],'one']);
+    fresh.checked=true;fresh.events.change[0]();enter();assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))),['add','Sent',[1],'one']);
     pressL();assert.equal(nodes.find(n=>n.type==='search').disabled,false,'no selected native list row is required for the active Sent conversation');
     controller.close();assert.equal(windowEvents['gm-conversation-messages-changed'],undefined);return;
   }
@@ -387,8 +390,12 @@ for(const independentMode of [false,true]) test(`label picker covers the full ac
   assert.deepEqual(flat.children.map(row=>row.children[1].textContent),['Project One/Child','Project One/Child/Leaf'],'search preserves the full path at every nesting depth');
   search.value='';search.events.input[0]();
   const first=nodes.find(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One');assert.equal(first.indeterminate,true);
-  first.checked=true;first.events.change[0]();assert.deepEqual(calls,[['add',[2],'one']]);
-  first.checked=false;first.events.change[0]();assert.deepEqual(calls[1],['remove',[1],'one']);
+  search.value='Project One';search.events.input[0]();
+  assert.equal(calls.length,0,'searching alone does not assign labels');
+  const confirm=()=>nodes.find(n=>n.className==='gm-label-picker').events.keydown[0]({key:'Enter',target:search,preventDefault(){},stopPropagation(){}});
+  confirm();assert.deepEqual(calls,[['add',[2],'one']]);
+  const currentFirst=nodes.filter(n=>n.type==='checkbox' && n.getAttribute('aria-label')==='Project One').at(-1);
+  currentFirst.checked=false;currentFirst.events.change[0]();confirm();assert.deepEqual(calls[1],['remove',[1],'one']);
   const undone=[];
   messages[0].folder.addKeywordsToMessages=(headers,key)=>undone.push([Array.from(headers,h=>h.messageKey),key]);
   assert.ok(nodes.some(n=>n.textContent==='Conversation removed from Project One'));
