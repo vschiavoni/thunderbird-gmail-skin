@@ -1149,3 +1149,15 @@ test('conversation label refresh is linear and retains unchanged chips while ref
   assert.equal(f.removals.length,0,'no existing assignments are modified');
   f.reader.close();
 });
+
+test('external-mail warning prefixes do not hide replies while changed subjects stay separate',()=>{
+ const scope=context(),root=message(1,'root'),reply=message(2,'reply'),different=message(3,'different');
+ root.mime2DecodedSubject='CUSO Winter School on Sustainable Computing, Champéry, January 2027';
+ reply.mime2DecodedSubject='Re: [!] '+root.mime2DecodedSubject;
+ different.mime2DecodedSubject='Re: [!] ok final?';
+ const result=scope.independentMessages([root,reply,different],root);
+ assert.ok(result.includes(reply));
+ assert.ok(!result.includes(different));
+ const reverse=scope.independentMessages([root,reply,different],reply);
+ assert.ok(reverse.includes(root),'opening the warning-prefixed reply retains its original conversation');
+});

@@ -123,3 +123,18 @@ test('changed-subject reference branches cannot spread labels into another conve
  assert.ok(!incoming.keys.has('team'));
  assert.ok(unrelated.keys.has('team'),'existing assignments survive');
 });
+
+test('warning-prefixed replies inherit labels only within the same subject boundary',()=>{
+ const f=fixture(),inbox=f.folder('inbox');
+ const root=f.message(inbox,'root',[],['project']);
+ const reply=f.message(inbox,'reply',['root']);
+ const different=f.message(inbox,'different',['root'],['team']);
+ root.mime2DecodedSubject='CUSO Winter School';
+ reply.mime2DecodedSubject='Re: [!] CUSO Winter School';
+ different.mime2DecodedSubject='Re: [!] ok final?';
+ root.thread=reply.thread=different.thread=[root,reply,different];
+ const members=f.scope.conversationLabelScope([reply],null,{requireReferences:true});
+ assert.ok(members.includes(root));assert.ok(!members.includes(different));
+ f.scope.inheritConversationLabels(members,f.mail);
+ assert.ok(reply.keys.has('project'));assert.ok(!reply.keys.has('team'));
+});

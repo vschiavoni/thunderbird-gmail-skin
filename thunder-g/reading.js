@@ -69,7 +69,7 @@ function conversationLabelScope(messages,folders=null,{requireReferences=false}=
     try{folders=Array.from(MailServices.accounts.allFolders);}catch(_){folders=[];}
   }
   const subject=header=>String(header?.mime2DecodedSubject ?? header?.subject ?? '')
-    .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi,'').normalize('NFC').trim().toLocaleLowerCase();
+    .replace(/^\s*(?:(?:(?:re|fw|fwd)\s*:|\[!\])\s*)+/gi,'').normalize('NFC').trim().toLocaleLowerCase();
   const subjects=new Set(messages.map(subject));
   const found=new Map(),queue=[],lookedUp=new Set(),threads=new Set(),threadIndexes=new Map();
   const normalize=id=>String(id || '').trim().replace(/^<|>$/g,'');
