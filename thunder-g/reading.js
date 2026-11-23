@@ -68,6 +68,9 @@ function conversationLabelScope(messages,folders=null,{requireReferences=false}=
   if(folders===null){
     try{folders=Array.from(MailServices.accounts.allFolders);}catch(_){folders=[];}
   }
+  const subject=header=>String(header?.mime2DecodedSubject ?? header?.subject ?? '')
+    .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi,'').normalize('NFC').trim().toLocaleLowerCase();
+  const subjects=new Set(messages.map(subject));
   const found=new Map(),queue=[],lookedUp=new Set(),threads=new Set(),threadIndexes=new Map();
   const normalize=id=>String(id || '').trim().replace(/^<|>$/g,'');
   function references(header){
@@ -80,6 +83,7 @@ function conversationLabelScope(messages,folders=null,{requireReferences=false}=
   const account=folder=>folder?.rootFolder?.URI || folder?.server?.key || folder?.server?.rootFolder?.URI || folder?.URI;
   function remember(header){
     if(!header?.folder?.URI || header.messageKey===undefined)return;
+    if(!subjects.has(subject(header)))return;
     const key=JSON.stringify([header.folder.URI,header.messageKey]);
     if(!found.has(key)){found.set(key,header);queue.push(header);}
   }

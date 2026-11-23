@@ -18,7 +18,11 @@ function independentMessageKey(message) {
 }
 function independentMessages(messages, anchor) {
   const physical=new Map();
+  const subject=header=>String(header?.mime2DecodedSubject ?? header?.subject ?? '')
+    .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi,'').normalize('NFC').trim().toLocaleLowerCase();
+  const anchorSubject=subject(anchor);
   for(const message of [anchor,...messages]) {
+    if(subject(message)!==anchorSubject)continue;
     if(message?.folder?.URI && message.messageKey !== undefined) physical.set(independentMessageKey(message),message);
   }
   const logical=new Map();
