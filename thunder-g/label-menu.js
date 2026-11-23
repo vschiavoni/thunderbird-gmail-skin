@@ -148,14 +148,15 @@ function installSidebarLabelMenu(win,service,prefs) {
     const items=targets();content.replaceChildren();const back=button(gmText("‹ Back"),home);back.className='gm-color-back';text(gmText("Label color"));
     const grid=doc.createElement('div');grid.className='gm-label-colors';content.append(grid);
     grid.setAttribute('role','group');gmBindAttribute(grid, 'aria-label', () => gmText("Label colors"));
-    for(const color of ['#cccccc','#6d9eeb','#76a5af','#8e7cc3','#c27ba0','#cc0000',
-      '#666666','#1155cc','#134f5c','#674ea7','#a64d79','#990000',
-      '#e69138','#f6b26b','#f1c232','#ffd966','#93c47d','#6aa84f',
-      '#ff6d01','#fbbc04','#d5a6bd','#a64d79','#34a853','#0b804b',
-      '#000000','#ffffff','#ead1dc','#a142f4','#4285f4','#24c1e0']){
-      const preview=chipColors(color);
+    for(const color of ['#e7e7e7','#becef2','#a7d5e2','#e2d7ff','#f4d4df','#e6b4a9',
+      '#757575','#3553b3','#376f84','#745abd','#ad2e5b','#c43f32',
+      '#f2c8b0','#f7dfb9','#f6e88f','#faedc3','#c1edd4','#b2d9c4',
+      '#e57f45','#f0b059','#e8dcde','#c4a7ac','#76d498','#55a46b',
+      '#000000','#ffffff','#f8ebf4','#8865c9','#f3d177','#d1f2df']){
+      const rgb=[1,3,5].map(index=>parseInt(color.slice(index,index+2),16));
+      const foreground=rgb[0]*.299+rgb[1]*.587+rgb[2]*.114<140?'#ffffff':'#3c4043';
       const node=doc.createElement('button');node.type='button';node.textContent='a';
-      node.style.backgroundColor=preview.background;node.style.color=preview.foreground;
+      node.style.backgroundColor=color;node.style.color=foreground;
       gmBindValue(node, "title", () => gmText("Label color $1", color));gmBindAttribute(node, 'aria-label', () => gmText("Set label color $1", color));
       node.setAttribute('aria-pressed',String(items.every(item=>(item.color || '').toLowerCase()===color)));
       node.addEventListener('click',()=>{try{apply({color});}catch(error){failure(error);}});grid.append(node);
