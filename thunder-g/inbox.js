@@ -1124,6 +1124,7 @@ function installInboxEdgeBounce(win, tree) {
   let releasing = false;
   let offset = 0;
   let target = 0;
+  let edge = 1;
 
   function reset() {
     if (frame !== null) win.cancelAnimationFrame(frame);
@@ -1136,12 +1137,13 @@ function installInboxEdgeBounce(win, tree) {
 
   function animate(now) {
     const top = tree._gmPageScrollLimits?.min ?? 0;
-    if (reducedMotion?.matches || tree.scrollTop < top - 1) {
+    const bottom=tree._gmPageScrollLimits?.max ?? tree.scrollHeight-tree.clientHeight;
+    if (reducedMotion?.matches || tree.scrollTop < top - 1 || tree.scrollTop > bottom + 1) {
       reset();
       return;
     }
 
-    if (now - lastWheel >= releaseGap || tree.scrollTop > top + 1) releasing = true;
+    if (now - lastWheel >= releaseGap || (edge===1 ? tree.scrollTop > top + 1 : tree.scrollTop < bottom - 1)) releasing = true;
     const elapsed = Math.max(0, now - lastFrame);
     lastFrame = Math.max(lastFrame, now);
     if (releasing) {
@@ -1157,28 +1159,27 @@ function installInboxEdgeBounce(win, tree) {
       offset += (target - offset) * -Math.expm1(-elapsed / followTime);
     }
 
-    tree.style.setProperty('--gm-inbox-edge-translate', `0 ${offset}px`);
+    tree.style.setProperty('--gm-inbox-edge-translate', `0 ${edge*offset}px`);
     frame = win.requestAnimationFrame(animate);
   }
 
   function onWheel(event) {
-    if (reducedMotion?.matches || event.ctrlKey || event.metaKey || event.defaultPrevented ||
+    if (reducedMotion?.matches || event.ctrlKey || event.metaKey || (event.defaultPrevented && !tree._gmPageScrollLimits) ||
         Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    if (event.deltaY > 0) {
-      releasing = true;
-      lastWheel = -Infinity;
-      return;
-    }
-
     const page = tree._gmPageScrollLimits;
     const top = page?.min ?? 0;
     const bottom = page?.max ?? tree.scrollHeight - tree.clientHeight;
-    const distanceToTop = tree.scrollTop - top;
+    const direction=event.deltaY<0?1:-1;
+    const distanceToTop = direction===1 ? tree.scrollTop-top : bottom-tree.scrollTop;
     if (bottom <= top || distanceToTop < -1) return;
 
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? tree.clientHeight : 1;
-    const overshoot = -event.deltaY * unit - Math.max(0, distanceToTop);
-    if (overshoot <= 0) return;
+    const overshoot = Math.abs(event.deltaY) * unit - Math.max(0, distanceToTop);
+    if (overshoot <= 0) {
+      if(direction!==edge){releasing=true;lastWheel=-Infinity;}
+      return;
+    }
+    if(direction!==edge){reset();edge=direction;}
 
     const now = win.performance.now();
     if (releasing) {
@@ -1579,6 +1580,17 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     }
   `;
   doc.head.append(style);
+  const actionTargets=new WeakMap();
+  function rowActionEvent(event){
+    const button=event.target.closest?.('.gm-row-actions button');
+    if(!button || !tree.contains(button))return;
+    event.stopPropagation();
+    if(event.type!=='click')return;
+    event.preventDefault();button.blur();
+    const row=button.closest('tr'),target=actionTargets.get(row);
+    if(!closed && target)runRowAction(win,row,button.dataset.gmCommand,target,reader);
+  }
+  for(const name of ['mousedown','dblclick','click'])tree.addEventListener(name,rowActionEvent,true);
   function render(row) {
     row.setAttribute('data-gm-keyboard-cursor',String(tree._gmKeyboardCursor?.view===win.gDBView && tree._gmKeyboardCursor?.index===row.index));
     syncInboxRowCheckbox(row,new Set(tree.selectedIndices||[]));
@@ -1600,15 +1612,26 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     drafts.render(row);
     renderUnreadThreadSenders(win,row);
     conversationCounts.render(row);
-    row.querySelector('.gm-row-actions')?.remove();
-    row.querySelector('.gm-message-snippet')?.remove();
-    row.querySelector('.subject-line')?.classList?.remove('gm-has-snippet');
-    if ((row.dataset.properties || '').split(' ').includes('dummy')) return;
+    actionTargets.delete(row);
+    if ((row.dataset.properties || '').split(' ').includes('dummy')) {
+      row.querySelector('.gm-row-actions')?.remove();
+      row.querySelector('.gm-message-snippet')?.remove();
+      row.querySelector('.subject-line')?.classList?.remove('gm-has-snippet');
+      return;
+    }
     const line = row.querySelector('.subject-line');
     if (!line) return;
     let header;
     try { header = win.gDBView?.getMsgHdrAt(row.index); } catch (_) { return; }
     if (!header) return;
+    const identity={key:header.messageKey,folderURI:header.folder?.URI};
+    const oldIdentity=row._gmPreviewIdentity;
+    if(!oldIdentity || oldIdentity.key!==identity.key || oldIdentity.folderURI!==identity.folderURI){
+      row.querySelector('.gm-message-snippet')?.remove();
+      line.classList.remove('gm-has-snippet');
+    }
+    row._gmPreviewIdentity=identity;
+    actionTargets.set(row,identity);
     const view = win.gDBView, index = row.index;
     const isCurrent = () => {
       if (closed || row.index !== index || win.gDBView !== view) return false;
@@ -1618,9 +1641,11 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       } catch (_) { return false; }
     };
     function showPreview(text) {
-      if (!text || !isCurrent()) return;
-      line.querySelector('.gm-message-snippet')?.remove();
-      const snippet = doc.createElement('div');
+      if (!isCurrent()) return;
+      let snippet=line.querySelector('.gm-message-snippet');
+      if(!text){snippet?.remove();line.classList.remove('gm-has-snippet');return;}
+      if(snippet?.title===text)return;
+      snippet ||= doc.createElement('div');
       snippet.className = 'gm-message-snippet';
       snippet.textContent = '- ' + text;
       snippet.title = text;
@@ -1641,8 +1666,12 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       showPreview(previews.get(previewHeader,isPreviewCurrent,()=>{},false,previewSettings));
     },true,previewSettings);
     showPreview(preview);
-    const actions = doc.createElement('div');
+    let actions=line.querySelector('.gm-row-actions');
+    const readState=String(!!header.isRead);
+    if(actions?.dataset.gmReadState===readState)return;
+    actions ||= doc.createElement('div');
     actions.className = 'gm-row-actions';
+    actions.dataset.gmReadState=readState;
     const commands = [
       [gmText("Archive conversation"), 'cmd_archive', 'M4 8h16v13H4z M3 3h18v5H3z M9 12h6'],
       [gmText("Delete conversation"), 'cmd_deleteMessage', 'M5 6h14 M9 6V3h6v3 M7 6l1 15h8l1-15'],
@@ -1650,8 +1679,12 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
         header.isRead ? 'cmd_markAsUnread' : 'cmd_markAsRead',
         header.isRead ? MATERIAL_MARK_EMAIL_UNREAD : 'M3 9l9-6 9 6v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9z M3 9l9 6 9-6']
     ];
-    for (const [label, command, path] of commands) {
-      const button = doc.createElement('button');
+    for (const [index,[label, command, path]] of commands.entries()) {
+      let button=actions.children[index];
+      if(button?.dataset.gmCommand===command)continue;
+      const replacing=button;
+      button = doc.createElement('button');
+      button.dataset.gmCommand=command;
       button.type = 'button'; gmBindAction(button,'title',label);
       gmBindAction(button,'aria-label',label,true);
       const svg = doc.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -1661,14 +1694,8 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
       svg.setAttribute('aria-hidden','true');
       const shape = doc.createElementNS(svg.namespaceURI,'path');
       shape.setAttribute('d',path); svg.append(shape); button.append(svg);
-      button.addEventListener('mousedown', event => event.stopPropagation());
-      button.addEventListener('dblclick', event => event.stopPropagation());
-      button.addEventListener('click', event => {
-        event.preventDefault(); event.stopPropagation();
-        button.blur();
-        if (!closed) runRowAction(win, row, command, {key:header.messageKey, folderURI:header.folder?.URI},reader);
-      });
-      actions.append(button);
+      if(replacing)replacing.replaceWith(button);
+      else actions.append(button);
     }
     line.append(actions);
   }
@@ -1731,6 +1758,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     closed = true;
     restoreRowPositions();
     restoreRangeUpdates();
+    for(const name of ['mousedown','dblclick','click'])tree.removeEventListener(name,rowActionEvent,true);
     edgeBounce.close();
     tree.removeEventListener('dragstart',dragStarted);
     for(const name of dragReleaseEvents)doc.removeEventListener?.(name,dragEnded,true);

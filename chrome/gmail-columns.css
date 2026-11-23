@@ -239,12 +239,29 @@
 
 /* Trim two pixels per label row in each native density mode. */
 #folderTree [data-tag-key] > .container {
-  min-block-size: calc(var(--list-item-min-height) - 2px) !important;
+  min-block-size: max(1.8em, calc(var(--list-item-min-height) - 2px)) !important;
+  block-size: auto !important;
+  line-height: 1.35 !important;
 }
 #folderTree [data-tag-key] > .container > .twisty {
-  block-size: calc(var(--list-item-min-height) - 2px) !important;
+  block-size: max(1.8em, calc(var(--list-item-min-height) - 2px)) !important;
 }
 
+/* Native sidebar icons have fixed pixel dimensions. Follow the text size
+   for both artwork and its flex track when UI font size changes. */
+#folderTree [data-tag-key] > .container > .icon {
+  inline-size: 1.5em !important;
+  block-size: 1.5em !important;
+  width: 1.5em !important;
+  height: 1.5em !important;
+  min-inline-size: 1.5em !important;
+  flex: 0 0 1.5em !important;
+  background-size: contain !important;
+}
+#folderTree [data-tag-key] > .container > .twisty {
+  inline-size: 1em !important;
+  min-inline-size: 1em !important;
+}
 #folderTree [data-gm-uncolored-label="true"] > .container > .icon {
   --icon-color: #5f6368 !important;
   color: #5f6368 !important;

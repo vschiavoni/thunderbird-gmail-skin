@@ -76,11 +76,13 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
   const nodes=[];
   function element(){
     return {children:[],events:{},dataset:{},style:{},className:'',classList:{add(){},remove(){}},
-      setAttribute(k,v){this[k]=v},append(...items){for(const item of items){item.parent=this;this.children.push(item)}},
+      setAttribute(k,v){this[k]=v},append(...items){for(const item of items){item.remove?.();item.parent=this;this.children.push(item)}},
       remove(){if(this.parent)this.parent.children=this.parent.children.filter(item=>item!==this)},
+      insertBefore(item,before){item.remove?.();item.parent=this;this.children.splice(this.children.indexOf(before),0,item)},
+      replaceWith(item){const parent=this.parent,index=parent.children.indexOf(this);parent.children[index]=item;item.parent=parent;this.parent=null},
       addEventListener(name,fn){this.events[name]=fn},
       querySelector(selector){if(selector==='.tree-view-row-select-checkbox')return this.checkbox;if(selector==='.subject-line')return this.line;
-        if(selector.startsWith('.gm-'))return this.line?.children.find(item=>item.className===selector.slice(1))}};
+        if(selector.startsWith('.gm-'))return (this.line || this).children.find(item=>selector.split(', ').some(value=>item.className===value.slice(1)))}};
   }
   class Row{static ROW_HEIGHT=22;fillRow(){
     assert.equal(this.querySelector('.gm-message-drag-handle'),undefined,
@@ -103,7 +105,12 @@ test('virtual row recycling updates actions, avoids duplicates, and cleanup rest
   assert.equal(row.dataset.gmThreadGuide,'start');
   const staleHandle=element();staleHandle.className='gm-message-drag-handle';
   row.line.append(staleHandle);
+  const actions=row.line.children[0],archive=actions.children[0],deleteButton=actions.children[1];
+  row.fillRow();
+  assert.equal(row.line.children[0],actions,'unchanged refill retains the action container');
   read=true;row.fillRow();
+  assert.equal(actions.children[0],archive,'read changes retain Archive');
+  assert.equal(actions.children[1],deleteButton,'read changes retain Delete');
   assert.equal(row.line.children.includes(staleHandle),false);
   assert.equal(row.line.children.length,1,'recycled row has only one action group');
   assert.equal(row.line.children[0].children[2].title,'Mark conversation as unread');
@@ -923,6 +930,12 @@ test('Inbox rebound starts and settles continuously at the top edge',()=>{
   assert.equal(offset(),0,'the list has not reached the edge yet');
   tree.scrollTop=200;step();assert.ok(offset()>0,'the unused part of the same gesture produces the rebound');
   events.get('gm-page-changed')();assert.equal(offset(),0);
+  tree.scrollTop=400;wheel(80);step();
+  assert.ok(offset()<0,'the bottom edge stretches upward without scrolling into the next page');
+  assert.equal(tree.scrollTop,400);
+  for(let i=0;i<40&&frames.size;i++)step();
+  assert.equal(offset(),0,'bottom rebound settles completely');
+  events.get('gm-page-changed')();
   motion.matches=true;wheel(-80);assert.equal(frames.size,0);
   bounce.close();assert.equal(events.size,0);
 });

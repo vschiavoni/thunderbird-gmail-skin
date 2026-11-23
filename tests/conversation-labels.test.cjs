@@ -106,3 +106,20 @@ test('strict inheritance retains valid cross-folder ancestors, siblings and desc
  f.scope.inheritConversationLabels(members,f.mail);
  for(const header of members){assert.ok(header.keys.has('project'));assert.ok(header.keys.has('team'));}
 });
+
+test('changed-subject reference branches cannot spread labels into another conversation',()=>{
+ const f=fixture(),inbox=f.folder('inbox'),sent=f.folder('sent');
+ const root=f.message(inbox,'root',[],['project']);
+ const unrelated=f.message(sent,'renamed',['root'],['team']);
+ const incoming=f.message(inbox,'new',['root']);
+ root.mime2DecodedSubject='Stratégie calcul scientifique';
+ incoming.mime2DecodedSubject='RE: Stratégie calcul scientifique';
+ unrelated.mime2DecodedSubject='ok final?';
+ root.thread=[root,unrelated,incoming];incoming.thread=root.thread;unrelated.thread=root.thread;
+ const members=f.scope.conversationLabelScope([incoming],null,{requireReferences:true});
+ assert.ok(!members.includes(unrelated));
+ f.scope.inheritConversationLabels(members,f.mail);
+ assert.ok(incoming.keys.has('project'));
+ assert.ok(!incoming.keys.has('team'));
+ assert.ok(unrelated.keys.has('team'),'existing assignments survive');
+});

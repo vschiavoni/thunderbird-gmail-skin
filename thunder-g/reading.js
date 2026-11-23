@@ -68,6 +68,9 @@ function conversationLabelScope(messages,folders=null,{requireReferences=false}=
   if(folders===null){
     try{folders=Array.from(MailServices.accounts.allFolders);}catch(_){folders=[];}
   }
+  const subject=header=>String(header?.mime2DecodedSubject ?? header?.subject ?? '')
+    .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi,'').normalize('NFC').trim().toLocaleLowerCase();
+  const subjects=new Set(messages.map(subject));
   const found=new Map(),queue=[],lookedUp=new Set(),threads=new Set(),threadIndexes=new Map();
   const normalize=id=>String(id || '').trim().replace(/^<|>$/g,'');
   function references(header){
@@ -80,6 +83,7 @@ function conversationLabelScope(messages,folders=null,{requireReferences=false}=
   const account=folder=>folder?.rootFolder?.URI || folder?.server?.key || folder?.server?.rootFolder?.URI || folder?.URI;
   function remember(header){
     if(!header?.folder?.URI || header.messageKey===undefined)return;
+    if(!subjects.has(subject(header)))return;
     const key=JSON.stringify([header.folder.URI,header.messageKey]);
     if(!found.has(key)){found.set(key,header);queue.push(header);}
   }
@@ -554,6 +558,8 @@ function installReadingMode(win) {
   picker.append(heading, scopeNote, searchBox, tagList, empty, footer); tagPopup.append(picker);
   let pickerMessages = [], pickerSelection = [], pickerTags = [], pickerOpen = false, returnFocus = null;
   let pickerConversation = null;
+  const pendingLabels=new Map();
+  const pickerOptions=new Map();
   function conversationDocument() {
     if (!active) return null;
     if (useIndependent) return independent;
@@ -588,34 +594,29 @@ function installReadingMode(win) {
       sameLabelMessages(resolveConversation(pickerConversation), pickerMessages));
   }
   function renderTags() {
+    pickerOptions.clear();
     tagList.replaceChildren();
     for (const tag of pickerTags.filter(tag=>labelMatchesQuery(tag.tag,search.value))) {
       const row = doc.createElement('label'); row.className = 'gm-label-option';
       const checkbox = doc.createElement('input'); checkbox.type = 'checkbox';
+      pickerOptions.set(checkbox,tag.key);
+      if(pickerOptions.size===1)row.setAttribute('data-gm-first-label','true');
       const state = labelAssignmentState(tag, pickerMessages);
-      checkbox.checked = state.checked; checkbox.indeterminate = state.mixed;
+      checkbox.checked = pendingLabels.has(tag.key)?pendingLabels.get(tag.key):state.checked; checkbox.indeterminate = !pendingLabels.has(tag.key) && state.mixed;
       checkbox.setAttribute('aria-label', tag.tag);
       const name = doc.createElement('span'); name.textContent = tag.tag;
       row.title=tag.tag;
       row.append(checkbox,name);tagList.append(row);
       checkbox.addEventListener('change', () => {
         if (!sameSelection()) { tagPopup.hidePopup(); return; }
-        try {
-          applyPickerLabel(tag.key, checkbox.checked);
-          checkbox.indeterminate = false;
-        } catch (error) {
-          // Cross-folder writes are not atomic. Keep the picker open and report
-          // failure instead of implying that every message was updated.
-          const state = labelAssignmentState(tag, pickerMessages);
-          checkbox.checked = state.checked; checkbox.indeterminate = state.mixed;
-          empty.hidden = false; gmBindValue(empty, "textContent", () => gmText("Could not update every message. Check labels and try again."));
-          console.error(gmText("Conversation label update failed:"), error);
-        }
+        pendingLabels.set(tag.key,checkbox.checked);
+        checkbox.indeterminate=false;
       });
     }
     empty.hidden = tagList.childElementCount > 0;
   }
   function showLabels(anchor) {
+    pendingLabels.clear();
     if(!active)syncBulk();
     anchor=labelPickerAnchor(doc,toolbar,labelsButton,anchor);
     const messages = win.gDBView?.getSelectedMsgHdrs() || [];
@@ -698,9 +699,41 @@ function installReadingMode(win) {
   tagPopup.addEventListener('popupshown', () => { pickerOpen = true; search.focus(); });
   tagPopup.addEventListener('popuphidden', () => {
     pickerOpen = false;
+    pendingLabels.clear();
     if (returnFocus?.isConnected) returnFocus.focus({preventScroll:true});
   });
+  function confirmPickerLabels(){
+      if(!sameSelection()){tagPopup.hidePopup();return;}
+      try{
+        for(const [key,add] of pendingLabels){
+          applyPickerLabel(key,add);
+          pendingLabels.delete(key);
+        }
+        tagPopup.hidePopup();
+      }catch(error){
+        renderTags();
+        empty.hidden=false;
+        gmBindValue(empty,'textContent',()=>gmText("Could not update every message. Check labels and try again."));
+        console.error(gmText("Conversation label update failed:"),error);
+      }
+  }
+  const applyLabelsButton=doc.createElement('button');
+  applyLabelsButton.type='button';
+  gmBindAction(applyLabelsButton,'textContent',gmText("Apply"));
+  applyLabelsButton.addEventListener('click',confirmPickerLabels);
+  footer.append(applyLabelsButton);
   picker.addEventListener('keydown', event => {
+    if(event.key==='Enter' && !event.isComposing &&
+        (event.target===search || event.target?.type==='checkbox')){
+      event.preventDefault();event.stopPropagation();
+      if(!pendingLabels.size){
+        const option=event.target===search?pickerOptions.keys().next().value:event.target;
+        const key=pickerOptions.get(option);
+        if(key)pendingLabels.set(key,true);
+      }
+      confirmPickerLabels();
+      return;
+    }
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); tagPopup.hidePopup(); }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       const options = [search, ...tagList.querySelectorAll('input,button:not(:disabled)')];
@@ -714,6 +747,7 @@ function installReadingMode(win) {
   // Other tabs, compose editors, search fields and modified shortcuts are untouched.
   const keyDocuments = new Set();
   function zoomReading(action) {
+    if(!closed && zoomMailInterface(win,action))return true;
     if(closed || !active)return false;
     if(useIndependent){independent?.zoom(action);return true;}
     const browser=conversationDocument() ? doc.getElementById('multiMessageBrowser') :
@@ -923,6 +957,9 @@ function installReadingMode(win) {
       box-sizing:border-box; padding:2px 20px; cursor:pointer; }
     .gm-label-option:hover, .gm-label-option:focus-within,
     .gm-label-footer > button:hover { background:var(--treeitem-background-hover, #f1f3f4); }
+    .gm-label-picker:has(.gm-label-search input:focus) .gm-label-option[data-gm-first-label] {
+      background:light-dark(#eee,#3c4043);
+    }
     .gm-label-option input { appearance:none; box-sizing:border-box; width:15px; height:15px;
       margin:0; flex:none; border:1.5px solid currentColor; border-radius:1px; color:inherit;
       background:transparent; display:grid; place-content:center; }

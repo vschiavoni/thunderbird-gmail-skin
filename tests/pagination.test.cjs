@@ -72,6 +72,20 @@ for (const collapsed of [false,true,'short-last','threaded']) test(`native pagin
   const selections=[];
   const pages=scope.installNativePagination(win,{selectIndices(indices){tree.selectedIndices=indices;selections.push(indices)}});
   assert.equal(quickFilter.pagination,tree.bar,'pager is placed directly beside Quick Filter');
+  pages.setSize(50);
+  const boundary=tree._gmPageScrollLimits.max;
+  tree.scrollTop=boundary;
+  let prevented=false;
+  tree.events.wheel({deltaY:80,deltaX:0,preventDefault(){prevented=true}});
+  assert.equal(prevented,true,'outward momentum is stopped before it crosses the page boundary');
+  assert.equal(tree.scrollTop,boundary);
+  tree.scrollTop=0;
+  prevented=false;
+  tree.events.wheel({deltaY:1,deltaX:0,preventDefault(){prevented=true}});
+  assert.equal(prevented,false,'normal scrolling within a page stays native');
+  scrolls.length=0;
+  pages.setSize(0);
+
   if(collapsed==='short-last') {
     pages.setSize(100);
     assert.equal(tree.children[0].style.height,'0px','full pages need no extra blank scroll room');
@@ -258,4 +272,20 @@ test('menu and native wheel zoom share conversation scope and retain native beha
  assert.equal(fire('command','cmd_reply').stopped,undefined);
  reading=false;assert.equal(fire('command','cmd_fullZoomEnlarge').stopped,undefined);assert.equal(fire('DoZoomReduce').stopped,undefined);
  control.close();assert.deepEqual(events,{});
+});
+
+test('interface zoom scales existing embedded editors and initializes future frames',()=>{
+  const listeners={},editor={docShell:{contentViewer:{fullZoom:1}},frames:[]};
+  const root={docShell:{contentViewer:{fullZoom:1}},frames:[editor],
+    addEventListener(name,fn){listeners[name]=fn},dispatchEvent(){},
+    Event:class{constructor(type){this.type=type}}};
+  assert.equal(scope.zoomMailInterface({top:root},'increaseSize'),true);
+  assert.equal(root.docShell.contentViewer.fullZoom,1.1);
+  assert.equal(editor.docShell.contentViewer.fullZoom,1.1);
+  const later={docShell:{contentViewer:{fullZoom:1}}};
+  listeners.load({target:{defaultView:later}});
+  assert.equal(later.docShell.contentViewer.fullZoom,1.1);
+  scope.zoomMailInterface({top:root},'resetSize');
+  assert.equal(editor.docShell.contentViewer.fullZoom,1);
+  assert.equal(scope.mailZoomAction({ctrlKey:true,key:'+',target:{isContentEditable:true}},true),'increaseSize');
 });

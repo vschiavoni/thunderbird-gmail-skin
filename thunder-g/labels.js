@@ -13,11 +13,15 @@ function assignedTags(header, tags) {
 function chipColors(color) {
   const valid = /^#[0-9a-f]{6}$/i.test(color || "");
   const rgb = valid ? [1, 3, 5].map(start => parseInt(color.slice(start, start + 2), 16)) : [128,134,139];
-  const mix = (base, weight) => `rgb(${rgb.map((value,index) => Math.round(value * weight + base[index] * (1-weight))).join(', ')})`;
-  // Related hues for background and text, with a distinct palette per theme.
+  const luminance=rgb.map(value=>{
+    const channel=value/255;
+    return channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4;
+  }).reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
+  const background=`rgb(${rgb.join(', ')})`;
+  const foreground=luminance>.179?'rgb(0, 0, 0)':'rgb(255, 255, 255)';
   return {
-    background: `light-dark(${mix([255,255,255],.2)}, ${mix([32,33,36],.28)})`,
-    foreground: `light-dark(${mix([0,0,0],.4)}, ${mix([255,255,255],.25)})`
+    background:`light-dark(${background}, ${background})`,
+    foreground:`light-dark(${foreground}, ${foreground})`
   };
 }
 

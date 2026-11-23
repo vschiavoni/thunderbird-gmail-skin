@@ -42,9 +42,42 @@ function nativeMessagePage(rows,size,page) {
   while(start<end){const mid=(start+end)>>1;if(spans[mid].start<range.end)start=mid+1;else end=mid;}
   return {...range,rowStart,rowEnd:start};
 }
-function mailZoomAction(event) {
+const mailWindowZoom=new WeakMap();
+function zoomMailInterface(win,action){
+  const root=win.top || win;
+  const viewer=root.docShell?.contentViewer;
+  if(!viewer)return false;
+  let state=mailWindowZoom.get(root);
+  if(!state){
+    state={base:viewer.fullZoom || 1,value:viewer.fullZoom || 1,viewers:new Map()};
+    mailWindowZoom.set(root,state);
+    state.onLoad=event=>{
+      const child=event.target?.defaultView;
+      const childViewer=child?.docShell?.contentViewer;
+      if(childViewer){
+        if(!state.viewers.has(childViewer))state.viewers.set(childViewer,childViewer.fullZoom);
+        childViewer.fullZoom=state.value;
+      }
+    };
+    root.addEventListener('load',state.onLoad,true);
+  }
+  state.value=action==='resetSize'?state.base:
+    Math.max(.5,Math.min(2.5,state.value*(action==='increaseSize'?1.1:1/1.1)));
+  function apply(window){
+    try{
+      const contentViewer=window.docShell.contentViewer;
+      if(!state.viewers.has(contentViewer))state.viewers.set(contentViewer,contentViewer.fullZoom);
+      contentViewer.fullZoom=state.value;
+      for(let index=0;index<window.frames.length;index++)apply(window.frames[index]);
+    }catch(_){/* A frame may be closing or changing process. */}
+  }
+  apply(root);
+  root.dispatchEvent(new root.Event('resize'));
+  return true;
+}
+function mailZoomAction(event,includeEditing=false) {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.defaultPrevented || event.isComposing ||
-      event.target?.isContentEditable || event.target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]')) return null;
+      (!includeEditing && (event.target?.isContentEditable || event.target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]')))) return null;
   if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') return 'increaseSize';
   if (event.key === '-' || event.code === 'NumpadSubtract') return 'reduceSize';
   if (event.key === '0' || event.code === 'Numpad0') return 'resetSize';
@@ -61,22 +94,32 @@ function installMailZoom(win, fontSize, zoomContent = null) {
   function keydown(event) {
     const tab=win.document.getElementById('tabmail')?.currentTabInfo;
     if (tab && tab.mode?.name !== 'mail3PaneTab') return;
-    const action=mailZoomAction(event);
+    const action=mailZoomAction(event,true);
     if (!action) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (!zoomContent?.(action)) fontSize[action]();
+    if (!zoomMailInterface(win,action) && !zoomContent?.(action)) fontSize[action]();
   }
   function conversationCommand(event) {
     const action={cmd_fullZoomEnlarge:'increaseSize',cmd_fullZoomReduce:'reduceSize',cmd_fullZoomReset:'resetSize'}[event.target?.id];
-    if(action && zoomContent?.(action)){event.preventDefault();event.stopImmediatePropagation();}
+    if(action && (zoomMailInterface(win,action) || zoomContent?.(action))){event.preventDefault();event.stopImmediatePropagation();}
   }
   function scrollZoom(event) {
     const action=event.type==='DoZoomEnlarge'?'increaseSize':'reduceSize';
-    if(zoomContent?.(action)){event.preventDefault();event.stopImmediatePropagation();}
+    if(zoomMailInterface(win,action) || zoomContent?.(action)){event.preventDefault();event.stopImmediatePropagation();}
   }
   const listeners=[['keydown',keydown],['command',conversationCommand],['DoZoomEnlarge',scrollZoom],['DoZoomReduce',scrollZoom]];
   for(const [name,listener] of listeners)win.addEventListener(name,listener,true);
-  return {close(){for(const [name,listener] of listeners)win.removeEventListener(name,listener,true)}};
+  return {close(){
+    for(const [name,listener] of listeners)win.removeEventListener(name,listener,true);
+    if(win===(win.top || win)){
+      const state=mailWindowZoom.get(win);
+      if(state){
+        win.removeEventListener('load',state.onLoad,true);
+        for(const [viewer,value] of state.viewers){try{viewer.fullZoom=value;}catch(_){}}
+        state.viewers.clear();mailWindowZoom.delete(win);
+      }
+    }
+  }};
 }
 function installNativePagination(win, reader) {
   const doc=win.document, tree=doc.getElementById('threadTree');
@@ -184,6 +227,20 @@ function installNativePagination(win, reader) {
       row.toggleAttribute('data-gm-outside-page',row.index<range.rowStart || row.index>=range.rowEnd);
     }
   }
+  function pageWheel(event){
+    const limits=tree._gmPageScrollLimits;
+    if(!size || closed || !limits || event.defaultPrevented || event.ctrlKey || event.metaKey ||
+        Math.abs(event.deltaY)<=Math.abs(event.deltaX))return;
+    const unit=event.deltaMode===1?16:event.deltaMode===2?tree.clientHeight:1;
+    const proposed=tree.scrollTop+event.deltaY*unit;
+    const clamped=Math.min(limits.max,Math.max(limits.min,proposed));
+    if(proposed===clamped)return;
+    // Stop native momentum entering the following page before paint clamps it
+    // back. The edge effect translates content without changing row indices.
+    event.preventDefault();
+    if(Math.abs(tree.scrollTop-clamped)>.5)tree.scrollTo({top:clamped,behavior:'instant'});
+  }
+  tree.addEventListener('wheel',pageWheel,{passive:false});
   function scrollPage(){
     if(!size || closed || pageScroll.hidden)return;
     const range=bounds(),height=rowHeight();
@@ -264,7 +321,7 @@ function installNativePagination(win, reader) {
       }
     },
     close(){
-      closed=true;tree.removeEventListener('gm-shortcut-page',shortcutPage);clear();delete tree._gmPageSelectionBounds;
+      closed=true;tree.removeEventListener('wheel',pageWheel);tree.removeEventListener('gm-shortcut-page',shortcutPage);clear();delete tree._gmPageSelectionBounds;
       tree.removeEventListener('scroll',schedule);tree.removeEventListener('viewchange',viewChanged);tree.removeEventListener('select',selectionChanged);
       for(const name of ['rowcountchange','expanded','collapsed'])tree.removeEventListener(name,structureChanged);
       tree.removeEventListener('gm-select-page',selectPage);tree.removeEventListener('click',selectPage,true);tree.removeEventListener('keydown',selectPage,true);
