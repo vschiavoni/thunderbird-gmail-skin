@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.33.0
+
+- Speed up Inbox updates after archiving by reusing accessibility position calculations and coalescing overlapping redraw requests.
+- Preserve Inbox action controls and unchanged previews across row refills, with shared action handling for recycled rows.
+- Clamp scrolling at page boundaries and add a bottom-edge elastic rebound.
+- Apply label selections with Enter or Apply; Enter also applies the highlighted search result, while Escape cancels pending choices.
+- Add experimental whole-interface zoom covering embedded composer frames, and scale sidebar label icons, arrows and row spacing with text.
+- Match the Gmail label palette and use selected colors directly for email label chips, with readable foreground text.
+- Separate changed-subject conversation branches in the reader and label scope to limit unintended label propagation.
+- Refine checkbox borders and strengthen message-row separators.
+
 ## 0.32.1
 
 - Add an opt-in Google fonts setting using locally installed Google Sans for the interface and Google Sans Code for monospaced text, with download links in Settings. Keep composer body text in Arial.
