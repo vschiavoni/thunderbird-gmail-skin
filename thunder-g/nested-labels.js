@@ -48,7 +48,32 @@ function sidebarLabelVisibleKeys(nodes,modes,unread,selectedKey=null) {
   for(const node of nodes)visit(node);
   return visible;
 }
-async function countUnreadLabelConversations(folders, keys, pause, isCurrent) {
+// Per-folder label/unread facts survive between counts. A read, an arrival or a
+// label change then rescans only the folder whose counters or keywords changed,
+// instead of every header in every account. Conversations are still joined
+// across folders on each count, from the cached reference IDs.
+function createLabelCountCache(now=()=>Date.now(),ttl=600000) {
+  const folders=new Map();let keysSignature=null;
+  const stampOf=folder=>{
+    try{return (folder.getTotalMessages?.(false) ?? '?')+'/'+(folder.getNumUnread?.(false) ?? '?');}
+    catch(_){return null;}
+  };
+  return {
+    stampOf,
+    useKeys(keys){const signature=[...keys].sort().join(' ');if(signature!==keysSignature){keysSignature=signature;folders.clear();}},
+    get(folder){
+      const entry=folders.get(folder.URI),stamp=stampOf(folder);
+      if(!entry || stamp===null || entry.stamp!==stamp || entry.expires<=now())return null;
+      return entry;
+    },
+    set(folder,stamp,facts){if(stamp!==null)folders.set(folder.URI,{...facts,stamp,expires:now()+ttl});},
+    invalidate(folder){if(folder?.URI)folders.delete(folder.URI);else folders.clear();},
+    retain(uris){for(const uri of folders.keys())if(!uris.has(uri))folders.delete(uri);},
+    get size(){return folders.size;},
+    clear(){folders.clear();keysSignature=null;},
+  };
+}
+async function countUnreadLabelConversations(folders, keys, pause, isCurrent, cache=null) {
   const parents=new Map(), tagged=[], unreadIds=[];
   function root(id) {
     while(parents.has(id)){
@@ -58,32 +83,49 @@ async function countUnreadLabelConversations(folders, keys, pause, isCurrent) {
     }
     return id;
   }
+  function join(ids){
+    const id=ids[0];
+    for(const related of ids){
+      const from=root(related),to=root(id);
+      if(from!==to)parents.set(from,to);
+    }
+    return id;
+  }
+  cache?.useKeys(keys);
   let visited=0;
+  const seen=new Set();
   for(const folder of folders){
     try {
       if(folder.isServer ||
           folder.isSpecialFolder(Ci.nsMsgFolderFlags.Virtual | Ci.nsMsgFolderFlags.Trash |
             Ci.nsMsgFolderFlags.Junk,false))continue;
-      for(const header of folder.messages){
-        if(++visited%250===0){
-          await pause();
-          if(!isCurrent())return null;
+      seen.add(folder.URI);
+      let facts=cache?.get(folder);
+      if(!facts){
+        const stamp=cache?cache.stampOf(folder):null,next={tagged:[],unread:[]};
+        for(const header of folder.messages){
+          if(++visited%250===0){
+            await pause();
+            if(!isCurrent())return null;
+          }
+          const keywords=(header.getStringProperty('keywords') || '').split(/\s+/);
+          if(header.label)keywords.push('$label'+header.label);
+          const labels=keywords.filter(key=>keys.has(key));
+          if(!labels.length && header.isRead!==false)continue;
+          const ids=independentReferenceIds(header).filter(Boolean);
+          if(!ids.length)ids.push(Symbol());
+          if(labels.length)next.tagged.push({ids,labels});
+          if(header.isRead===false)next.unread.push(ids);
         }
-        const keywords=(header.getStringProperty('keywords') || '').split(/\s+/);
-        if(header.label)keywords.push('$label'+header.label);
-        const labels=keywords.filter(key=>keys.has(key));
-        if(!labels.length && header.isRead!==false)continue;
-        const ids=independentReferenceIds(header).filter(Boolean);
-        const id=ids[0] || Symbol();
-        for(const related of ids){
-          const from=root(related),to=root(id);
-          if(from!==to)parents.set(from,to);
-        }
-        if(labels.length)tagged.push({id,labels});
-        if(header.isRead===false)unreadIds.push(id);
+        facts=next;
+        // A folder that changed while it was being read is counted, not cached.
+        if(cache && stamp!==null && cache.stampOf(folder)===stamp)cache.set(folder,stamp,facts);
       }
+      for(const {ids,labels} of facts.tagged)tagged.push({id:join(ids),labels});
+      for(const ids of facts.unread)unreadIds.push(join(ids));
     }catch(_){/* Some folders have no available local summary. */}
   }
+  cache?.retain(seen);
   const unreadRoots=new Set(unreadIds.map(root));
   const conversations=new Map();
   for(const {id,labels} of tagged){
@@ -104,6 +146,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
   const saved=new Map(),rowStates=new Map(),vocabulary=new Map(),createButtons=new Map(),uriKeys=new Map(),unread=new Map();
   let closed=false,timer=null,definitionsDirty=true,rowsDirty=true,hierarchy=[],definitions=[],currentList=null,expanded=false,more=null,moreStyle=null;
   let countRevision=0,countTimer=null,counts=null;
+  const countCache=createLabelCountCache();
   function showCounts(){
     if(!counts)return;
     for(const [key,row] of saved){
@@ -122,7 +165,7 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
       const isCurrent=()=>!closed && revision===countRevision;
       try {
         const result=await countUnreadLabelConversations(mailServices.accounts.allFolders,
-          new Set(saved.keys()),()=>new Promise(resolve=>win.setTimeout(resolve,0)),isCurrent);
+          new Set(saved.keys()),()=>new Promise(resolve=>win.setTimeout(resolve,0)),isCurrent,countCache);
         if(result && isCurrent()){counts=result;showCounts();applyVisibility();}
       }catch(_){/* Account setup can briefly make folder summaries unavailable. */}
     },200);
@@ -241,14 +284,16 @@ function installNestedLabelSidebar(win,mailServices=MailServices,prefs=Services.
   }};
   const folderFlag=typeof Ci==='undefined'?null:Ci.nsIFolderListener?.intPropertyChanged;
   if(folderFlag!=null)mailServices.mailSession?.AddFolderListener(folderListener,folderFlag);
-  const keywordListener={msgPropertyChanged(_header,property){
-    if(property==='keywords' || property==='label')scheduleCounts();
+  const keywordListener={msgPropertyChanged(header,property){
+    if(property!=='keywords' && property!=='label')return;
+    // Labels change no folder counter: drop only that folder's cached facts.
+    countCache.invalidate(header?.folder);scheduleCounts();
   }};
   const propertyFlag=typeof Ci==='undefined'?null:Ci.nsIMsgFolderNotificationService?.msgPropertyChanged;
   if(propertyFlag!=null)mailServices.mfn?.addListener(keywordListener,propertyFlag);
   tree.addEventListener?.('select',schedule);schedule();
   return {refresh(){definitionsDirty=true;rowsDirty=true;schedule();},close(){
-    closed=true;if(countTimer!==null)win.clearTimeout(countTimer);observer.disconnect();menu.close();prefs.removeObserver('mailnews.tags.',prefObserver);prefs.removeObserver(visibilityPref,prefObserver);
+    closed=true;if(countTimer!==null)win.clearTimeout(countTimer);countCache.clear();observer.disconnect();menu.close();prefs.removeObserver('mailnews.tags.',prefObserver);prefs.removeObserver(visibilityPref,prefObserver);
     if(folderFlag!=null)mailServices.mailSession?.RemoveFolderListener(folderListener);
     if(propertyFlag!=null)mailServices.mfn?.removeListener(keywordListener);
     tree.removeEventListener?.('select',schedule);if(timer!==null)win.clearTimeout(timer);
