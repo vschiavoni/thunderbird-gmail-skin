@@ -1056,3 +1056,59 @@ test('Inbox range updates merge notifications and discard replaced views',()=>{
   assert.deepEqual(calls[1],[tree.view,4,8]);
   assert.equal(tree.invalidateRange,native);assert.equal(frames.size,0);
 });
+
+test('toolbar checkbox uses the native selection count instead of walking every row',()=>{
+ let flagReads=0;
+ const view={rowCount:50000,selection:{count:0},getFlagsAt(){flagReads++;return 0}};
+ const tree={get selectedIndices(){throw new Error('the full selection must not be copied')}};
+ const state=(...args)=>JSON.parse(JSON.stringify(scope.inboxSelectionSummary(...args)));
+ assert.deepEqual(state(view,tree),{checked:false,indeterminate:false});
+ view.selection.count=1;assert.deepEqual(state(view,tree),{checked:false,indeterminate:true});
+ view.selection.count=50000;assert.deepEqual(state(view,tree),{checked:true,indeterminate:false});
+ assert.equal(flagReads,0,'an arrow key in a large Inbox reads no row flags');
+ // Group headers are not messages, and a page is bounded: both keep the exact scan.
+ const grouped={rowCount:5,selection:{count:4},getFlagsAt:i=>i===2?0x20000000:0},exact={selectedIndices:[0,1,3,4]};
+ assert.deepEqual(state(grouped,exact,null,true),{checked:true,indeterminate:false});
+ assert.deepEqual(state(grouped,{selectedIndices:[3,4]},{rowStart:3,rowEnd:5}),{checked:true,indeterminate:false});
+ assert.deepEqual(state({rowCount:3,getFlagsAt:()=>0},{selectedIndices:[1]}),{checked:false,indeterminate:true},'views without a native selection fall back');
+});
+
+test('draft labels never rescan on window focus and read only Drafts folders',async()=>{
+ const timers=new Map(),events={},observers=new Map();let serial=0,allFoldersRead=0,lookups=[];
+ const drafts={URI:'imap://a/Drafts',isServer:false,messages:[{messageId:'d',numReferences:0}]};
+ const custom={URI:'mailbox://local/MyDrafts',isServer:false,messages:[]};
+ const mail={accounts:{allIdentities:[{draftFolder:custom.URI}],get allFolders(){allFoldersRead++;return []},
+   allServers:[{rootFolder:{getFoldersWithFlags(flag){assert.equal(flag,1024);return [drafts]}}}]},
+  folderLookup:{getFolderForURL(uri){lookups.push(uri);return uri===custom.URI?custom:null}},mfn:{addListener(){},removeListener(){}}};
+ const interfaces={nsMsgFolderFlags:{Drafts:1024},nsIMsgFolderNotificationService:{}};
+ const previous=scope.Services;
+ scope.Services={prefs:{addObserver(key,value){observers.set(key,value)},removeObserver(key){observers.delete(key)}}};
+ try{
+  const win={document:{head:{append(){}},createElement:()=>({remove(){}}),querySelectorAll:()=>[]},
+   setTimeout(fn){timers.set(++serial,fn);return serial},clearTimeout(id){timers.delete(id)},
+   addEventListener(name,fn){events[name]=fn},removeEventListener(name){delete events[name]}};
+  const controller=scope.installSenderDraftLabels(win,mail,interfaces);
+  for(const [id,fn] of [...timers]){timers.delete(id);await fn()}
+  assert.equal(allFoldersRead,0,'Drafts come from flagged folders and identity URIs');
+  assert.deepEqual(lookups,[custom.URI]);
+  assert.equal(events.focus,undefined,'switching back to Thunderbird schedules no Drafts scan');
+  observers.get('mail.identity.').observe(null,'nsPref:changed','mail.identity.id1.fcc_folder');assert.equal(timers.size,0);
+  observers.get('mail.identity.').observe(null,'nsPref:changed','mail.identity.id1.draft_folder');assert.equal(timers.size,1,'a new Drafts location rescans');
+  controller.close();assert.equal(observers.size,0);assert.equal(timers.size,0);
+ }finally{scope.Services=previous}
+});
+
+test('row checkboxes ask the native selection per row instead of copying the whole selection',()=>{
+ let asked=[];
+ const view={selection:{isSelected(index){asked.push(index);return index%2===0}}};
+ const tree={get selectedIndices(){throw new Error('a redrawn row must not copy every selected index')}};
+ const selected=scope.inboxRowSelection(view,tree);
+ const attrs=new Map(),writes=[],checkbox={getAttribute:key=>attrs.get(key)??null,setAttribute(key,value){writes.push(value);attrs.set(key,value)}};
+ const row={index:4,dataset:{},querySelector:()=>checkbox};
+ scope.syncInboxRowCheckbox(row,selected);assert.equal(attrs.get('data-gm-selection-checked'),'true');
+ scope.syncInboxRowCheckbox(row,selected);assert.equal(writes.length,1,'an unchanged mark is not rewritten');
+ row.index=5;scope.syncInboxRowCheckbox(row,selected);assert.equal(attrs.get('data-gm-selection-checked'),'false');
+ assert.deepEqual(asked,[4,4,5]);
+ const fallback=scope.inboxRowSelection({},{selectedIndices:[5]});row.index=5;scope.syncInboxRowCheckbox(row,fallback);
+ assert.equal(attrs.get('data-gm-selection-checked'),'true','views without a native selection keep the set');
+});
