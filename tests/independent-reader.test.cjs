@@ -1161,3 +1161,21 @@ test('external-mail warning prefixes do not hide replies while changed subjects 
  const reverse=scope.independentMessages([root,reply,different],reply);
  assert.ok(reverse.includes(root),'opening the warning-prefixed reply retains its original conversation');
 });
+
+test('conversation rows list people from the resolved conversation, including your own replies from Sent',async()=>{
+  const scope=context();vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/inbox.js'),'utf8'),scope);
+  const people={inbox:{name:'Sonia Ben Mokhtar',email:'sonia@example.org'},sent:{name:'Valerio',email:'me@example.org'},later:{name:'Mathis Morais',email:'mathis@example.org'}};
+  const anchor={...message(1,'root','inbox',1),isRead:true,author:'inbox',mime2DecodedAuthor:'inbox'};
+  const mine={...message(2,'mine','sent',2),isRead:true,author:'sent',mime2DecodedAuthor:'sent'};
+  const reply={...message(3,'reply','inbox',3),isRead:false,author:'later',mime2DecodedAuthor:'later'};
+  let resolveJob;const cache=scope.createConversationCountCache(()=>({promise:new Promise(resolve=>resolveJob=resolve)}),()=>{},()=>0);
+  assert.equal(cache.get(anchor),undefined);assert.equal(cache.messages(anchor),undefined,'nothing until resolved');
+  resolveJob({messages:[anchor,mine,reply]});await new Promise(setImmediate);
+  assert.equal(cache.get(anchor),3);assert.equal(cache.messages(anchor).length,3);
+  const summary=scope.gmailConversationParticipants(cache.messages(anchor),{parser:{parseDecodedHeader:value=>[people[value]]},isMe:email=>email==='me@example.org',meLabel:'me'});
+  assert.deepEqual(JSON.parse(JSON.stringify(summary.items.map(item=>[item.label,item.unread]))),[['Sonia',false],['me',false],['Mathis',true]]);
+  reply.isRead=true;
+  const again=scope.gmailConversationParticipants(cache.messages(anchor),{parser:{parseDecodedHeader:value=>[people[value]]},isMe:email=>email==='me@example.org'});
+  assert.equal(again.items.some(item=>item.unread),false,'read state is live, not cached');
+  cache.close();
+});

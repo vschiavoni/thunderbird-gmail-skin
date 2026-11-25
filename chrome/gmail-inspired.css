@@ -234,7 +234,13 @@
     outline: none !important;
   }
 
-  #threadTree .gm-unread-thread-senders {
+  /* Conversation participants: only people with unread messages are bold,
+     even when the whole collapsed row is drawn as unread. */
+  #threadTree .gm-participants {
+    font-weight: 400;
+  }
+
+  #threadTree .gm-participant[data-gm-unread="true"] {
     font-weight: 700;
   }
 

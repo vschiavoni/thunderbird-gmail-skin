@@ -789,55 +789,69 @@ test('resolved cross-folder totals replace folder-local counts, including a sing
   level=1;scope.renderThreadCount(win,row,6);assert.equal(badge,undefined,'expanded child rows have no conversation badge');
 });
 
-test('unread thread sender names skip read messages and deduplicate by address',()=>{
-  const messages=[
-    {isRead:true,author:'read'},
-    {isRead:false,author:'first'},
-    {isRead:false,author:'duplicate'},
-    {isRead:false,author:'second'},
-  ];
+test('conversation participants follow Gmail: full name alone, short names, "..", me and per-person bold',()=>{
   const addresses={
-    read:{name:'Read Sender',email:'read@example.org'},
-    first:{name:'Virginia Fasel',email:'fasel@example.org'},
-    duplicate:{name:'V. Fasel',email:'FASEL@example.org'},
-    second:{name:'Dimitrakakis, Christos',email:'d@example.org'},
+    sonia:{name:'Sonia Ben Mokhtar',email:'sonia@example.org'},
+    mathis:{name:'Mathis Morais',email:'mathis@example.org'},
+    etienne:{name:'Etienne Riviere',email:'etienne@example.org'},
+    matthieu:{name:'Matthieu Bettinger',email:'matthieu@example.org'},
+    me:{name:'Valerio Schiavoni',email:'Me@Example.org'},
+    rabellino:{name:'Rabellino Sergio',email:'rabellino@example.org'},
+    christos:{name:'Dimitrakakis, Christos',email:'d@example.org'},
+    bare:{name:'',email:'noreply@hotcrp.example'},
   };
-  const thread={get numChildren(){return messages.length},getChildHdrAt:index=>messages[index]};
   const parser={parseDecodedHeader:value=>[addresses[value]]};
-  assert.deepEqual(Array.from(scope.unreadThreadSenderNames(thread,parser)),['Fasel','Dimitrakakis']);
-  messages[3].isRead=true;
-  assert.equal(scope.unreadThreadSenderNames(thread,parser).length,0);
+  const options={parser,isMe:email=>email==='me@example.org',meLabel:'me'};
+  let time=0;const message=(author,read=true,extra={})=>({author,isRead:read,dateInSeconds:++time,messageId:'m'+time,...extra});
+  const view=summary=>summary.items.map(item=>item.gap?'..':(item.unread?item.label.toUpperCase():item.label)).join(' ');
+  const summary=messages=>scope.gmailConversationParticipants(messages,options);
+  // One person: full display name, bold while anything is unread.
+  assert.equal(view(summary([message('bare'),message('bare',false)])),'NOREPLY@HOTCRP.EXAMPLE','without a display name the address is shown');
+  assert.equal(view(summary([message('rabellino'),message('rabellino')])),'Rabellino Sergio');
+  // Two or three people: short names, first sender first, then by latest message.
+  assert.equal(view(summary([message('sonia'),message('mathis',false)])),'Sonia MATHIS');
+  assert.equal(view(summary([message('mathis'),message('sonia'),message('mathis')])),'Mathis Sonia');
+  assert.equal(view(summary([message('christos'),message('rabellino')])),'Christos Rabellino','surname-first names use the given name after the comma');
+  // Above three: first, "..", then the two most recent, including "me".
+  const long=[message('sonia'),message('etienne'),message('matthieu'),message('me'),message('mathis',false)];
+  const result=summary(long);
+  assert.equal(view(result),'Sonia .. me MATHIS');assert.equal(result.count,5);
+  assert.equal(result.title,'Sonia Ben Mokhtar, Etienne Riviere, Matthieu Bettinger, me, Mathis Morais');
+  // Copies of one message in several folders count once; any unread copy counts.
+  const copy={...long[1],isRead:false};
+  assert.equal(summary([...long,copy]).count,5);
+  assert.equal(view(summary([long[0],copy,long[1]])),'Sonia ETIENNE');
+  // Order follows dates, not the order the folders returned them.
+  assert.equal(view(summary([message('mathis'),{...message('sonia'),dateInSeconds:0}])),'Sonia Mathis');
 });
 
-test('recycled sender cells retain the native first span after an unread summary',()=>{
-  const children=[];
-  function span(text=''){
-    const classes=new Set();
-    return {textContent:text,classList:{add:c=>classes.add(c),remove:c=>classes.delete(c)},
-      remove(){children.splice(children.indexOf(this),1)},
-      hasClass:c=>classes.has(c)};
+test('participant summaries keep the native first span, mark unread people and clear on recycled rows',()=>{
+  class Node{
+    constructor(text=''){this.children=[];this.attributes=new Map();this.classes=new Set();this.textContent=text;this.className='';this.parent=null}
+    get classList(){const node=this;return {add:c=>node.classes.add(c),remove:c=>node.classes.delete(c),contains:c=>node.classes.has(c)}}
+    setAttribute(k,v){this.attributes.set(k,v)}
+    append(...nodes){for(const node of nodes){if(typeof node==='object'){node.parent=this}this.children.push(node)}}
+    remove(){if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this)}
+    matchesSelector(selector){return selector.split(',').some(part=>{part=part.trim();return part==='span'?this.tag==='span':(this.className===part.slice(1)||this.classes.has(part.slice(1)))})}
+    querySelector(selector){for(const node of this.children){if(typeof node!=='object')continue;if(node.matchesSelector(selector))return node;const found=node.querySelector(selector);if(found)return found}return null}
+    text(){return this.children.map(node=>typeof node==='object'?node.text():node).join('')||this.textContent}
   }
-  const native=span('Original sender');children.push(native);
-  const cell={querySelector(selector){
-    if(selector==='span')return children[0];
-    return children.find(c=>c.className===selector.slice(1)||c.hasClass(selector.slice(1)));
-  },append:child=>children.push(child)};
-  let collapsed=true;
-  const row={index:0,matches:()=>collapsed,querySelector(selector){
-    return selector.startsWith('.sendercol')?cell:cell.querySelector(selector);
-  }};
-  const thread={numChildren:2,getChildHdrAt:i=>({isRead:false,author:String(i)})};
-  const win={gDBView:{getThreadContainingIndex:()=>thread},document:{createElement:()=>span()}};
-  const parser={parseDecodedHeader:i=>[{name:`Sender ${i}`,email:`${i}@example.org`}]};
-  scope.renderUnreadThreadSenders(win,row,parser);
-  assert.equal(children[0],native,'native fillRow must still find its own span first');
-  assert.equal(children[1].textContent,'0, 1');
-  // Simulate native fillRow recycling the cell for a single-message thread.
-  cell.querySelector('span').textContent='Next sender';collapsed=false;
-  scope.renderUnreadThreadSenders(win,row,parser);
-  assert.deepEqual(children,[native]);
-  assert.equal(native.textContent,'Next sender');
-  assert.equal(native.hasClass('gm-native-thread-sender'),false);
+  const doc={createElement(tag){const node=new Node();node.tag=tag;return node},createTextNode:text=>text};
+  const cell=new Node();cell.className='sendercol-column';const native=doc.createElement('span');native.textContent='Original sender';cell.append(native);
+  const row=new Node();row.dataset={};row.append(cell);
+  const parser={parseDecodedHeader:value=>[{name:value+' Surname',email:value+'@example.org'}]};
+  const messages=[{author:'Ada',isRead:true,dateInSeconds:1,messageId:'a'},{author:'Bob',isRead:false,dateInSeconds:2,messageId:'b'}];
+  scope.renderConversationParticipants({document:doc},row,messages,{parser});
+  assert.equal(cell.children[0],native,'native fillRow must still find its own span first');
+  assert.equal(native.classes.has('gm-native-thread-sender'),true);
+  const list=cell.children[1];assert.equal(list.className,'gm-participants');assert.equal(list.text(),'Ada, Bob');
+  assert.equal(list.title,'Ada Surname, Bob Surname');
+  assert.equal(list.children[0].attributes.has('data-gm-unread'),false);assert.equal(list.children[2].attributes.get('data-gm-unread'),'true');
+  // A recycled row showing a single message returns to the native sender.
+  scope.renderConversationParticipants({document:doc},row,[messages[0]],{parser});
+  assert.deepEqual(cell.children,[native]);assert.equal(native.classes.has('gm-native-thread-sender'),false);
+  scope.renderConversationParticipants({document:doc},row,messages,{parser});scope.clearConversationParticipants(row);
+  assert.deepEqual(cell.children,[native]);
 });
 
 test('empty and colored stars share vector geometry instead of font-dependent glyph sizes',()=>{
