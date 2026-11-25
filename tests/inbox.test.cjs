@@ -825,33 +825,51 @@ test('conversation participants follow Gmail: full name alone, short names, ".."
   assert.equal(view(summary([message('mathis'),{...message('sonia'),dateInSeconds:0}])),'Sonia Mathis');
 });
 
-test('participant summaries keep the native first span, mark unread people and clear on recycled rows',()=>{
-  class Node{
-    constructor(text=''){this.children=[];this.attributes=new Map();this.classes=new Set();this.textContent=text;this.className='';this.parent=null}
-    get classList(){const node=this;return {add:c=>node.classes.add(c),remove:c=>node.classes.delete(c),contains:c=>node.classes.has(c)}}
+test('participant summaries hide Thunderbird\'s bare sender text, keep the count last and restore the cell',()=>{
+  // Minimal DOM: Thunderbird's fillRow writes the sender with cell.textContent.
+  class Text{constructor(value){this.nodeType=3;this.data=value;this.parentNode=null}get textContent(){return this.data}
+    replaceWith(...nodes){this.parentNode.replaceChild(this,nodes)}remove(){this.parentNode?.removeChild(this)}}
+  class Element{
+    constructor(tag){this.nodeType=1;this.tagName=tag;this.childNodes=[];this.attributes=new Map();this.className='';this.title='';this.parentNode=null}
+    get textContent(){return this.childNodes.map(node=>node.textContent).join('')}
+    set textContent(value){for(const node of this.childNodes)node.parentNode=null;this.childNodes=[];if(value!=='')this.append(new Text(value))}
     setAttribute(k,v){this.attributes.set(k,v)}
-    append(...nodes){for(const node of nodes){if(typeof node==='object'){node.parent=this}this.children.push(node)}}
-    remove(){if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this)}
-    matchesSelector(selector){return selector.split(',').some(part=>{part=part.trim();return part==='span'?this.tag==='span':(this.className===part.slice(1)||this.classes.has(part.slice(1)))})}
-    querySelector(selector){for(const node of this.children){if(typeof node!=='object')continue;if(node.matchesSelector(selector))return node;const found=node.querySelector(selector);if(found)return found}return null}
-    text(){return this.children.map(node=>typeof node==='object'?node.text():node).join('')||this.textContent}
+    detach(node){node.parentNode?.removeChild(node)}
+    removeChild(node){this.childNodes=this.childNodes.filter(child=>child!==node);node.parentNode=null}
+    append(...nodes){for(const node of nodes){const item=typeof node==='string'?new Text(node):node;this.detach(item);item.parentNode=this;this.childNodes.push(item)}}
+    insertBefore(node,before){this.detach(node);node.parentNode=this;const i=this.childNodes.indexOf(before);this.childNodes.splice(i<0?this.childNodes.length:i,0,node)}
+    replaceChild(old,nodes){const i=this.childNodes.indexOf(old);old.parentNode=null;for(const node of nodes)this.detach(node);this.childNodes.splice(this.childNodes.indexOf(old)<0?i:this.childNodes.indexOf(old),1,...nodes);for(const node of nodes)node.parentNode=this}
+    replaceWith(...nodes){this.parentNode.replaceChild(this,nodes)}
+    remove(){this.parentNode?.removeChild(this)}
+    matches(selector){return selector.split(',').some(part=>part.trim()==='.'+this.className || part.trim().slice(1)===this.className.split(' ').find(c=>'.'+c===part.trim()))}
+    querySelectorAll(selector){const found=[];for(const node of this.childNodes){if(node.nodeType!==1)continue;if(node.matches(selector))found.push(node);found.push(...node.querySelectorAll(selector))}return found}
+    querySelector(selector){return this.querySelectorAll(selector)[0] || null}
   }
-  const doc={createElement(tag){const node=new Node();node.tag=tag;return node},createTextNode:text=>text};
-  const cell=new Node();cell.className='sendercol-column';const native=doc.createElement('span');native.textContent='Original sender';cell.append(native);
-  const row=new Node();row.dataset={};row.append(cell);
-  const parser={parseDecodedHeader:value=>[{name:value+' Surname',email:value+'@example.org'}]};
-  const messages=[{author:'Ada',isRead:true,dateInSeconds:1,messageId:'a'},{author:'Bob',isRead:false,dateInSeconds:2,messageId:'b'}];
-  scope.renderConversationParticipants({document:doc},row,messages,{parser});
-  assert.equal(cell.children[0],native,'native fillRow must still find its own span first');
-  assert.equal(native.classes.has('gm-native-thread-sender'),true);
-  const list=cell.children[1];assert.equal(list.className,'gm-participants');assert.equal(list.text(),'Ada, Bob');
-  assert.equal(list.title,'Ada Surname, Bob Surname');
-  assert.equal(list.children[0].attributes.has('data-gm-unread'),false);assert.equal(list.children[2].attributes.get('data-gm-unread'),'true');
-  // A recycled row showing a single message returns to the native sender.
-  scope.renderConversationParticipants({document:doc},row,[messages[0]],{parser});
-  assert.deepEqual(cell.children,[native]);assert.equal(native.classes.has('gm-native-thread-sender'),false);
-  scope.renderConversationParticipants({document:doc},row,messages,{parser});scope.clearConversationParticipants(row);
-  assert.deepEqual(cell.children,[native]);
+  const doc={createElement:tag=>new Element(tag),createTextNode:value=>new Text(value)};
+  const row=new Element('tr');row.dataset={};const cell=new Element('td');cell.className='sendercol-column';row.append(cell);
+  cell.textContent='ncrooks@berkeley.edu';
+  const count=doc.createElement('span');count.className='gm-thread-count';count.textContent='3';cell.append(count);
+  const parser={parseDecodedHeader:value=>[{name:value==='me'?'Valerio':value.includes('@')?'':value+' Crooks',email:value.includes('@')?value:value+'@example.org'}]};
+  const messages=[{author:'ncrooks@berkeley.edu',isRead:true,dateInSeconds:1,messageId:'a'},{author:'Natacha',isRead:false,dateInSeconds:2,messageId:'b'},{author:'me',isRead:true,dateInSeconds:3,messageId:'c'}];
+  const options={parser,isMe:email=>email==='me@example.org',meLabel:'me'};
+  scope.renderConversationParticipants({document:doc},row,messages,options);
+  const [wrapper,list,badge]=cell.childNodes;
+  assert.equal(wrapper.className,'gm-native-thread-sender','the bare native text is wrapped so CSS can hide it');
+  assert.equal(wrapper.textContent,'ncrooks@berkeley.edu');
+  assert.equal(list.className,'gm-participants');assert.equal(list.textContent,'ncrooks, Natacha, me','names are separated');
+  assert.equal(badge,count,'the message count stays after the names');
+  assert.equal(list.childNodes[2].attributes.get('data-gm-unread'),'true');
+  // Rendering again (an async conversation update) must not nest or duplicate.
+  scope.renderConversationParticipants({document:doc},row,messages,options);
+  assert.equal(cell.querySelectorAll('.gm-native-thread-sender').length,1);assert.equal(cell.querySelectorAll('.gm-participants').length,1);
+  assert.equal(cell.childNodes[0].textContent,'ncrooks@berkeley.edu');
+  // A recycled row showing a single message gets its plain native text back.
+  scope.renderConversationParticipants({document:doc},row,[messages[0]],options);
+  assert.equal(cell.childNodes[0].nodeType,3);assert.equal(cell.childNodes[0].textContent,'ncrooks@berkeley.edu');
+  assert.equal(cell.querySelector('.gm-participants'),null);
+  // Native fillRow replacing the text drops every added node by itself.
+  scope.renderConversationParticipants({document:doc},row,messages,options);cell.textContent='Someone else';
+  scope.renderConversationParticipants({document:doc},row,[messages[0]],options);assert.equal(cell.textContent,'Someone else');
 });
 
 test('empty and colored stars share vector geometry instead of font-dependent glyph sizes',()=>{

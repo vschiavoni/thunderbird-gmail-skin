@@ -1530,6 +1530,6 @@ function installConversationCounts(win,mail=globalThis.MailServices,interfaces=t
     if(invalidation!==null)win.clearTimeout(invalidation);
     cache.close();sentCache.close();
     for(const node of win.document.querySelectorAll('.gm-thread-count, .gm-participants'))node.remove();
-    for(const node of win.document.querySelectorAll('.gm-native-thread-sender'))node.classList.remove('gm-native-thread-sender');
+    for(const node of win.document.querySelectorAll('.gm-native-thread-sender'))node.replaceWith(...node.childNodes);
   }};
 }

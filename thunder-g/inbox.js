@@ -60,7 +60,8 @@ function gmailConversationParticipants(messages,{parser,isMe=()=>false,meLabel='
 }
 function clearConversationParticipants(row) {
   row.querySelector('.gm-participants')?.remove();
-  row.querySelector('.gm-native-thread-sender')?.classList.remove('gm-native-thread-sender');
+  // Put Thunderbird's own sender text back where it was.
+  for(const wrapper of row.querySelectorAll?.('.gm-native-thread-sender') || [])wrapper.replaceWith(...wrapper.childNodes);
 }
 function renderConversationParticipants(win,row,messages,options={}) {
   clearConversationParticipants(row);
@@ -69,22 +70,28 @@ function renderConversationParticipants(win,row,messages,options={}) {
   const summary=gmailConversationParticipants(messages,options);
   // A single message keeps Thunderbird's own sender text.
   if(summary.count<2 || !summary.items.length)return null;
-  // Native fillRow updates the first span in the cell. Keep that original
-  // span first, otherwise a recycled row writes into our disposable summary.
-  const native=cell.querySelector('span');
-  if(!native)return null;
-  const doc=win.document,list=doc.createElement('span');
+  const doc=win.document;
+  // Native fillRow writes the sender as plain text straight into the cell
+  // (cell.textContent), replacing any children on the next fill. Wrap that
+  // text so it can be hidden; clearing unwraps it again.
+  const native=[...cell.childNodes].filter(node=>!(node.nodeType===1 && /(^|\s)gm-/.test(node.className || '')));
+  if(native.length){
+    const wrapper=doc.createElement('span');wrapper.className='gm-native-thread-sender';
+    cell.insertBefore(wrapper,native[0]);wrapper.append(...native);
+  }
+  const list=doc.createElement('span');
   list.className='gm-participants';list.title=summary.title;
   summary.items.forEach((item,index)=>{
-    if(item.gap){list.append(doc.createTextNode?.(' .. ') ?? ' .. ');return;}
-    if(index>0 && !summary.items[index-1].gap)list.append(doc.createTextNode?.(', ') ?? ', ');
+    if(item.gap){list.append(doc.createTextNode(' .. '));return;}
+    if(index>0 && !summary.items[index-1].gap)list.append(doc.createTextNode(', '));
     const name=doc.createElement('span');
     name.className='gm-participant';name.textContent=item.label;
     if(item.unread)name.setAttribute('data-gm-unread','true');
     list.append(name);
   });
-  native.classList.add('gm-native-thread-sender');
-  cell.append(list);
+  // Keep the list before the message count, which is appended after it.
+  const count=cell.querySelector('.gm-thread-count');
+  if(count)cell.insertBefore(list,count);else cell.append(list);
   return summary;
 }
 function nativeThreadMessages(view,index) {
@@ -1810,7 +1817,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     delete tree._gmSmartActionPending;tree.removeAttribute?.('data-gm-smart-action-done');
     if (prototype?.fillRow === wrapped) prototype.fillRow = original;
     for (const node of doc.querySelectorAll('.gm-row-actions, .gm-message-snippet, .gm-message-drag-handle, .gm-participants')) node.remove();
-    for (const node of doc.querySelectorAll('.gm-native-thread-sender')) node.classList.remove('gm-native-thread-sender');
+    for (const node of doc.querySelectorAll('.gm-native-thread-sender')) node.replaceWith(...node.childNodes);
     for (const line of doc.querySelectorAll('.gm-has-snippet')) line.classList.remove('gm-has-snippet');
     for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) delete row.dataset.gmThreadGuide;
     style.remove();
