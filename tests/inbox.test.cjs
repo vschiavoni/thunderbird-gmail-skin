@@ -1097,3 +1097,18 @@ test('draft labels never rescan on window focus and read only Drafts folders',as
   controller.close();assert.equal(observers.size,0);assert.equal(timers.size,0);
  }finally{scope.Services=previous}
 });
+
+test('row checkboxes ask the native selection per row instead of copying the whole selection',()=>{
+ let asked=[];
+ const view={selection:{isSelected(index){asked.push(index);return index%2===0}}};
+ const tree={get selectedIndices(){throw new Error('a redrawn row must not copy every selected index')}};
+ const selected=scope.inboxRowSelection(view,tree);
+ const attrs=new Map(),writes=[],checkbox={getAttribute:key=>attrs.get(key)??null,setAttribute(key,value){writes.push(value);attrs.set(key,value)}};
+ const row={index:4,dataset:{},querySelector:()=>checkbox};
+ scope.syncInboxRowCheckbox(row,selected);assert.equal(attrs.get('data-gm-selection-checked'),'true');
+ scope.syncInboxRowCheckbox(row,selected);assert.equal(writes.length,1,'an unchanged mark is not rewritten');
+ row.index=5;scope.syncInboxRowCheckbox(row,selected);assert.equal(attrs.get('data-gm-selection-checked'),'false');
+ assert.deepEqual(asked,[4,4,5]);
+ const fallback=scope.inboxRowSelection({},{selectedIndices:[5]});row.index=5;scope.syncInboxRowCheckbox(row,fallback);
+ assert.equal(attrs.get('data-gm-selection-checked'),'true','views without a native selection keep the set');
+});

@@ -226,3 +226,38 @@ test('a stalled background Snoozed refresh does not delay or duplicate accepted 
   assert.equal(f.copyCount,1);assert.equal(held.refreshes,1,'one refresh per destination batch');
   assert.equal(held.messages.length,5);f.service.close();
 });
+
+test('reply detection keeps one Inbox index across checks and updates it as mail arrives',async()=>{
+  const f=fixture();await f.service.snooze([f.header('keep-a'),f.header('keep-b')],Date.now()+100000);
+  for(let i=0;i<500;i++)f.header('other-'+i);
+  const messages=f.inbox.messages;let reads=0,creating=false;
+  Object.defineProperty(f.inbox,'messages',{configurable:true,get(){if(!creating)reads++;return messages},set(value){messages.splice(0,messages.length,...value)}});
+  const create=(...args)=>{creating=true;try{return f.header(...args)}finally{creating=false}};
+  await f.service.check();await f.service.check();await f.service.check();
+  assert.equal(reads,1,'the 30-second scheduler does not reread the Inbox on every check');
+  // A sync burst schedules no immediate check per message, and needs no rescan.
+  for(let i=0;i<200;i++)f.listener.msgAdded(create('burst-'+i));
+  await f.service.check();
+  assert.equal(reads,1,'new mail is added to the index incrementally');assert.equal(f.saved.length,2);
+  const reply=create('reply-to-a',f.inbox,{refs:['keep-a']});reply.dateInSeconds=Date.now()/1000+1;f.listener.msgAdded(reply);
+  await f.service.check();
+  assert.equal(f.saved.length,1,'the reply still wakes its conversation');assert.equal(f.saved[0].messages[0].id,'keep-b');
+});
+
+test('the reply index forgets deleted replies and rebuilds when the Inbox count disagrees',()=>{
+  const scope=vm.createContext({Ci:{nsMsgFolderFlags:{Inbox:1}}});
+  vm.runInContext(fs.readFileSync('thunder-g/snooze-native.js','utf8'),scope);
+  let now=0,reads=0;const index=scope.createSnoozeReplyIndex({now:()=>now,ttl:1000});
+  const inbox={URI:'inbox',items:[],getTotalMessages(){return this.items.length},get messages(){reads++;return this.items}};
+  const message=(key,id,refs=[])=>({messageKey:key,messageId:id,dateInSeconds:5,folder:inbox,numReferences:refs.length,getStringReference:i=>refs[i]});
+  inbox.items.push(message(1,'root'),message(2,'r1',['root']));
+  assert.equal(index.references('acct',inbox).get('root').length,1);assert.equal(reads,1);
+  const second=message(3,'r2',['root']);inbox.items.push(second);index.add('acct',second);
+  assert.equal(index.references('acct',inbox).get('root').length,2);assert.equal(reads,1);
+  inbox.items=inbox.items.filter(item=>item!==second);index.remove('acct',[second]);
+  assert.deepEqual(Array.from(index.references('acct',inbox).get('root'),reply=>reply.id),['r1']);assert.equal(reads,1);
+  inbox.items.push(message(4,'missed',['root']));
+  assert.equal(index.references('acct',inbox).get('root').length,2,'a missed arrival is caught by the count check');assert.equal(reads,2);
+  now=5000;index.references('acct',inbox);assert.equal(reads,3,'entries expire');
+  index.forget();assert.equal(index.size,0);
+});

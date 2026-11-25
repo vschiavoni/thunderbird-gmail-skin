@@ -1,3 +1,61 @@
+// Replies to snoozed conversations are found through each account Inbox's
+// References. The scheduler checks every 30 seconds while anything is snoozed,
+// so keep one reference index per account and update it as mail arrives or
+// leaves, instead of reading the whole Inbox on every check. The index is
+// rebuilt when its message count no longer matches the Inbox, or after a TTL,
+// so a missed notification cannot hide or invent a reply for long.
+function createSnoozeReplyIndex({now=()=>Date.now(),ttl=600000}={}) {
+  const accounts=new Map();
+  const normalize=value=>String(value || '').replace(/^<|>$/g,'');
+  const total=folder=>{try{return folder.getTotalMessages?.(false);}catch(_){return undefined;}};
+  function entry(header){
+    return {key:header.messageKey,id:normalize(header.messageId),
+      received:header.getUint32Property?.('dateReceived')||header.dateInSeconds};
+  }
+  function insert(index,header){
+    const reply=entry(header);
+    for(let i=0;i<(header.numReferences || 0);i++){
+      const ref=normalize(header.getStringReference(i));if(!ref)continue;
+      const replies=index.references.get(ref)||[];replies.push(reply);index.references.set(ref,replies);
+    }
+    index.count++;
+  }
+  return {
+    references(account,inbox){
+      let index=accounts.get(account);
+      const count=total(inbox);
+      if(!index || index.folder!==inbox.URI || index.expires<=now() || (Number.isFinite(count) && index.count!==count)){
+        index={folder:inbox.URI,references:new Map(),count:0,expires:now()+ttl};
+        for(const header of inbox.messages)insert(index,header);
+        accounts.set(account,index);
+      }
+      return index.references;
+    },
+    add(account,header){
+      const index=accounts.get(account);
+      if(index && header?.folder?.URI===index.folder)insert(index,header);
+    },
+    remove(account,headers){
+      const index=accounts.get(account);if(!index)return;
+      for(const header of headers){
+        if(header?.folder?.URI!==index.folder)continue;
+        let removed=false;
+        for(let i=0;i<(header.numReferences || 0);i++){
+          const ref=normalize(header.getStringReference(i)),replies=index.references.get(ref);
+          if(!replies)continue;
+          const kept=replies.filter(reply=>reply.key!==header.messageKey);
+          if(kept.length!==replies.length)removed=true;
+          if(kept.length)index.references.set(ref,kept);else index.references.delete(ref);
+        }
+        index.count--;
+        if(!removed && header.numReferences)accounts.delete(account);
+      }
+    },
+    forget(account){if(account===undefined)accounts.clear();else accounts.delete(account);},
+    get size(){return accounts.size;},
+  };
+}
+
 function createNativeSnooze({onTiming=null}={}) {
   function timing(phase,started,details={}){if(onTiming){try{onTiming({phase,startedMs:started,ms:Date.now()-started,...details});}catch(error){console.warn('Thunder-G snooze timing:',error);}}}
   const pref='extensions.thunderg.snooze.v1',folderName='Thunder-G Snoozed',pendingFolder='thunderg:snoozed';
@@ -136,11 +194,11 @@ function createNativeSnooze({onTiming=null}={}) {
     throw new Error('The snoozed message is unavailable.');
   }
   const recoveredJobs=new WeakSet();
-  let replyCache=null;
+  const replyIndex=createSnoozeReplyIndex();
+  let arrivalCheck=null;
   const adapter={
     timing,
-    beginCheck(){replyCache=new Map();},endCheck(){replyCache=null;},
-    close(){closed=true;returning.clear();},
+    close(){closed=true;returning.clear();replyIndex.forget();if(arrivalCheck!==null){clearTimeout(arrivalCheck);arrivalCheck=null;}},
     load(){const jobs=JSON.parse(Services.prefs.getStringPref(pref,'[]'));if(Array.isArray(jobs))for(const job of jobs)if(job&&job.state!=='sleeping')recoveredJobs.add(job);return jobs;},
     save(jobs){const started=Date.now();const text=JSON.stringify(jobs);if(text.length>250000)throw new Error('Snooze storage is full.');Services.prefs.setStringPref(pref,text);Services.prefs.savePrefFile(null);timing('journal-write',started);},
     report(error){console.error('Thunder-G snooze:',error);},
@@ -254,18 +312,7 @@ function createNativeSnooze({onTiming=null}={}) {
         const ids=new Set(job.messages.filter(item=>item.account===message.account).map(item=>item.id));
         const inbox=serverFor(message).rootFolder.getFolderWithFlags(folderFlags.Inbox);
         if(!inbox)continue;
-        let references=replyCache?.get(message.account);
-        if(!references){
-          references=new Map();
-          for(const header of inbox.messages){
-            const received=header.getUint32Property?.('dateReceived')||header.dateInSeconds,id=messageId(header);
-            for(let index=0;index<header.numReferences;index++){
-              const ref=(header.getStringReference(index)||'').replace(/^<|>$/g,'');
-              const replies=references.get(ref)||[];replies.push({id,received});references.set(ref,replies);
-            }
-          }
-          replyCache?.set(message.account,references);
-        }
+        const references=replyIndex.references(message.account,inbox);
         for(const id of ids)if(references.get(id)?.some(reply=>reply.received>=Math.floor(job.created/1000)&&!ids.has(reply.id)))return true;
       }
       return false;
@@ -339,9 +386,18 @@ function createNativeSnooze({onTiming=null}={}) {
     return [...found];
   };
   const listener={
-    msgAdded(header){if(header.folder?.flags&folderFlags.Inbox){replyCache?.delete(accountId(header.folder.server));stampReturned(header);service.check().catch(adapter.report);}},
+    msgAdded(header){
+      if(!(header.folder?.flags&folderFlags.Inbox))return;
+      replyIndex.add(accountId(header.folder.server),header);stampReturned(header);
+      // A sync can deliver hundreds of messages. One check after the burst is
+      // enough to wake conversations that received a reply.
+      if(closed)return;
+      if(arrivalCheck!==null)clearTimeout(arrivalCheck);
+      arrivalCheck=setTimeout(()=>{arrivalCheck=null;if(!closed)service.check().catch(adapter.report);},2000);
+    },
     msgsMoveCopyCompleted(move,headers){if(move)this.msgsDeleted(headers);},
     msgsDeleted(headers){
+      for(const header of headers)if(header?.folder?.flags&folderFlags.Inbox && header.folder.server)replyIndex.remove(accountId(header.folder.server),[header]);
       if(![...headers].some(header=>header.folder?.name===folderName))return;
       const removed=[...headers].map(header=>({folder:header.folder?.URI,id:messageId(header),date:header.date}));
       service.forget(async message=>{

@@ -425,7 +425,16 @@ function selectInboxMode(win,reader,mode) {
 function syncInboxRowCheckbox(row,selected){
   const checkbox=row.querySelector('.tree-view-row-select-checkbox');
   if(!checkbox?.setAttribute)return;
-  checkbox.setAttribute('data-gm-selection-checked',String(!(row.dataset.properties||'').split(' ').includes('dummy')&&selected.has(row.index)));
+  const isSelected=typeof selected==='function'?selected(row.index):selected.has(row.index);
+  const value=String(!(row.dataset.properties||'').split(' ').includes('dummy')&&!!isSelected);
+  if(checkbox.getAttribute?.('data-gm-selection-checked')!==value)checkbox.setAttribute('data-gm-selection-checked',value);
+}
+// Rows are redrawn while scrolling. Ask the native selection about one row
+// instead of copying every selected index (all rows after Select all).
+function inboxRowSelection(view,tree){
+  const selection=view?.selection;
+  if(typeof selection?.isSelected==='function')return index=>{try{return selection.isSelected(index);}catch(_){return false;}};
+  return new Set(tree?.selectedIndices || []);
 }
 
 function inboxSelectionState(view,selectedIndices,range=null){
@@ -1625,7 +1634,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   for(const name of ['mousedown','dblclick','click'])tree.addEventListener(name,rowActionEvent,true);
   function render(row) {
     row.setAttribute('data-gm-keyboard-cursor',String(tree._gmKeyboardCursor?.view===win.gDBView && tree._gmKeyboardCursor?.index===row.index));
-    syncInboxRowCheckbox(row,new Set(tree.selectedIndices||[]));
+    syncInboxRowCheckbox(row,inboxRowSelection(win.gDBView,tree));
     row.querySelector('.gm-message-drag-handle')?.remove();
     const selectionCell=row.querySelector('.selectcol-column, .tree-view-row-select');
     if(selectionCell && !(row.dataset.properties || '').split(' ').includes('dummy')){
@@ -1770,7 +1779,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   }
   function syncRowCheckboxes(){
     if(closed)return;
-    const selected=new Set(tree.selectedIndices||[]);
+    const selected=inboxRowSelection(win.gDBView,tree);
     for(const row of doc.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout'))syncInboxRowCheckbox(row,selected);
   }
   for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])tree.addEventListener(name,syncRowCheckboxes);
