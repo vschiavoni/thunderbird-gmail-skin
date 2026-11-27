@@ -789,55 +789,89 @@ test('resolved cross-folder totals replace folder-local counts, including a sing
   level=1;scope.renderThreadCount(win,row,6);assert.equal(badge,undefined,'expanded child rows have no conversation badge');
 });
 
-test('unread thread sender names skip read messages and deduplicate by address',()=>{
-  const messages=[
-    {isRead:true,author:'read'},
-    {isRead:false,author:'first'},
-    {isRead:false,author:'duplicate'},
-    {isRead:false,author:'second'},
-  ];
+test('conversation participants follow Gmail: full name alone, short names, "..", me and per-person bold',()=>{
   const addresses={
-    read:{name:'Read Sender',email:'read@example.org'},
-    first:{name:'Virginia Fasel',email:'fasel@example.org'},
-    duplicate:{name:'V. Fasel',email:'FASEL@example.org'},
-    second:{name:'Dimitrakakis, Christos',email:'d@example.org'},
+    sonia:{name:'Sonia Ben Mokhtar',email:'sonia@example.org'},
+    mathis:{name:'Mathis Morais',email:'mathis@example.org'},
+    etienne:{name:'Etienne Riviere',email:'etienne@example.org'},
+    matthieu:{name:'Matthieu Bettinger',email:'matthieu@example.org'},
+    me:{name:'Valerio Schiavoni',email:'Me@Example.org'},
+    rabellino:{name:'Rabellino Sergio',email:'rabellino@example.org'},
+    christos:{name:'Dimitrakakis, Christos',email:'d@example.org'},
+    bare:{name:'',email:'noreply@hotcrp.example'},
   };
-  const thread={get numChildren(){return messages.length},getChildHdrAt:index=>messages[index]};
   const parser={parseDecodedHeader:value=>[addresses[value]]};
-  assert.deepEqual(Array.from(scope.unreadThreadSenderNames(thread,parser)),['Fasel','Dimitrakakis']);
-  messages[3].isRead=true;
-  assert.equal(scope.unreadThreadSenderNames(thread,parser).length,0);
+  const options={parser,isMe:email=>email==='me@example.org',meLabel:'me'};
+  let time=0;const message=(author,read=true,extra={})=>({author,isRead:read,dateInSeconds:++time,messageId:'m'+time,...extra});
+  const view=summary=>summary.items.map(item=>item.gap?'..':(item.unread?item.label.toUpperCase():item.label)).join(' ');
+  const summary=messages=>scope.gmailConversationParticipants(messages,options);
+  // One person: full display name, bold while anything is unread.
+  assert.equal(view(summary([message('bare'),message('bare',false)])),'NOREPLY@HOTCRP.EXAMPLE','without a display name the address is shown');
+  assert.equal(view(summary([message('rabellino'),message('rabellino')])),'Rabellino Sergio');
+  // Short names follow each participant's latest message.
+  assert.equal(view(summary([message('sonia'),message('mathis',false)])),'Sonia MATHIS');
+  assert.equal(view(summary([message('mathis'),message('sonia'),message('mathis')])),'Sonia Mathis');
+  assert.equal(view(summary([message('christos'),message('rabellino')])),'Christos Rabellino','surname-first names use the given name after the comma');
+  assert.equal(view(summary([message('mathis'),message('sonia'),message('me'),message('mathis',false)])),
+    'Sonia me MATHIS','the original sender moves to the right when replying last');
+  // Above three: first, "..", then the two most recent, including "me".
+  const long=[message('sonia'),message('etienne'),message('matthieu'),message('me'),message('mathis',false)];
+  const result=summary(long);
+  assert.equal(view(result),'Sonia .. me MATHIS');assert.equal(result.count,5);
+  assert.equal(result.title,'Sonia Ben Mokhtar, Etienne Riviere, Matthieu Bettinger, me, Mathis Morais');
+  // Copies of one message in several folders count once; any unread copy counts.
+  const copy={...long[1],isRead:false};
+  assert.equal(summary([...long,copy]).count,5);
+  assert.equal(view(summary([long[0],copy,long[1]])),'Sonia ETIENNE');
+  // Order follows dates, not the order the folders returned them.
+  assert.equal(view(summary([message('mathis'),{...message('sonia'),dateInSeconds:0}])),'Sonia Mathis');
 });
 
-test('recycled sender cells retain the native first span after an unread summary',()=>{
-  const children=[];
-  function span(text=''){
-    const classes=new Set();
-    return {textContent:text,classList:{add:c=>classes.add(c),remove:c=>classes.delete(c)},
-      remove(){children.splice(children.indexOf(this),1)},
-      hasClass:c=>classes.has(c)};
+test('participant summaries hide Thunderbird\'s bare sender text, keep the count last and restore the cell',()=>{
+  // Minimal DOM: Thunderbird's fillRow writes the sender with cell.textContent.
+  class Text{constructor(value){this.nodeType=3;this.data=value;this.parentNode=null}get textContent(){return this.data}
+    replaceWith(...nodes){this.parentNode.replaceChild(this,nodes)}remove(){this.parentNode?.removeChild(this)}}
+  class Element{
+    constructor(tag){this.nodeType=1;this.tagName=tag;this.childNodes=[];this.attributes=new Map();this.className='';this.title='';this.parentNode=null}
+    get textContent(){return this.childNodes.map(node=>node.textContent).join('')}
+    set textContent(value){for(const node of this.childNodes)node.parentNode=null;this.childNodes=[];if(value!=='')this.append(new Text(value))}
+    setAttribute(k,v){this.attributes.set(k,v)}
+    detach(node){node.parentNode?.removeChild(node)}
+    removeChild(node){this.childNodes=this.childNodes.filter(child=>child!==node);node.parentNode=null}
+    append(...nodes){for(const node of nodes){const item=typeof node==='string'?new Text(node):node;this.detach(item);item.parentNode=this;this.childNodes.push(item)}}
+    insertBefore(node,before){this.detach(node);node.parentNode=this;const i=this.childNodes.indexOf(before);this.childNodes.splice(i<0?this.childNodes.length:i,0,node)}
+    replaceChild(old,nodes){const i=this.childNodes.indexOf(old);old.parentNode=null;for(const node of nodes)this.detach(node);this.childNodes.splice(this.childNodes.indexOf(old)<0?i:this.childNodes.indexOf(old),1,...nodes);for(const node of nodes)node.parentNode=this}
+    replaceWith(...nodes){this.parentNode.replaceChild(this,nodes)}
+    remove(){this.parentNode?.removeChild(this)}
+    matches(selector){return selector.split(',').some(part=>part.trim()==='.'+this.className || part.trim().slice(1)===this.className.split(' ').find(c=>'.'+c===part.trim()))}
+    querySelectorAll(selector){const found=[];for(const node of this.childNodes){if(node.nodeType!==1)continue;if(node.matches(selector))found.push(node);found.push(...node.querySelectorAll(selector))}return found}
+    querySelector(selector){return this.querySelectorAll(selector)[0] || null}
   }
-  const native=span('Original sender');children.push(native);
-  const cell={querySelector(selector){
-    if(selector==='span')return children[0];
-    return children.find(c=>c.className===selector.slice(1)||c.hasClass(selector.slice(1)));
-  },append:child=>children.push(child)};
-  let collapsed=true;
-  const row={index:0,matches:()=>collapsed,querySelector(selector){
-    return selector.startsWith('.sendercol')?cell:cell.querySelector(selector);
-  }};
-  const thread={numChildren:2,getChildHdrAt:i=>({isRead:false,author:String(i)})};
-  const win={gDBView:{getThreadContainingIndex:()=>thread},document:{createElement:()=>span()}};
-  const parser={parseDecodedHeader:i=>[{name:`Sender ${i}`,email:`${i}@example.org`}]};
-  scope.renderUnreadThreadSenders(win,row,parser);
-  assert.equal(children[0],native,'native fillRow must still find its own span first');
-  assert.equal(children[1].textContent,'0, 1');
-  // Simulate native fillRow recycling the cell for a single-message thread.
-  cell.querySelector('span').textContent='Next sender';collapsed=false;
-  scope.renderUnreadThreadSenders(win,row,parser);
-  assert.deepEqual(children,[native]);
-  assert.equal(native.textContent,'Next sender');
-  assert.equal(native.hasClass('gm-native-thread-sender'),false);
+  const doc={createElement:tag=>new Element(tag),createTextNode:value=>new Text(value)};
+  const row=new Element('tr');row.dataset={};const cell=new Element('td');cell.className='sendercol-column';row.append(cell);
+  cell.textContent='ncrooks@berkeley.edu';
+  const count=doc.createElement('span');count.className='gm-thread-count';count.textContent='3';cell.append(count);
+  const parser={parseDecodedHeader:value=>[{name:value==='me'?'Valerio':value.includes('@')?'':value+' Crooks',email:value.includes('@')?value:value+'@example.org'}]};
+  const messages=[{author:'ncrooks@berkeley.edu',isRead:true,dateInSeconds:1,messageId:'a'},{author:'Natacha',isRead:false,dateInSeconds:2,messageId:'b'},{author:'me',isRead:true,dateInSeconds:3,messageId:'c'}];
+  const options={parser,isMe:email=>email==='me@example.org',meLabel:'me'};
+  scope.renderConversationParticipants({document:doc},row,messages,options);
+  const [wrapper,list,badge]=cell.childNodes;
+  assert.equal(wrapper.className,'gm-native-thread-sender','the bare native text is wrapped so CSS can hide it');
+  assert.equal(wrapper.textContent,'ncrooks@berkeley.edu');
+  assert.equal(list.className,'gm-participants');assert.equal(list.textContent,'ncrooks, Natacha, me','names are separated');
+  assert.equal(badge,count,'the message count stays after the names');
+  assert.equal(list.childNodes[2].attributes.get('data-gm-unread'),'true');
+  // Rendering again (an async conversation update) must not nest or duplicate.
+  scope.renderConversationParticipants({document:doc},row,messages,options);
+  assert.equal(cell.querySelectorAll('.gm-native-thread-sender').length,1);assert.equal(cell.querySelectorAll('.gm-participants').length,1);
+  assert.equal(cell.childNodes[0].textContent,'ncrooks@berkeley.edu');
+  // A recycled row showing a single message gets its plain native text back.
+  scope.renderConversationParticipants({document:doc},row,[messages[0]],options);
+  assert.equal(cell.childNodes[0].nodeType,3);assert.equal(cell.childNodes[0].textContent,'ncrooks@berkeley.edu');
+  assert.equal(cell.querySelector('.gm-participants'),null);
+  // Native fillRow replacing the text drops every added node by itself.
+  scope.renderConversationParticipants({document:doc},row,messages,options);cell.textContent='Someone else';
+  scope.renderConversationParticipants({document:doc},row,[messages[0]],options);assert.equal(cell.textContent,'Someone else');
 });
 
 test('empty and colored stars share vector geometry instead of font-dependent glyph sizes',()=>{

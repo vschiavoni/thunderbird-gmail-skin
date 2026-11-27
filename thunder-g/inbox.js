@@ -14,44 +14,91 @@ function threadPreviewHeader(view,index,header) {
   return header;
 }
 
-function unreadThreadSenderNames(thread,parser) {
-  const senders=new Map();
-  for(let i=0;i<thread.numChildren;i++){
-    const message=thread.getChildHdrAt(i);
-    if(message?.isRead!==false)continue;
-    const address=parser.parseDecodedHeader(message.mime2DecodedAuthor || message.author || '')[0];
-    const email=address?.email?.toLowerCase();
-    if(!email || senders.has(email))continue;
-    const name=address.name?.trim();
-    // Display names are unstructured. Prefer an explicit surname-first form.
-    const familyName=name?.includes(',')?name.split(',')[0].trim():name?.split(/\s+/).at(-1);
-    senders.set(email,familyName || address.email);
-  }
-  return senders.size>1?[...senders.values()]:[];
+// Gmail lists the people in a conversation instead of one sender. With one
+// participant it shows the full name. With several it shows short names: the
+// people in order of their latest message; above three
+// people it keeps the earliest and the two most recent, joined by "..". Your own
+// messages appear as "me", and only people with unread messages are bold.
+function gmailParticipantShortName(name,email) {
+  name=String(name || '').replace(/^["'\s]+|["'\s]+$/g,'');
+  if(!name || name.includes('@'))return String(email || name).split('@')[0] || name;
+  // "Surname, Given" names put the given name after the comma.
+  if(name.includes(',')){const given=name.split(',').slice(1).join(',').trim().split(/\s+/)[0];if(given)return given;}
+  return name.split(/\s+/)[0];
 }
-
-function renderUnreadThreadSenders(win,row,parser=globalThis.MailServices?.headerParser) {
-  row.querySelector('.gm-unread-thread-senders')?.remove();
-  row.querySelector('.gm-native-thread-sender')?.classList.remove('gm-native-thread-sender');
-  const view=win.gDBView;
-  if(!parser || !row.matches('.children.collapsed[data-properties~="hasUnread"]:not([data-properties~="dummy"])'))return;
+function gmailConversationParticipants(messages,{parser,isMe=()=>false,meLabel='me'}={}) {
+  const seen=new Map(),people=new Map();
+  for(const message of messages || []){
+    if(!message)continue;
+    const key=message.messageId || JSON.stringify([message.folder?.URI,message.messageKey]);
+    const previous=seen.get(key);
+    // A message filed in several folders counts once; it is unread if any copy is.
+    if(previous){previous.unread=previous.unread || message.isRead===false;continue;}
+    seen.set(key,{message,unread:message.isRead===false,date:message.dateInSeconds ?? (message.date || 0)/1000000});
+  }
+  const ordered=[...seen.values()].sort((a,b)=>a.date-b.date);
+  ordered.forEach((item,index)=>{
+    let address=null;
+    try{address=parser?.parseDecodedHeader(item.message.mime2DecodedAuthor || item.message.author || '')?.[0] || null;}catch(_){}
+    const email=String(address?.email || item.message.author || '').trim().toLowerCase();
+    const person=people.get(email) || {email,name:address?.name?.trim() || '',me:isMe(email),unread:false,first:index,last:index};
+    person.unread=person.unread || item.unread;person.last=index;
+    if(!person.name && address?.name)person.name=address.name.trim();
+    people.set(email,person);
+  });
+  const count=ordered.length;
+  if(!people.size)return {count,items:[],title:''};
+  const full=person=>person.me?meLabel:(person.name || person.email);
+  const everyone=[...people.values()];
+  const title=everyone.map(full).join(', ');
+  if(everyone.length===1){const [person]=everyone;return {count,title,items:[{label:full(person),unread:person.unread}]};}
+  const recent=[...everyone].sort((a,b)=>a.last-b.last);
+  const label=person=>person.me?meLabel:gmailParticipantShortName(person.name,person.email);
+  const shown=recent.length<=3?recent:[recent[0],null,...recent.slice(-2)];
+  return {count,title,items:shown.map(person=>person?{label:label(person),unread:person.unread}:{gap:true})};
+}
+function clearConversationParticipants(row) {
+  row.querySelector('.gm-participants')?.remove();
+  // Put Thunderbird's own sender text back where it was.
+  for(const wrapper of row.querySelectorAll?.('.gm-native-thread-sender') || [])wrapper.replaceWith(...wrapper.childNodes);
+}
+function renderConversationParticipants(win,row,messages,options={}) {
+  clearConversationParticipants(row);
   const cell=row.querySelector('.sendercol-column, .correspondentcol-column');
-  if(!cell || cell.querySelector('.gm-draft-sender-content'))return;
-  try {
-    const thread=view?.getThreadContainingIndex?.(row.index);
-    if(!thread)return;
-    const names=unreadThreadSenderNames(thread,parser);
-    if(!names.length)return;
-    const summary=win.document.createElement('span');
-    summary.className='gm-unread-thread-senders';
-    summary.textContent=summary.title=names.join(', ');
-    // Native fillRow updates the first span in the cell. Keep that original
-    // span first, otherwise a recycled row writes into our disposable summary.
-    const native=cell.querySelector('span');
-    if(!native)return;
-    native.classList.add('gm-native-thread-sender');
-    cell.append(summary);
-  }catch(_){/* The native thread may be unavailable during a folder change. */}
+  if(!cell || cell.querySelector('.gm-draft-sender-content'))return null;
+  const summary=gmailConversationParticipants(messages,options);
+  // A single message keeps Thunderbird's own sender text.
+  if(summary.count<2 || !summary.items.length)return null;
+  const doc=win.document;
+  // Native fillRow writes the sender as plain text straight into the cell
+  // (cell.textContent), replacing any children on the next fill. Wrap that
+  // text so it can be hidden; clearing unwraps it again.
+  const native=[...cell.childNodes].filter(node=>!(node.nodeType===1 && /(^|\s)gm-/.test(node.className || '')));
+  if(native.length){
+    const wrapper=doc.createElement('span');wrapper.className='gm-native-thread-sender';
+    cell.insertBefore(wrapper,native[0]);wrapper.append(...native);
+  }
+  const list=doc.createElement('span');
+  list.className='gm-participants';list.title=summary.title;
+  summary.items.forEach((item,index)=>{
+    if(item.gap){list.append(doc.createTextNode(' .. '));return;}
+    if(index>0 && !summary.items[index-1].gap)list.append(doc.createTextNode(', '));
+    const name=doc.createElement('span');
+    name.className='gm-participant';name.textContent=item.label;
+    if(item.unread)name.setAttribute('data-gm-unread','true');
+    list.append(name);
+  });
+  // Keep the list before the message count, which is appended after it.
+  const count=cell.querySelector('.gm-thread-count');
+  if(count)cell.insertBefore(list,count);else cell.append(list);
+  return summary;
+}
+function nativeThreadMessages(view,index) {
+  try{
+    const thread=view?.getThreadContainingIndex?.(index),messages=[];
+    for(let i=0;i<(thread?.numChildren || 0);i++)messages.push(thread.getChildHdrAt(i));
+    return messages;
+  }catch(_){return [];}
 }
 
 function renderThreadCount(win,row,total) {
@@ -1647,11 +1694,8 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     renderPersonalIndicator(row);
     renderThreadGuide(row);
     stars.render(row);
-    row.querySelector('.gm-unread-thread-senders')?.remove();
-    const nativeSender=row.querySelector('.gm-native-thread-sender');
-    nativeSender?.classList.remove('gm-native-thread-sender');
+    clearConversationParticipants(row);
     drafts.render(row);
-    renderUnreadThreadSenders(win,row);
     conversationCounts.render(row);
     actionTargets.delete(row);
     if ((row.dataset.properties || '').split(' ').includes('dummy')) {
@@ -1812,7 +1856,8 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
     tree.removeEventListener('pointermove',resumeHover);
     delete tree._gmSmartActionPending;tree.removeAttribute?.('data-gm-smart-action-done');
     if (prototype?.fillRow === wrapped) prototype.fillRow = original;
-    for (const node of doc.querySelectorAll('.gm-row-actions, .gm-message-snippet, .gm-message-drag-handle')) node.remove();
+    for (const node of doc.querySelectorAll('.gm-row-actions, .gm-message-snippet, .gm-message-drag-handle, .gm-participants')) node.remove();
+    for (const node of doc.querySelectorAll('.gm-native-thread-sender')) node.replaceWith(...node.childNodes);
     for (const line of doc.querySelectorAll('.gm-has-snippet')) line.classList.remove('gm-has-snippet');
     for (const row of doc.querySelectorAll('#threadTree tr.table-layout')) delete row.dataset.gmThreadGuide;
     style.remove();

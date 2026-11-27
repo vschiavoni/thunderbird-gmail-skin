@@ -2280,5 +2280,9 @@
   },
   "default_reply_behavior_help": {
     "message": "Scegli l’azione di risposta in alto a destra nel lettore delle conversazioni Thunder-G. Si applica subito; un messaggio già in composizione rimane invariato."
+  },
+  "me_b1c1d87": {
+    "message": "io",
+    "description": "Your own name in a conversation participant list, as Gmail shows it"
   }
 }

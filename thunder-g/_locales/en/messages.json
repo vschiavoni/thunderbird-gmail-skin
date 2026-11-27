@@ -2280,5 +2280,9 @@
   },
   "default_reply_behavior_help": {
     "message": "Choose the top-right reply action in the Thunder-G conversation reader. Applies immediately; an open composer is unchanged."
+  },
+  "me_b1c1d87": {
+    "message": "me",
+    "description": "Your own name in a conversation participant list, as Gmail shows it"
   }
 }

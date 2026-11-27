@@ -1395,7 +1395,7 @@ function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=5
       Promise.resolve(job.promise).then(result=>{
         if(closed || entry.stale || entry.generation!==generation)return;
         const messages=independentMessages(result.messages || [],entry.header);
-        entry.count=messages.length;
+        entry.count=messages.length;entry.messages=messages;
         entry.ids=new Set(messages.flatMap(independentReferenceIds));
         entry.folders=new Set(messages.map(message=>message.folder?.URI));
         entry.expires=now()+ttl;
@@ -1423,6 +1423,13 @@ function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=5
       }
       return entry.count;
     },
+    // The resolved conversation, including your own replies from Sent. Read
+    // state is taken from these headers when a row is drawn, so it stays live.
+    messages(header){
+      if(closed || !header?.folder)return undefined;
+      const entry=entries.get(key(header));
+      return entry && entry.count!==undefined?entry.messages:undefined;
+    },
     invalidateMessages(headers){
       if(!headers){this.invalidate();return}
       const changed=Array.from(headers),ids=new Set(changed.flatMap(independentReferenceIds));
@@ -1438,21 +1445,48 @@ function createConversationCountCache(resolve,changed,now=()=>Date.now(),limit=5
   };
 }
 function installConversationCounts(win,mail=globalThis.MailServices,interfaces=typeof Ci==='undefined'?null:Ci){
-  if(!mail?.accounts || !interfaces)return {render:row=>renderThreadCount(win,row),close(){}};
+  const parser=mail?.headerParser;
+  let myAddresses=null,myAddressesAt=0;
+  function isMe(email){
+    if(!myAddresses || Date.now()-myAddressesAt>60000){
+      myAddresses=new Set();myAddressesAt=Date.now();
+      try{for(const identity of mail?.accounts?.allIdentities || [])if(identity?.email)myAddresses.add(String(identity.email).toLowerCase());}catch(_){}
+    }
+    return myAddresses.has(String(email || '').toLowerCase());
+  }
+  const participantOptions={parser,isMe,get meLabel(){return gmText("me");}};
+  // Collapsed conversation rows only: an open thread lists each message itself.
+  function conversationRow(view,row){
+    return !(row.dataset.properties || '').split(' ').includes('dummy') &&
+      !(view?.getLevel?.(row.index)>0) &&
+      !(view?.isContainer?.(row.index) && view.isContainerOpen(row.index));
+  }
+  if(!mail?.accounts || !interfaces)return {render(row){
+    const view=win.gDBView;
+    if(conversationRow(view,row))renderConversationParticipants(win,row,nativeThreadMessages(view,row.index),participantOptions);
+    else clearConversationParticipants(row);
+    renderThreadCount(win,row);
+  },close(){}};
   let gloda=null,closed=false,frame=null,invalidation=null;
   try{if(Services.prefs.getBoolPref('mailnews.database.global.indexer.enabled',true))
     gloda=ChromeUtils.importESModule('resource:///modules/gloda/GlodaPublic.sys.mjs').Gloda}catch(_){}
   const sentCache=createSentCandidateCache(win);
   const cache=createConversationCountCache(header=>independentConversation(win,header,gloda,independentSentFolders(),sentCache),schedule);
   function render(row){
-    let count;
+    let count,messages=null;
     try{
       const view=win.gDBView;
-      if(!(row.dataset.properties || '').split(' ').includes('dummy') &&
-          !(view?.getLevel?.(row.index)>0) &&
-          !(view?.isContainer?.(row.index) && view.isContainerOpen(row.index)))
-        count=cache.get(view?.getMsgHdrAt(row.index));
+      if(conversationRow(view,row)){
+        const header=view?.getMsgHdrAt(row.index);
+        count=cache.get(header);
+        // Until the whole conversation resolves, show the native thread's people.
+        messages=cache.messages(header) || nativeThreadMessages(view,row.index);
+      }
     }catch(_){/* Row may have been recycled while the folder changed. */}
+    try{
+      if(messages)renderConversationParticipants(win,row,messages,participantOptions);
+      else clearConversationParticipants(row);
+    }catch(_){clearConversationParticipants(row);}
     renderThreadCount(win,row,count);
   }
   function schedule(){
@@ -1495,6 +1529,7 @@ function installConversationCounts(win,mail=globalThis.MailServices,interfaces=t
     if(frame!==null)win.cancelAnimationFrame(frame);
     if(invalidation!==null)win.clearTimeout(invalidation);
     cache.close();sentCache.close();
-    for(const node of win.document.querySelectorAll('.gm-thread-count'))node.remove();
+    for(const node of win.document.querySelectorAll('.gm-thread-count, .gm-participants'))node.remove();
+    for(const node of win.document.querySelectorAll('.gm-native-thread-sender'))node.replaceWith(...node.childNodes);
   }};
 }
