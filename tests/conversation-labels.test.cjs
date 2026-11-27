@@ -32,7 +32,7 @@ test('label scope follows references, native threads and physical copies across 
  assert.ok(!f.scope.conversationPhysicalMessages([root],[other]).includes(foreign),'physical-copy expansion also respects account boundaries');
 });
 
-test('new unread follow-up inherits the union without removing old assignments, legacy tags or internal flags',()=>{
+test('new follow-up inherits its verified parent labels without rewriting historical messages',()=>{
  const f=fixture(),inbox=f.folder('inbox'),sent=f.folder('sent');
  const root=f.message(inbox,'root',[],['project','$Junk']),reply=f.message(sent,'reply',['root'],['team']);reply.label=1;
  const incoming=f.message(inbox,'incoming',['root','reply'],['existing-undefined']);incoming.isRead=false;
@@ -40,7 +40,11 @@ test('new unread follow-up inherits the union without removing old assignments, 
  assert.equal(f.writes.length,0,'installation never rewrites existing mailbox labels');
  const listener=[...f.listeners][0];listener.msgAdded(incoming);listener.msgAdded(incoming);
  assert.equal(f.timers.size,1,'deduplicate arrivals before processing');f.flush();
- for(const header of [root,reply,incoming])for(const key of ['project','team'])assert.ok(header.keys.has(key));
+ assert.ok(incoming.keys.has('team'));
+ assert.ok(!incoming.keys.has('project'),'labels from other ancestors are not unioned');
+ assert.deepEqual([...root.keys],['project','$Junk']);
+ assert.deepEqual([...reply.keys],['team']);
+ assert.ok(f.writes.every(write=>write.items.every(header=>header===incoming)),'only the arriving reply is written');
  assert.ok(incoming.keys.has('$label1'));assert.equal(reply.label,1);
  assert.ok(root.keys.has('$Junk'));assert.ok(!incoming.keys.has('$Junk'));
  assert.ok(incoming.keys.has('existing-undefined'));assert.equal(incoming.isRead,false);
@@ -137,4 +141,19 @@ test('warning-prefixed replies inherit labels only within the same subject bound
  assert.ok(members.includes(root));assert.ok(!members.includes(different));
  f.scope.inheritConversationLabels(members,f.mail);
  assert.ok(reply.keys.has('project'));assert.ok(!reply.keys.has('team'));
+});
+
+test('classification alone never propagates labels across existing mail',()=>{
+ const f=fixture(),inbox=f.folder('inbox');
+ const old=f.message(inbox,'old',[],['project']),reply=f.message(inbox,'reply',['old'],['team']);
+ const controller=f.scope.installConversationLabelInheritance(f.mail,f.clock,f.scope.Ci);
+ [...f.listeners][0].msgsClassified([old,reply]);f.flush();
+ assert.equal(f.writes.length,0);
+ controller.close();
+});
+test('copy resolution rejects a database result with a different Message-ID',()=>{
+ const f=fixture(),inbox=f.folder('inbox'),sent=f.folder('sent');
+ const selected=f.message(inbox,'wanted',[],['project']),unrelated=f.message(sent,'other',[],['team']);
+ sent.msgDatabase.getMsgHdrForMessageID=()=>unrelated;
+ assert.deepEqual(Array.from(f.scope.conversationPhysicalMessages([selected],[sent])),[selected]);
 });

@@ -92,3 +92,45 @@ test('uncolored sidebar icons override native pink while message chips retain th
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/labels.js'),'utf8'),colors);
  assert.deepEqual(colors.chipColors(''),colors.chipColors('#80868b'));
 });
+
+test('label unread counts reuse unchanged folders and rescan only the folder that changed',async()=>{
+ const local=require('./localization-context.cjs').createContext({Ci:{nsMsgFolderFlags:{Virtual:1,Trash:2,Junk:4}}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/independent-reader.js'),'utf8').match(/function independentReferenceIds[\s\S]*?\n}\n/)[0],local);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../thunder-g/nested-labels.js'),'utf8'),local);
+ let reads=0;
+ const message=(id,{keywords='',read=true,refs=[]}={})=>({messageId:id,isRead:read,numReferences:refs.length,getStringReference:i=>refs[i],getStringProperty:key=>key==='keywords'?keywords:''});
+ function folder(URI,messages){
+  return {URI,isServer:false,isSpecialFolder:()=>false,messages:null,items:messages,
+   get messages(){const items=this.items;return (function*(){for(const item of items){reads++;yield item}})()},set messages(_){},
+   getTotalMessages(){return this.items.length},getNumUnread(){return this.items.filter(item=>item.isRead===false).length}};
+ }
+ // A labelled message in Archive becomes unread through a reply in Inbox.
+ const archive=folder('archive',[message('a1',{keywords:'work'}),...Array.from({length:500},(_,i)=>message('old'+i))]);
+ const inbox=folder('inbox',[message('i1',{read:false,refs:['a1']}),...Array.from({length:300},(_,i)=>message('in'+i))]);
+ const keys=new Set(['work']),pause=()=>Promise.resolve(),current=()=>true;
+ const cache=local.createLabelCountCache();
+ const plain=await local.countUnreadLabelConversations([archive,inbox],keys,pause,current);
+ assert.equal(plain.get('work'),1,'conversations join across folders');
+ reads=0;let counts=await local.countUnreadLabelConversations([archive,inbox],keys,pause,current,cache);
+ assert.equal(counts.get('work'),1);assert.equal(reads,802,'first count reads every header once');
+ reads=0;counts=await local.countUnreadLabelConversations([archive,inbox],keys,pause,current,cache);
+ assert.equal(counts.get('work'),1);assert.equal(reads,0,'unchanged folders are not read again');
+ // Reading the reply changes only the Inbox counters.
+ inbox.items[0].isRead=true;
+ reads=0;counts=await local.countUnreadLabelConversations([archive,inbox],keys,pause,current,cache);
+ assert.equal(counts.get('work'),undefined);assert.equal(reads,301,'only the changed folder is rescanned');
+ // A label change keeps every counter equal, so it is invalidated explicitly.
+ inbox.items[0].isRead=false;await local.countUnreadLabelConversations([archive,inbox],keys,pause,current,cache);
+ archive.items[0].getStringProperty=()=> '';cache.invalidate(archive);
+ reads=0;counts=await local.countUnreadLabelConversations([archive,inbox],keys,pause,current,cache);
+ assert.equal(counts.get('work'),undefined);assert.equal(reads,501,'a label change rescans only its folder');
+ // New label keys change which messages matter: everything is read again.
+ reads=0;await local.countUnreadLabelConversations([archive,inbox],new Set(['work','home']),pause,current,cache);
+ assert.equal(reads,802);
+ // Removed folders are dropped from the cache.
+ await local.countUnreadLabelConversations([inbox],new Set(['work','home']),pause,current,cache);assert.equal(cache.size,1);
+ // Entries expire, so a missed notification cannot keep a stale count forever.
+ let now=0;const expiring=local.createLabelCountCache(()=>now,1000);
+ await local.countUnreadLabelConversations([inbox],keys,pause,current,expiring);
+ reads=0;now=2000;await local.countUnreadLabelConversations([inbox],keys,pause,current,expiring);assert.equal(reads,301);
+});

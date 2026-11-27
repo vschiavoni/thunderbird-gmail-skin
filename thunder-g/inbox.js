@@ -16,8 +16,8 @@ function threadPreviewHeader(view,index,header) {
 
 // Gmail lists the people in a conversation instead of one sender. With one
 // participant it shows the full name. With several it shows short names: the
-// first sender, then the others in order of their latest message; above three
-// people it keeps the first and the two most recent, joined by "..". Your own
+// people in order of their latest message; above three
+// people it keeps the earliest and the two most recent, joined by "..". Your own
 // messages appear as "me", and only people with unread messages are bold.
 function gmailParticipantShortName(name,email) {
   name=String(name || '').replace(/^["'\s]+|["'\s]+$/g,'');
@@ -52,10 +52,9 @@ function gmailConversationParticipants(messages,{parser,isMe=()=>false,meLabel='
   const everyone=[...people.values()];
   const title=everyone.map(full).join(', ');
   if(everyone.length===1){const [person]=everyone;return {count,title,items:[{label:full(person),unread:person.unread}]};}
-  const first=everyone.find(person=>person.first===0);
-  const others=everyone.filter(person=>person!==first).sort((a,b)=>a.last-b.last);
+  const recent=[...everyone].sort((a,b)=>a.last-b.last);
   const label=person=>person.me?meLabel:gmailParticipantShortName(person.name,person.email);
-  const shown=others.length<=2?[first,...others]:[first,null,...others.slice(-2)];
+  const shown=recent.length<=3?recent:[recent[0],null,...recent.slice(-2)];
   return {count,title,items:shown.map(person=>person?{label:label(person),unread:person.unread}:{gap:true})};
 }
 function clearConversationParticipants(row) {
@@ -192,13 +191,28 @@ function installSenderDraftLabels(win,mail=globalThis.MailServices,interfaces=ty
     }catch(error){console.warn('Thunder-G: could not open saved draft.',error);refresh();return false;}
   }
   function renderAll(){if(!closed)for(const row of doc.querySelectorAll('#threadTree tr.table-layout'))render(row)}
+  // Ask each account for its Drafts-flagged folders and resolve identity draft
+  // URIs directly, instead of walking every folder of every account.
+  function draftFolders() {
+    const found=new Map(),servers=mail.accounts.allServers,lookup=mail.folderLookup;
+    if(servers && lookup?.getFolderForURL) {
+      for(const server of servers) {
+        try{for(const folder of server.rootFolder?.getFoldersWithFlags(interfaces.nsMsgFolderFlags.Drafts) || [])found.set(folder.URI,folder);}
+        catch(_){/* A server can be unavailable while accounts load. */}
+      }
+      for(const uri of folders) {
+        try{const folder=lookup.getFolderForURL(uri);if(folder && !folder.isServer)found.set(folder.URI,folder);}catch(_){}
+      }
+      return [...found.values()];
+    }
+    return Array.from(mail.accounts.allFolders).filter(isDraft);
+  }
   async function rebuild() {
     timer=null;const revision=++generation,next=new Map();let visited=0;
     try {
       folders=new Set(Array.from(mail.accounts.allIdentities,identity=>identity.draftFolder).filter(Boolean));
-      for(const folder of mail.accounts.allFolders) {
+      for(const folder of draftFolders()) {
         if(closed || revision!==generation)return;
-        if(!isDraft(folder))continue;
         try {
           for(const header of folder.messages) {
             for(const id of draftMessageIds(header)) {
@@ -239,10 +253,16 @@ function installSenderDraftLabels(win,mail=globalThis.MailServices,interfaces=ty
     #threadTree .gm-sender-draft { flex:none; color:light-dark(#b3261e,#f28b82); font-weight:400; }
     @media (forced-colors:active) { #threadTree .gm-sender-draft { color:CanvasText; } }
   `;doc.head.append(style);
-  win.addEventListener('focus',refresh);refresh();
+  // Draft saves, deletions and moves arrive as folder notifications above.
+  // Returning to the window changes no draft, so it must not rescan Drafts.
+  // A different Drafts location in account settings does need a rescan.
+  const prefs=globalThis.Services?.prefs;
+  const draftLocation={observe(_subject,_topic,name){if(String(name).endsWith('.draft_folder'))refresh();}};
+  try{prefs?.addObserver('mail.identity.',draftLocation);}catch(_){}
+  refresh();
   return {render,refresh,openRow,getRowDraft,close(){
     closed=true;generation++;if(timer!==null)win.clearTimeout(timer);
-    mail.mfn?.removeListener(listener);win.removeEventListener('focus',refresh);
+    mail.mfn?.removeListener(listener);try{prefs?.removeObserver('mail.identity.',draftLocation);}catch(_){}
     for(const row of doc.querySelectorAll('#threadTree tr.table-layout'))clear(row);
     style.remove();drafts.clear();folders.clear();
   }};
@@ -452,7 +472,16 @@ function selectInboxMode(win,reader,mode) {
 function syncInboxRowCheckbox(row,selected){
   const checkbox=row.querySelector('.tree-view-row-select-checkbox');
   if(!checkbox?.setAttribute)return;
-  checkbox.setAttribute('data-gm-selection-checked',String(!(row.dataset.properties||'').split(' ').includes('dummy')&&selected.has(row.index)));
+  const isSelected=typeof selected==='function'?selected(row.index):selected.has(row.index);
+  const value=String(!(row.dataset.properties||'').split(' ').includes('dummy')&&!!isSelected);
+  if(checkbox.getAttribute?.('data-gm-selection-checked')!==value)checkbox.setAttribute('data-gm-selection-checked',value);
+}
+// Rows are redrawn while scrolling. Ask the native selection about one row
+// instead of copying every selected index (all rows after Select all).
+function inboxRowSelection(view,tree){
+  const selection=view?.selection;
+  if(typeof selection?.isSelected==='function')return index=>{try{return selection.isSelected(index);}catch(_){return false;}};
+  return new Set(tree?.selectedIndices || []);
 }
 
 function inboxSelectionState(view,selectedIndices,range=null){
@@ -462,6 +491,17 @@ function inboxSelectionState(view,selectedIndices,range=null){
     try{if(view.getFlagsAt(index)&0x20000000)continue;}catch(_){continue;}
     total++;if(selected.has(index))count++;
   }
+  return {checked:total>0 && count===total,indeterminate:count>0 && count<total};
+}
+// The toolbar checkbox follows every selection change, including each arrow
+// key. Without group headers every row is selectable, so the native selection
+// count answers in constant time. Pages and grouped views keep the exact scan:
+// a page is bounded, and group headers must not count as messages.
+function inboxSelectionSummary(view,tree,range=null,grouped=false){
+  const selection=view?.selection;
+  if(range || grouped || !selection || !Number.isFinite(selection.count) || !Number.isFinite(view.rowCount))
+    return inboxSelectionState(view,tree?.selectedIndices,range);
+  const total=view.rowCount,count=Math.min(selection.count,total);
   return {checked:total>0 && count===total,indeterminate:count>0 && count<total};
 }
 // Refreshes can reuse an already-running IMAP URL, which does not necessarily
@@ -544,7 +584,7 @@ function installInboxIdleActions(win,reader=null) {
     if(closed)return;
     const tree=doc.getElementById('threadTree');
     const range=tree?.hasAttribute('data-gm-paginated')?tree._gmPageSelectionBounds?.():null;
-    const state=inboxSelectionState(win.gDBView,tree?.selectedIndices,range);
+    const state=inboxSelectionSummary(win.gDBView,tree,range,!!win.gViewWrapper?.showGroupedBySort);
     select.checked=state.checked;select.indeterminate=state.indeterminate;
   }
   select.addEventListener('change',()=>{
@@ -553,7 +593,7 @@ function installInboxIdleActions(win,reader=null) {
     // The browser clears indeterminate before change fires. Read the native
     // selection instead: both a partial and a full selection toggle to none.
     const range=tree?.hasAttribute('data-gm-paginated')?tree._gmPageSelectionBounds?.():null;
-    const previous=inboxSelectionState(win.gDBView,tree?.selectedIndices,range);
+    const previous=inboxSelectionSummary(win.gDBView,tree,range,!!win.gViewWrapper?.showGroupedBySort);
     if(previous.checked || previous.indeterminate){
       selectInboxMode(win,reader,'none');
     }else if(tree?.hasAttribute('data-gm-paginated')){
@@ -1641,7 +1681,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   for(const name of ['mousedown','dblclick','click'])tree.addEventListener(name,rowActionEvent,true);
   function render(row) {
     row.setAttribute('data-gm-keyboard-cursor',String(tree._gmKeyboardCursor?.view===win.gDBView && tree._gmKeyboardCursor?.index===row.index));
-    syncInboxRowCheckbox(row,new Set(tree.selectedIndices||[]));
+    syncInboxRowCheckbox(row,inboxRowSelection(win.gDBView,tree));
     row.querySelector('.gm-message-drag-handle')?.remove();
     const selectionCell=row.querySelector('.selectcol-column, .tree-view-row-select');
     if(selectionCell && !(row.dataset.properties || '').split(' ').includes('dummy')){
@@ -1783,7 +1823,7 @@ function installInboxControls(win,{threadGuides=true,threadExpandArrows=false,pe
   }
   function syncRowCheckboxes(){
     if(closed)return;
-    const selected=new Set(tree.selectedIndices||[]);
+    const selected=inboxRowSelection(win.gDBView,tree);
     for(const row of doc.querySelectorAll('#threadTree tr.table-layout, #threadTree tr.card-layout'))syncInboxRowCheckbox(row,selected);
   }
   for(const name of ['select','viewchange','rowcountchange','gm-page-changed','gm-selection-cleared'])tree.addEventListener(name,syncRowCheckboxes);

@@ -159,12 +159,31 @@ function installConversationLabelInheritance(services=MailServices,clock={setTim
     const [key,header]=first.value;pending.delete(key);
     try{
       const messages=conversationPhysicalMessages(conversationLabelScope([header],null,{requireReferences:true}));
-      inheritConversationLabels(messages,services);
-      for(const item of messages)pending.delete(JSON.stringify([item.folder.URI,item.messageKey]));
+      // Arrival/classification must never reconcile labels back into history.
+      // Use the closest verified referenced message as the source, rather than
+      // unioning every label reachable through a thread or reference graph.
+      const normalize=id=>String(id || '').trim().replace(/^<|>$/g,'');
+      let parent=null;
+      for(let index=(header.numReferences || 0)-1;index>=0 && !parent;index--){
+        const id=normalize(header.getStringReference(index));
+        if(!id)continue;
+        parent=messages.find(item=>item!==header && normalize(item.messageId)===id);
+      }
+      if(parent){
+        const definitions=services.tags.getAllTags();
+        const existing=new Set(assignedTags(header,definitions).map(tag=>tag.key));
+        const missing=assignedTags(parent,definitions).map(tag=>tag.key).filter(key=>!existing.has(key));
+        if(missing.length)header.folder.addKeywordsToMessages([header],missing.join(' '));
+      }
     }catch(error){console.warn('Thunder-G: could not inherit conversation labels.',error);}
     if(pending.size)timer=clock.setTimeout(drain,0);
   }
-  const listener={msgAdded:enqueue,msgsClassified(headers){for(const header of headers || [])enqueue(header);}};
+  const listener={msgAdded:enqueue,msgsClassified(headers){
+    for(const header of headers || []){
+      const key=JSON.stringify([header?.folder?.URI,header?.messageKey]);
+      if(pending.has(key))enqueue(header);
+    }
+  }};
   services.mfn.addListener(listener,interfaces.nsIMsgFolderNotificationService.msgAdded | interfaces.nsIMsgFolderNotificationService.msgsClassified);
   return {close(){closed=true;if(timer!==null)clock.clearTimeout(timer);pending.clear();services.mfn.removeListener(listener);}};
 }
@@ -211,7 +230,7 @@ function conversationPhysicalMessages(messages,copyFolders=null) {
       const owner=message.folder.rootFolder?.URI || message.folder.server?.key;
       const candidate=folder.rootFolder?.URI || folder.server?.key;
       if(owner && candidate && owner!==candidate)continue;
-      try{const copy=folder.msgDatabase?.getMsgHdrForMessageID(id);if(copy?.folder)remember(copy);}
+      try{const copy=folder.msgDatabase?.getMsgHdrForMessageID(id);if(copy?.folder && String(copy.messageId || '').trim().replace(/^<|>$/g,'')===id)remember(copy);}
       catch(_){/* Missing/offline summaries must not block the selected messages. */}
     }
   }
@@ -219,6 +238,9 @@ function conversationPhysicalMessages(messages,copyFolders=null) {
 }
 const conversationLabelNotices = new WeakMap();
 function showConversationLabelNotice(win, name, add, undo) {
+  showConversationActionNotice(win,add ? gmText("Conversation added to $1", name) : gmText("Conversation removed from $1", name),undo,gmText("Could not undo the label change."));
+}
+function showConversationActionNotice(win,text,undo=null,undoFailure='') {
   conversationLabelNotices.get(win)?.();
   const doc = win.document;
   const notice = doc.createElement('div');
@@ -232,7 +254,7 @@ function showConversationLabelNotice(win, name, add, undo) {
   const message = doc.createElement('span');
   message.setAttribute('role','status');
   message.style.cssText = 'min-inline-size:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-  message.textContent = add ? gmText("Conversation added to $1", name) : gmText("Conversation removed from $1", name);
+  message.textContent = text;
   message.title = message.textContent;
   // Thunderbird chrome gives buttons a minimum width even with an explicit padding.
   const actionStyle = 'appearance:none;flex:none;min-inline-size:0!important;margin:0!important;border:0!important;background:transparent;cursor:pointer;';
@@ -255,14 +277,16 @@ function showConversationLabelNotice(win, name, add, undo) {
       undo();
       close();
     } catch(error) {
-      message.textContent = gmText("Could not undo the label change.");
+      message.textContent = undoFailure;
       message.title = message.textContent;
       button.disabled = true;
       console.error(error);
     }
   });
   dismiss.addEventListener('click',close);
-  notice.append(message,button,dismiss);
+  notice.append(message);
+  if(undo)notice.append(button);
+  notice.append(dismiss);
   doc.documentElement.append(notice);
   const timer = win.setTimeout(close,10000);
   conversationLabelNotices.set(win,close);
@@ -1193,7 +1217,13 @@ function installReadingMode(win) {
   // Conversations archives via the messages API, bypassing our toolbar.
   // Observe successful moves so every archive entry point returns to the list.
   const moveListener = {
-    msgsMoveCopyCompleted(move, messages) {
+    msgsMoveCopyCompleted(move, messages, destination) {
+      const archiveFlag=Ci.nsMsgFolderFlags?.Archive;
+      if(move && messages?.length && archiveFlag!=null &&
+          destination?.isSpecialFolder?.(archiveFlag,true) &&
+          messages.some(message=>message.folder?.URI===win.gFolder?.URI)){
+        showConversationActionNotice(win,messages.length===1?gmText("Message archived"):gmText("$1 messages archived",messages.length));
+      }
       if (active && readingMessageWasMoved(previous, move, messages)) {
         leave(true);
       }
