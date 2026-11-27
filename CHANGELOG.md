@@ -5,6 +5,11 @@
 ## 0.33.1
 
 - Extend compatibility to Thunderbird 161.x while preserving the Thunderbird 153.0 minimum.
+- Display Gmail-style conversation participants, ordered by their latest messages, with unread participants emphasized and unread conversations on a white background.
+- Reduce background rescans for label counts, selection changes, drafts and snooze replies.
+- Preserve replies carrying the external-mail warning prefix in their original conversation.
+- Limit automatic label inheritance to a newly arrived reply and its verified parent; avoid rewriting historical messages on classification and verify stored-copy Message-IDs.
+- Show a bottom-left confirmation after successful archiving.
 
 ## 0.33.0
 
