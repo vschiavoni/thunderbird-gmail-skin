@@ -30,7 +30,7 @@ class ReleaseAssetsTests(unittest.TestCase):
             self.assertTrue(xpi.with_suffix('.xpi.sha256').exists())
 
     def test_supported_update_ranges_preserve_the_153_minimum(self):
-        for maximum in ['158.*', '159.*', '160.*']:
+        for maximum in ['158.*', '159.*', '160.*', '161.*']:
             with self.subTest(maximum=maximum), tempfile.TemporaryDirectory() as folder:
                 root=Path(folder)
                 self.fixture(root,maximum=maximum)

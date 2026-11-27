@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.33.1
+
+- Extend compatibility to Thunderbird 161.x while preserving the Thunderbird 153.0 minimum.
+
 ## 0.33.0
 
 - Speed up Inbox updates after archiving by reusing accessibility position calculations and coalescing overlapping redraw requests.
