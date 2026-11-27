@@ -215,6 +215,14 @@ test('responsive columns fit the pane on resize, reserve date space and restore 
   tree.clientWidth=1200;resized();frames.shift()();
   assert.equal(size(table),1200);assert.ok(size(subject)>500,'growing the pane gives space back to the subject');
   tree.clientWidth=640;resized();frames.shift()();
+  sender.style.setProperty('--senderColSplitter-width','25%');
+  date.style.setProperty('--dateColSplitter-width','12.5%');
+  changed();frames.shift()();
+  assert.equal(size(sender),160,'Thunderbird 161 percentage widths convert to pane pixels');
+  assert.equal(size(date),80,'percentage date widths must not collapse to a few pixels');
+  sender.style.setProperty('--senderColSplitter-width','160px');
+  date.style.setProperty('--dateColSplitter-width','100px');
+  changed();frames.shift()();
   const visibleSender=size(sender),visibleSubject=size(subject);
   events.pointerdown({target:{closest:()=>({})}});
   assert.equal(size(sender),visibleSender,'drag starts from the visible sender width');

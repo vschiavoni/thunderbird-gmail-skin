@@ -829,11 +829,12 @@ function installResponsiveColumns(win) {
       if (!lastResizable.resizable) lastResizable.resizable = true;
     }
     for (const header of headers) {
-      const value=parseFloat(header.style.getPropertyValue(`--${header.id}Splitter-width`));
+      const nativeWidth=header.style.getPropertyValue(`--${header.id}Splitter-width`).trim();
+      const value=parseFloat(nativeWidth)*(nativeWidth.endsWith('%')?width/100:1);
       if(Number.isFinite(value) && value>0){
         preferred.set(header.id,value);
         const properties=saved.get(header);
-        if(properties?.has(`--${header.id}Splitter-width`))properties.set(`--${header.id}Splitter-width`,[`${value}px`,'']);
+        if(properties?.has(`--${header.id}Splitter-width`))properties.set(`--${header.id}Splitter-width`,[nativeWidth,'']);
       }
     }
     const subject = headers.find(header=>header.id==='subjectCol');
