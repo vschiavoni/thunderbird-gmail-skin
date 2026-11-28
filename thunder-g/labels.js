@@ -29,7 +29,16 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
   const doc = window.document;
   let disposed = false;
   let prototype, original, wrapped;
-  let tags = MailServices.tags.getAllTags();
+  let definitions=new Map(),revision=0,definitionSignature='';
+  function readDefinitions(){
+    const hidden=hiddenMessageLabelKeys(labelPrefs);
+    const visible=MailServices.tags.getAllTags().filter(tag=>!hidden.has(tag.key));
+    const signature=JSON.stringify(visible.map(tag=>[tag.key,tag.tag,tag.color]));
+    if(signature===definitionSignature)return;
+    definitionSignature=signature;
+    definitions=new Map(visible.map((tag,index)=>[tag.key,{tag,index}]));
+    revision++;
+  }
   const rendered = new WeakMap();
   const style = doc.createElement("style");
   style.textContent = `
@@ -105,13 +114,20 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     try {
       const header = window.gDBView?.getMsgHdrAt(row.index);
       if (!header) {existing?.remove();return;}
-      const hidden=hiddenMessageLabelKeys(labelPrefs);
-      labels = assignedTags(header, tags).filter(tag=>!hidden.has(tag.key));
+      const keywords=header.getStringProperty('keywords') || '',legacy=header.label || 0;
+      const previous=rendered.get(row);
+      if(existing && previous?.revision===revision && previous.keywords===keywords && previous.legacy===legacy)return;
+      const keys=new Set(keywords.split(/\s+/));
+      if(legacy)keys.add(`$label${legacy}`);
+      // Look up only assigned keys, retaining Thunderbird's label order.
+      labels=[...keys].map(key=>definitions.get(key)).filter(Boolean)
+        .sort((a,b)=>a.index-b.index).map(item=>item.tag);
+      const signature=JSON.stringify(labels.map(tag=>[tag.key,tag.tag,tag.color]));
+      rendered.set(row,{revision,keywords,legacy,signature});
+      if(existing && previous?.signature===signature)return;
     } catch (_) {existing?.remove();return;}
     if (!labels.length) {existing?.remove();return;}
-    const signature=JSON.stringify(labels.map(tag=>[tag.key,tag.tag,tag.color]));
-    if(existing && rendered.get(row)===signature)return;
-    existing?.remove();rendered.set(row,signature);
+    existing?.remove();
     const container = doc.createElement("span");
     container.className = "gm-inline-labels";
     gmBindAttribute(container, "aria-label", () => gmText("Labels: $1", labels.map(tag => tag.tag).join(", ")));
@@ -133,7 +149,7 @@ function installInlineLabels(window = globalThis.window, MailServices = globalTh
     line.append(container);
   }
   const refresh = () => {
-    tags = MailServices.tags.getAllTags();
+    readDefinitions();
     for (const row of doc.querySelectorAll("#threadTree tr.table-layout")) render(row);
   };
   window.customElements.whenDefined("thread-row").then(() => {

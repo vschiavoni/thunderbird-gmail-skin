@@ -1179,3 +1179,49 @@ test('conversation rows list people from the resolved conversation, including yo
   assert.equal(again.items.some(item=>item.unread),false,'read state is live, not cached');
   cache.close();
 });
+
+test('large conversation enrichment uses linear key lookups and preserves existing viewers',async(t)=>{
+  const f=readerFixture();let lookup,conversation,keyCalls=0;
+  const key=f.scope.independentMessageKey;
+  f.scope.independentMessageKey=header=>{keyCalls++;return key(header)};
+  const messages=Array.from({length:200},(_,i)=>i===0?f.anchor:f.prepare(message(i+1,'large-'+i)));
+  f.anchor.folder.msgDatabase={getThreadContainingMsgHdr:()=>({numChildren:messages.length,getChildHdrAt:i=>messages[i]})};
+  f.scope.Services.prefs.getBoolPref=()=>true;
+  f.scope.ChromeUtils.importESModule=()=>({UIFontSize:{},Gloda:{getMessageCollectionForHeader(_header,listener){lookup=listener;return {}}}});
+  const opening=f.reader.open(f.anchor);f.loaded();
+  const original=f.cards.children[0],viewer=f.browsers[0];
+  lookup.onQueryCompleted({items:[{conversation:{getMessagesCollection(listener){conversation=listener;return {}}}}]});
+  keyCalls=0;
+  const incoming=[...messages,f.prepare(message(201,'new-indexed-reply'))];
+  conversation.onQueryCompleted({items:incoming.map(folderMessage=>({folderMessage}))});
+  await opening;
+  t.diagnostic(`${messages.length} existing messages plus one reply: ${keyCalls} key lookups`);
+  assert.ok(keyCalls<messages.length*20,`expected linear key work, observed ${keyCalls} lookups`);
+  assert.equal(f.cards.children[0],original);assert.equal(f.browsers[0],viewer);
+  f.reader.close();
+});
+
+test('native message loading reuses a cloneable view only when it contains the target message',()=>{
+ const scope=context(),header=message(1,'target'),calls=[];
+ header.folder.getUriForMsg=()=> 'mailbox://inbox/1';
+ let index=0;
+ const wrapper={clone(){assert.fail('about:message owns cloning, not the Inbox')},dbView:{findIndexOfMsgHdr(target,expand){assert.equal(target,header);assert.equal(expand,false);return index}}};
+ const frame={displayMessage(...args){calls.push(args)}};
+ scope.independentDisplayMessage(frame,{gViewWrapper:wrapper},header);
+ assert.deepEqual(calls.pop(),['mailbox://inbox/1',wrapper]);
+ for(index of [-1,0xffffffff,undefined]){
+  scope.independentDisplayMessage(frame,{gViewWrapper:wrapper},header);
+  assert.deepEqual(calls.pop(),['mailbox://inbox/1'],'unlisted messages use the native standalone fallback');
+ }
+ wrapper.dbView.findIndexOfMsgHdr=()=>{throw new Error('view closing')};
+ scope.independentDisplayMessage(frame,{gViewWrapper:wrapper},header);assert.equal(calls.pop().length,1);
+ scope.independentDisplayMessage(frame,{},header);assert.equal(calls.pop().length,1);
+});
+
+test('opening a conversation supplies its existing native view to the embedded message loader',async()=>{
+ const f=readerFixture();let supplied;
+ f.win.gViewWrapper={clone(){},dbView:{findIndexOfMsgHdr:()=>0}};
+ await f.reader.open(f.anchor);
+ f.browsers[0].contentWindow.displayMessage=(_uri,wrapper)=>supplied=wrapper;
+ f.loaded();assert.equal(supplied,f.win.gViewWrapper);f.reader.close();
+});

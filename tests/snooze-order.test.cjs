@@ -52,3 +52,23 @@ test('closing an older runtime leaves replacement sort handlers and active views
  const old=scope.createSnoozeOrder(),current=scope.createSnoozeOrder();const handler=columns.get('gmSnoozeThreadOrder');old.close();
  assert.equal(columns.size,2);assert.equal(columns.get('gmSnoozeThreadOrder'),handler);current.close();assert.equal(columns.size,0);
 });
+
+test('an Inbox without returned reminders is scanned once until its view or return revision changes',()=>{
+ const columns=new Map(),timers=[],events=new Map();let notify,reads=0,threads=0;
+ const header={getStringProperty(){reads++;return ''}};
+ const thread={numChildren:1,getChildHdrAt:()=>header};
+ const service={orderRevision:0,subscribe(fn){notify=fn;return ()=>{}}};
+ const view={sortType:18,sortOrder:2,viewFlags:1,rowCount:100,getMsgHdrAt:()=>header,getThreadContainingMsgHdr(){threads++;return thread}};
+ const win={gFolder:{URI:'inbox',flags:1},gDBView:view,gViewWrapper:{sort(){assert.fail('no snooze return means native sorting stays intact')}},addEventListener:(name,fn)=>events.set(name,fn),removeEventListener(){},setInterval:fn=>{timers.push(fn);return 1},clearInterval(){}};
+ const scope=vm.createContext({ChromeUtils:{importESModule:()=>({ThreadPaneColumns:{getCustomColumns:()=>[],addCustomColumn:(id,column)=>columns.set(id,column),removeCustomColumn(){}}})},gmText:s=>s,Ci:{nsMsgFolderFlags:{Inbox:1},nsMsgViewSortType:{byDate:18},nsMsgViewFlagsType:{kThreadedDisplay:1}},thunderGSnooze:service});
+ vm.runInContext(fs.readFileSync('thunder-g/snooze-order.js','utf8'),scope);
+ const order=scope.createSnoozeOrder(),pane=order.attach(win);
+ assert.equal(threads,100);const initial=reads;
+ for(let i=0;i<30;i++)timers[0]();
+ assert.equal(reads,initial,'unchanged negative results avoid a full Inbox scan every two seconds');
+ service.orderRevision++;timers[0]();assert.equal(reads,initial*2,'late returned metadata is checked even at equal row count');
+ view.rowCount++;timers[0]();assert.equal(threads,301,'new native rows invalidate the scan');
+ notify();assert.equal(threads,402,'explicit service notifications force a fresh check');
+ events.get('folderURIChanged')();assert.equal(threads,503);
+ pane.close();order.close();
+});

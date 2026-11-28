@@ -873,6 +873,9 @@ test('participant summaries hide Thunderbird\'s bare sender text, keep the count
   scope.renderConversationParticipants({document:doc},row,messages,options);
   assert.equal(cell.querySelectorAll('.gm-native-thread-sender').length,1);assert.equal(cell.querySelectorAll('.gm-participants').length,1);
   assert.equal(cell.childNodes[0].textContent,'ncrooks@berkeley.edu');
+  assert.equal(cell.querySelector('.gm-participants'),list,'unchanged async updates retain participant nodes');
+  messages[1].isRead=true;scope.renderConversationParticipants({document:doc},row,messages,options);
+  assert.notEqual(cell.querySelector('.gm-participants'),list,'read changes update participant emphasis');
   // A recycled row showing a single message gets its plain native text back.
   scope.renderConversationParticipants({document:doc},row,[messages[0]],options);
   assert.equal(cell.childNodes[0].nodeType,3);assert.equal(cell.childNodes[0].textContent,'ncrooks@berkeley.edu');
@@ -1153,4 +1156,19 @@ test('row checkboxes ask the native selection per row instead of copying the who
  assert.deepEqual(asked,[4,4,5]);
  const fallback=scope.inboxRowSelection({},{selectedIndices:[5]});row.index=5;scope.syncInboxRowCheckbox(row,fallback);
  assert.equal(attrs.get('data-gm-selection-checked'),'true','views without a native selection keep the set');
+});
+
+test('participant parsing scales with distinct authors and bounded caches keep read state live',()=>{
+  let parses=0;
+  const options={addressCache:new Map(),parser:{parseDecodedHeader(value){parses++;return [{name:value,email:value+'@example.org'}]}}};
+  const messages=Array.from({length:1000},(_,i)=>({messageId:String(i),author:'Person'+i%4,dateInSeconds:i,isRead:true}));
+  scope.gmailConversationParticipants(messages,options);
+  assert.equal(parses,4);
+  messages[999].isRead=false;
+  const summary=scope.gmailConversationParticipants(messages,options);
+  assert.equal(parses,4);assert.equal(summary.items.at(-1).unread,true);
+  scope.gmailConversationParticipants(Array.from({length:1000},(_,i)=>({messageId:String(i),author:'New'+i})),options);
+  assert.ok(options.addressCache.size<=256,'cache cannot grow with mailbox size');
+  options.meLabel='myself';options.isMe=()=>true;
+  assert.equal(scope.gmailConversationParticipants([messages[0]],options).items[0].label,'myself','cached addresses do not cache identity or localization decisions');
 });

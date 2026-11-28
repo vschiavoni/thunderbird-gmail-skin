@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Avoid rebuilding the native folder thread view when an embedded message can clone the existing Inbox view.
+- Stop rescanning an unchanged Inbox every two seconds when no returned snooze reminder exists.
+- Preserve sender column widths when Thunderbird 161 stores column sizes as percentages.
+- Reduce repeated Inbox label work with indexed definitions and reuse unchanged chips and participant names.
+- Cache parsed participant addresses with a fixed size limit while keeping unread state live.
+- Reconcile newly discovered conversation messages with linear lookups while retaining existing viewers.
+
 ## 0.33.1
 
 - Extend compatibility to Thunderbird 161.x while preserving the Thunderbird 153.0 minimum.

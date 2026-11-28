@@ -33,6 +33,21 @@ function independentMessages(messages, anchor) {
   }
   return [...logical.values()].sort((a,b)=>(a.dateInSeconds || 0)-(b.dateInSeconds || 0));
 }
+// about:message clones a supplied view into its own command context. Without
+// one it opens and threads the entire folder again before loading this message.
+function independentDisplayMessage(frame,win,header) {
+  const uri=header.folder.getUriForMsg(header),wrapper=win.gViewWrapper;
+  let source=null;
+  try{
+    if(typeof wrapper?.clone==='function' && wrapper.dbView){
+      const index=wrapper.dbView.findIndexOfMsgHdr(header,false);
+      if(Number.isInteger(index) && index>=0 && index!==0xffffffff)source=wrapper;
+    }
+  }catch(_){/* Missing/deleted or cross-folder messages use the native fallback. */}
+  if(source)frame.displayMessage(uri,source);
+  else frame.displayMessage(uri);
+}
+
 function independentFolderThread(header) {
   const messages=[];
   try {
@@ -1031,7 +1046,7 @@ function installIndependentReader(win) {
             const listeners=browser.contentWindow.gMessageListeners,listener={onStartHeaders(){},onEndHeaders(){},onEndAttachments:renderAttachments};listeners.push(listener);
             attachmentListenerCleanup=()=>{const index=listeners.indexOf(listener);if(index>=0)listeners.splice(index,1);};
           }
-          browser.contentWindow.displayMessage(header.folder.getUriForMsg(header));
+          independentDisplayMessage(browser.contentWindow,win,header);
         }catch(_){release();revealSavedBody();error.hidden=false}
       },true);
       browser.addEventListener('MsgLoaded',()=>{
@@ -1245,7 +1260,8 @@ function installIndependentReader(win) {
   }
   function enrichConversation(headers,anchor,token,focusMessage) {
     const existing=new Map(currentHeaders.map(header=>[independentMessageKey(header),header]));
-    if(!currentHeaders.every(header=>headers.some(next=>independentMessageKey(next)===independentMessageKey(header)))){
+    const incoming=new Set(headers.map(independentMessageKey));
+    if(!currentHeaders.every(header=>incoming.has(independentMessageKey(header)))){
       render(headers,anchor,token,focusMessage);
       return;
     }
@@ -1454,7 +1470,7 @@ function installConversationCounts(win,mail=globalThis.MailServices,interfaces=t
     }
     return myAddresses.has(String(email || '').toLowerCase());
   }
-  const participantOptions={parser,isMe,get meLabel(){return gmText("me");}};
+  const participantOptions={parser,isMe,addressCache:new Map(),get meLabel(){return gmText("me");}};
   // Collapsed conversation rows only: an open thread lists each message itself.
   function conversationRow(view,row){
     return !(row.dataset.properties || '').split(' ').includes('dummy') &&

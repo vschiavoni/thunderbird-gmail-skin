@@ -31,7 +31,7 @@ function fixture() {
     removeSheetUsingURIString(uri,type){assert.deepEqual(sheets.pop(),[uri,type]);}},document:doc, customElements:{whenDefined:async()=>{},get:()=>ThreadRow}, gDBView:{getMsgHdrAt:()=>({getStringProperty:()=>keywords})}, addEventListener(){},removeEventListener(){}};
   const scope = require('./localization-context.cjs').createContext({Ci:{nsIDOMWindowUtils:{USER_SHEET:1}},window:win,MailServices:{tags:{getAllTags:()=>tags}},console});
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../thunder-g/label-navigation.js'),'utf8')+'\n'+menuCode+'\n'+code, scope);
-  return { scope, row, nativeSubject, tags, sheets, setKeywords(value){keywords=value;} };
+  return { scope, row, nativeSubject, tags, sheets, win, setKeywords(value){keywords=value;} };
 }
 
 test('existing tag keys select exact assignments; legacy labels work', () => {
@@ -88,4 +88,29 @@ test('chips preserve the selected background in both themes and provide readable
       assert.ok((values[0]+.05)/(values[1]+.05)>=4.5,`${color} theme ${i} text contrast`);
     }
   }
+});
+
+test('Inbox refills avoid scanning all label definitions and observe preference changes on refresh',async()=>{
+  const f=fixture();let reads=0,hidden='[]',visits=0;
+  const prefs={getStringPref(){reads++;return hidden}};
+  for(let i=0;i<2000;i++)f.tags.push({get key(){visits++;return `unused-${i}`},tag:'Unused',color:'#00aa00'});
+  f.setKeywords('institution project project unknown');
+  const controller=f.scope.installInlineLabels(f.win,f.scope.MailServices,prefs);
+  await Promise.resolve();
+  const chips=f.row.line.querySelector('.gm-inline-labels');
+  assert.deepEqual(chips.children.map(chip=>chip.textContent),['Project <A>','University'],'definition order and duplicate keys are preserved');
+  const before=visits;
+  for(let i=0;i<100;i++)f.row.fillRow();
+  assert.equal(visits,before,'refilling rows does not walk unrelated label definitions');
+  assert.equal(reads,1,'hidden-label preferences are read once per definition refresh');
+  controller.refresh();
+  assert.equal(f.row.line.querySelector('.gm-inline-labels'),chips,'unrelated preference notifications preserve unchanged chip nodes');
+  f.tags.at(-1).color='#ff0000';controller.refresh();
+  assert.equal(f.row.line.querySelector('.gm-inline-labels'),chips,'changing an unrelated label does not rebuild this row');
+  hidden='["project"]';controller.refresh();
+  assert.deepEqual(f.row.line.querySelector('.gm-inline-labels').children.map(chip=>chip.textContent),['University']);
+  f.win.gDBView.getMsgHdrAt=()=>({label:2,getStringProperty:()=>''});
+  f.tags.push({key:'$label2',tag:'Legacy',color:'#ff0000'});controller.refresh();
+  assert.equal(f.row.line.querySelector('.gm-inline-labels').children[0].textContent,'Legacy');
+  controller.close();
 });

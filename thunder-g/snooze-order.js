@@ -54,7 +54,13 @@ function createSnoozeOrder() {
             for(let child=0;child<thread.numChildren&&!returned;child++)returned=!!thread.getChildHdrAt(child).getStringProperty('thunderGSnoozeReturned');
           }
         }
-        if(!returned)return;
+        if(!returned){
+          // A negative result is stable too. Otherwise the two-second poll
+          // walks every Inbox thread forever when no reminder has returned.
+          lastView=view;lastSignature=currentSignature;
+          lastRevision=thunderGSnooze.orderRevision||0;lastFolder=folder?.URI;
+          return;
+        }
       }
       busy=true;
       try{

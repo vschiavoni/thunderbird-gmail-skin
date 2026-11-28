@@ -26,7 +26,7 @@ function gmailParticipantShortName(name,email) {
   if(name.includes(',')){const given=name.split(',').slice(1).join(',').trim().split(/\s+/)[0];if(given)return given;}
   return name.split(/\s+/)[0];
 }
-function gmailConversationParticipants(messages,{parser,isMe=()=>false,meLabel='me'}={}) {
+function gmailConversationParticipants(messages,{parser,isMe=()=>false,meLabel='me',addressCache=new Map()}={}) {
   const seen=new Map(),people=new Map();
   for(const message of messages || []){
     if(!message)continue;
@@ -39,7 +39,17 @@ function gmailConversationParticipants(messages,{parser,isMe=()=>false,meLabel='
   const ordered=[...seen.values()].sort((a,b)=>a.date-b.date);
   ordered.forEach((item,index)=>{
     let address=null;
-    try{address=parser?.parseDecodedHeader(item.message.mime2DecodedAuthor || item.message.author || '')?.[0] || null;}catch(_){}
+    const author=item.message.mime2DecodedAuthor || item.message.author || '';
+    address=addressCache.get(author);
+    if(address===undefined){
+      try{
+        const parsed=parser?.parseDecodedHeader(author)?.[0];
+        address=parsed?{name:parsed.name,email:parsed.email}:null;
+        // Cache strings only, never message headers or native address objects.
+        if(addressCache.size>=256)addressCache.delete(addressCache.keys().next().value);
+        addressCache.set(author,address);
+      }catch(_){address=null;}
+    }
     const email=String(address?.email || item.message.author || '').trim().toLowerCase();
     const person=people.get(email) || {email,name:address?.name?.trim() || '',me:isMe(email),unread:false,first:index,last:index};
     person.unread=person.unread || item.unread;person.last=index;
@@ -63,12 +73,15 @@ function clearConversationParticipants(row) {
   for(const wrapper of row.querySelectorAll?.('.gm-native-thread-sender') || [])wrapper.replaceWith(...wrapper.childNodes);
 }
 function renderConversationParticipants(win,row,messages,options={}) {
-  clearConversationParticipants(row);
   const cell=row.querySelector('.sendercol-column, .correspondentcol-column');
-  if(!cell || cell.querySelector('.gm-draft-sender-content'))return null;
+  if(!cell || cell.querySelector('.gm-draft-sender-content')){clearConversationParticipants(row);return null;}
   const summary=gmailConversationParticipants(messages,options);
   // A single message keeps Thunderbird's own sender text.
-  if(summary.count<2 || !summary.items.length)return null;
+  if(summary.count<2 || !summary.items.length){clearConversationParticipants(row);return null;}
+  const signature=JSON.stringify([summary.title,summary.items]);
+  const previous=cell.querySelector('.gm-participants');
+  if(previous && previous._gmSignature===signature)return summary;
+  clearConversationParticipants(row);
   const doc=win.document;
   // Native fillRow writes the sender as plain text straight into the cell
   // (cell.textContent), replacing any children on the next fill. Wrap that
@@ -79,7 +92,7 @@ function renderConversationParticipants(win,row,messages,options={}) {
     cell.insertBefore(wrapper,native[0]);wrapper.append(...native);
   }
   const list=doc.createElement('span');
-  list.className='gm-participants';list.title=summary.title;
+  list.className='gm-participants';list.title=summary.title;list._gmSignature=signature;
   summary.items.forEach((item,index)=>{
     if(item.gap){list.append(doc.createTextNode(' .. '));return;}
     if(index>0 && !summary.items[index-1].gap)list.append(doc.createTextNode(', '));
