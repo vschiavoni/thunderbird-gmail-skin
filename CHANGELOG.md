@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.34.0
+
+- Publish the conversation-opening, Inbox performance and Thunderbird 161 layout improvements as the 0.34 minor release. Runtime changes match 0.33.2.
+
 ## 0.33.2
 
 - Avoid rebuilding the native folder thread view when an embedded message can clone the existing Inbox view.
