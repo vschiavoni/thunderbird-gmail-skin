@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.33.2
+
 - Avoid rebuilding the native folder thread view when an embedded message can clone the existing Inbox view.
 - Stop rescanning an unchanged Inbox every two seconds when no returned snooze reminder exists.
 - Preserve sender column widths when Thunderbird 161 stores column sizes as percentages.
